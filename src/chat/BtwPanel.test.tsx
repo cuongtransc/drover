@@ -12,7 +12,7 @@ const put = (a: Partial<Aside>) =>
   useBtw.setState({ asides: { [KEY]: { question: "why that file?", phase: "asking", signal: { cancelled: false }, ...a } } });
 
 afterEach(() => {
-  useBtw.setState({ asides: {} });
+  useBtw.setState({ asides: {}, history: {} });
   vi.mocked(herdrCall).mockClear();
 });
 
@@ -41,6 +41,23 @@ describe("BtwPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(useBtw.getState().asides[KEY]).toBeUndefined();
     expect(herdrCall).not.toHaveBeenCalled();
+  });
+
+  it("keeps the earlier questions above the latest, folded, each with its answer", () => {
+    put({ phase: "done", answer: "Because of the parser." });
+    useBtw.setState({ history: { [KEY]: [
+      { question: "what changed?", phase: "done", answer: "Two files.", signal: { cancelled: false } },
+      { question: "which test?", phase: "failed", error: "No answer from /btw yet", signal: { cancelled: false } },
+    ] } });
+    render(<BtwPanel pane={pane} />);
+    const earlier = screen.getAllByRole("group");
+    expect(earlier.map((d) => d.querySelector("summary")?.textContent)).toEqual(["what changed?", "which test?"]);
+    expect(earlier[0].hasAttribute("open")).toBe(false);
+    expect(earlier[0].textContent).toContain("Two files.");
+    expect(earlier[1].textContent).toContain("No answer from /btw yet");
+    expect(screen.getByText("Because of the parser.").tagName).toBe("PRE");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(useBtw.getState().history[KEY]).toBeUndefined();
   });
 
   it("on a failed read, says so and offers the terminal, where the answer is", () => {

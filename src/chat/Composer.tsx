@@ -348,6 +348,16 @@ export function Composer({
       .finally(() => setSending(false));
   };
 
+  /** Puts `/btw ` before what is typed (once) and returns to the box, caret at the end. */
+  const startBtw = () => {
+    setText((cur) => (/^\s*\/btw\s/.test(cur) ? cur : `/btw ${cur.replace(/^\s+/, "")}`));
+    box.current?.focus();
+    requestAnimationFrame(() => {
+      const el = box.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    });
+  };
+
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {
     if (sending || asking) return;
@@ -381,6 +391,15 @@ export function Composer({
           </div>
         )}
         <div className="composer-keys">
+          {agent === "claude" && (
+            <button
+              className="keycap"
+              title="Ask on the side: Claude answers from the conversation without stopping or steering its turn, and the answer stays out of the transcript"
+              onClick={startBtw}
+            >
+              /btw
+            </button>
+          )}
           {KEYS.map((k) => (
             <button key={k.key} className="keycap" onClick={() => call("agent.send_keys", { target: pane.pane_id, keys: [k.key] }).catch(() => {})}>
               {k.label}

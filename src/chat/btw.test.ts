@@ -238,7 +238,7 @@ describe("runBtw", () => {
 });
 
 describe("useBtw", () => {
-  afterEach(() => useBtw.setState({ asides: {} }));
+  afterEach(() => useBtw.setState({ asides: {}, history: {} }));
   const pane = { machine_id: "local", session: "s", pane_id: "w1:p1" };
 
   it("holds the answer per pane", async () => {
@@ -247,6 +247,26 @@ describe("useBtw", () => {
     expect(useBtw.getState().asides["local/s/w1:p1"]).toMatchObject({ question: "what is my favourite colour?", phase: "asking" });
     await done;
     expect(useBtw.getState().asides["local/s/w1:p1"]).toMatchObject({ phase: "done", answer: expect.stringContaining("Teal") });
+  });
+
+  it("keeps earlier answers of the pane as a thread when a new question starts", async () => {
+    await useBtw.getState().ask(pane, "what is my favourite colour?", fakePane([ANSWERED]).call, fast);
+    const next = useBtw.getState().ask(pane, "why?", fakePane([ANSWERING]).call, { ...fast, openMs: 5000 });
+    expect(useBtw.getState().history["local/s/w1:p1"]).toEqual([
+      expect.objectContaining({ question: "what is my favourite colour?", phase: "done", answer: expect.stringContaining("Teal") }),
+    ]);
+    expect(useBtw.getState().asides["local/s/w1:p1"]).toMatchObject({ question: "why?", phase: "asking" });
+    await closeBtw(pane, vi.fn().mockResolvedValue({}));
+    await next;
+  });
+
+  it("closing drops the whole thread", async () => {
+    await useBtw.getState().ask(pane, "what is my favourite colour?", fakePane([ANSWERED]).call, fast);
+    await useBtw.getState().ask(pane, "what is my favourite colour?", fakePane([ANSWERED]).call, fast);
+    expect(useBtw.getState().history["local/s/w1:p1"]).toHaveLength(1);
+    await closeBtw(pane, vi.fn());
+    expect(useBtw.getState().history["local/s/w1:p1"]).toBeUndefined();
+    expect(useBtw.getState().asides["local/s/w1:p1"]).toBeUndefined();
   });
 
   it("keeps the error", async () => {

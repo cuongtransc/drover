@@ -140,7 +140,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
 | **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
-| **Side question** | A `/btw <question>` sent from a Claude pane's Composer: its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
+| **Side question** | A `/btw <question>` sent from a Claude pane's Composer (or started with its **/btw** key): its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer, earlier ones folded above it; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
 | **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane Tab) is off, and closing its Tab, Workspace or Session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |
