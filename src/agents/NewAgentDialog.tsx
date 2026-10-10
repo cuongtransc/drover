@@ -62,7 +62,7 @@ export function NewAgentDialog({
           <kbd aria-hidden="true">esc</kbd>
         </div>
         {stored === null && (
-          <PathInput machineId={machineId} label="Folder" autoFocus value={folder} placeholder="/path/to/project" onChange={setFolderValue} />
+          <PathInput machineId={machineId} label="Folder" autoFocus value={folder} placeholder="/path/to/repo" onChange={setFolderValue} />
         )}
         <div className="tab-name">
           <label htmlFor="new-tab-name">Tab name</label>

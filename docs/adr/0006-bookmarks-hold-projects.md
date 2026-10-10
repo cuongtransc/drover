@@ -1,6 +1,8 @@
 # 0006: Bookmarks hold projects, not Sessions
 
 > Status: Accepted · Date: 2026-10-08 · Changes the **Bookmark** of `CONTEXT.md`
+>
+> Wording, 2026-10-10: "project" here is the Workspace; `CONTEXT.md` now says Workspace and Workspace row ("project" is avoided). The decision is unchanged.
 
 ## Context
 

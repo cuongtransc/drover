@@ -137,9 +137,19 @@ dir = "src-tauri"
 run = "cargo test -- --ignored --test-threads=1"
 
 # Read-only, runs on pre-commit (.githooks/pre-commit).
+# Warns, never fails: words the glossaries list under _Avoid_ in living docs and UI strings
+# (specs/plans under docs/superpowers and the ADRs are history and left out).
+[tasks."lint:terms"]
+description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator)"
+run = """
+hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' | grep -v -F '.test.' \\
+  | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project' || true)
+if [ -n "$hits" ]; then echo "lint:terms (warning) — see CONTEXT.md:"; echo "$hits"; else echo "lint:terms: clean"; fi
+"""
+
 [tasks.ci]
-description = "The gate: format, typecheck, lint and test must pass"
-depends = ["fmt:check", "typecheck", "lint", "test"]
+description = "The gate: format, typecheck, lint and test must pass; term check warns"
+depends = ["fmt:check", "typecheck", "lint", "test", "lint:terms"]
 run = "echo 'ci passed'"
 
 # Regenerates src-tauri/icons from one square source image. Only needed when the

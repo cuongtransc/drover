@@ -2,7 +2,7 @@ import { tabRole } from "../agents/roles";
 import { paneKey } from "../lib/types";
 import type { AgentStatus, MachineView, PaneRef, PaneView, SessionView, WorkspaceView } from "../lib/types";
 
-/** The Agent Dashboard columns, in display order. */
+/** The Agent Board columns, in display order. */
 export type Bucket = "attention" | "working" | "done" | "idle";
 
 export const BUCKETS: { id: Bucket; label: string }[] = [

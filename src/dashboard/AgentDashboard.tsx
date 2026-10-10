@@ -130,11 +130,11 @@ export function AgentDashboard() {
   const openCard = (c: DashCard) => select(c.ref);
 
   return (
-    <section className="dashboard" role="dialog" aria-label="Agent Dashboard">
+    <section className="dashboard" role="dialog" aria-label="Agent Board">
       <header className="dash-head" data-tauri-drag-region>
         <span className="dash-title">Agents</span>
         <span className="dash-total">{filtering ? `${shown.length} of ${cards.length} shown` : `${cards.length} total`}</span>
-        <button className="icon-btn dash-close" aria-label="Close dashboard" onClick={() => setOpen(false)}>
+        <button className="icon-btn dash-close" aria-label="Close Agent Board" onClick={() => setOpen(false)}>
           <CloseIcon />
         </button>
       </header>

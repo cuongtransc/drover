@@ -151,7 +151,7 @@
   },
   {
    "group": "Sidebar",
-   "name": "Project row",
+   "name": "Workspace row",
    "selector": ".project-row",
    "at": [
     0,
@@ -382,7 +382,7 @@
     157,
     17
    ],
-   "what": "Under the Pane rows; ⌘E focuses it.",
+   "what": "Under the Pane rows; ⌘E shows and hides it.",
    "code": "src/files/FilesPanel.tsx",
    "rect": {
     "x": 249,
