@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { paneKey, type Located, type MachineView, type PaneView } from "../lib/types";
 import { useApp } from "../store/app";
 import { useLensSettings } from "../settings/lens";
-import { forkBlocked, forkSession, useForks, watchForkPrune } from "./forkSession";
+import { forkBlocked, forkFromMessage, forkSession, useForks, watchForkPrune } from "./forkSession";
+import { readDraft } from "../chat/drafts";
 
 const orig = { machine_id: "local", session: "default", pane_id: "w1:p1" };
 const claude = (status: PaneView["status"], extra: Partial<PaneView> = {}): PaneView =>
@@ -158,5 +159,80 @@ describe("watchForkPrune", () => {
     useApp.getState().upsertMachine(gone);
     expect(Object.keys(useForks.getState().forks)).toEqual(["local/default/w1:p1"]);
     stop();
+  });
+});
+
+describe("forkFromMessage", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 10, 9, 0));
+    localStorage.clear();
+    useForks.setState({ forks: {} });
+    useApp.setState({ machines: {}, order: [], selected: null, lensOverride: {}, starting: {} });
+    useApp.getState().upsertMachine(machine(null));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const message = { id: "u4", text: "try it with a smaller batch", ts: "2026-10-10T01:30:00.000Z" };
+  const deps = (over: { located?: Located; cut?: { id: string | null; path: string | null; cwd: string | null } } = {}) => {
+    const call = vi.fn(async (method: string, _params?: unknown) => {
+      if (method === "tab.create") return { root_pane: { pane_id: "w1:p9" } };
+      if (method === "agent.start") {
+        useApp.getState().upsertMachine(machine("claude"));
+        return {};
+      }
+      return {};
+    });
+    const locate = vi.fn(async () => over.located ?? located());
+    const cut = vi.fn(async () => over.cut ?? { id: "cut-1", path: "/h/.claude/projects/x/cut-1.jsonl", cwd: "/srv/app/sub" });
+    return { call, locate, cut };
+  };
+
+  it("cuts the transcript before the message and opens claude on the copy, with the message waiting in its Composer", async () => {
+    const d = deps();
+    await forkFromMessage(orig, ws, claude("idle"), message, d);
+    expect(d.cut).toHaveBeenCalledWith("/h/.claude/projects/x/sid-1.jsonl", "u4");
+    expect(d.call).toHaveBeenCalledWith("tab.create", { workspace_id: "w1", cwd: "/srv/app/sub", label: "fork", focus: false });
+    expect(d.call).toHaveBeenCalledWith("agent.start", expect.objectContaining({
+      kind: "claude", pane_id: "w1:p9", args: ["--resume", "cut-1", "--name", "Fork · Port Files panel"],
+    }));
+    const fork = { machine_id: "local", session: "default", pane_id: "w1:p9" };
+    expect(readDraft(paneKey(fork))).toBe("try it with a smaller batch");
+    expect(useApp.getState().selected).toEqual(fork);
+    expect(useApp.getState().lensOverride[paneKey(fork)]).toBe("chat");
+    expect(useForks.getState().forks[paneKey(fork)]).toEqual({ of: orig, from: "Port Files panel", at: Date.parse(message.ts), worktree: null });
+  });
+
+  it("works while the original is busy: the cut ends before a message, never inside a tool call", async () => {
+    const d = deps();
+    await forkFromMessage(orig, ws, claude("working"), message, d);
+    expect(d.call).toHaveBeenCalledWith("agent.start", expect.anything());
+  });
+
+  it("refuses the first message, which has nothing before it, without opening a tab", async () => {
+    const d = deps({ cut: { id: null, path: null, cwd: null } });
+    await expect(forkFromMessage(orig, ws, claude("idle"), message, d)).rejects.toThrow("Nothing comes before the first message to fork from");
+    expect(d.call).not.toHaveBeenCalledWith("tab.create", expect.anything());
+  });
+
+  it("refuses another agent, a wrapped Claude, and a transcript that is missing or a guess", async () => {
+    await expect(forkFromMessage(orig, ws, claude("idle", { agent: "pi" }), message, deps())).rejects.toThrow("Only Claude sessions can be forked");
+    await expect(forkFromMessage(orig, ws, claude("idle", { untracked: true }), message, deps())).rejects.toThrow("Herdr does not track this Claude session");
+    for (const over of [{ pending: true }, { ambiguous: true }]) {
+      const d = deps({ located: located(over) });
+      await expect(forkFromMessage(orig, ws, claude("idle"), message, d)).rejects.toThrow();
+      expect(d.cut).not.toHaveBeenCalled();
+    }
+  });
+
+  it("forgets the fork record when claude does not start", async () => {
+    const d = deps();
+    d.call.mockImplementation(async (method: string) => {
+      if (method === "tab.create") return { root_pane: { pane_id: "w1:p9" } };
+      if (method === "agent.start") throw { code: "herdr_error", message: "timed out" };
+      return {};
+    });
+    await expect(forkFromMessage(orig, ws, claude("idle"), message, d)).rejects.toBeTruthy();
+    expect(useForks.getState().forks).toEqual({});
   });
 });

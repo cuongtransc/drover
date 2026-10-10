@@ -4,7 +4,22 @@ vi.mock("../lib/ipc", () => ({ chatImage: vi.fn().mockResolvedValue(new Uint8Arr
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
 import { BackgroundContext } from "./backgroundTaskState";
+import { ChatForkContext } from "./forkContext";
 describe("ChatItemView", () => {
+  it("offers Fork from here on a message of the user's that has its transcript entry", () => {
+    const onFork = vi.fn();
+    const item = { kind: "user", id: "u4", text: "try again", ts: "2026-10-10T01:30:00.000Z" } as const;
+    render(<ChatForkContext.Provider value={onFork}><ChatItemView item={item} copy /></ChatForkContext.Provider>);
+    fireEvent.click(screen.getByRole("button", { name: "Fork from here" }));
+    expect(onFork).toHaveBeenCalledWith(item);
+  });
+  it("offers no fork without an entry id, or where forking is off", () => {
+    const { unmount } = render(<ChatForkContext.Provider value={vi.fn()}><ChatItemView item={{ kind: "user", text: "no id" }} copy /></ChatForkContext.Provider>);
+    expect(screen.queryByRole("button", { name: "Fork from here" })).toBeNull();
+    unmount();
+    render(<ChatItemView item={{ kind: "user", id: "u1", text: "no context" }} copy />);
+    expect(screen.queryByRole("button", { name: "Fork from here" })).toBeNull();
+  });
   it("renders markdown", () => {
     render(<ChatItemView item={{ kind: "assistant_text", markdown: "Hello **world**" }} />);
     expect(screen.getByText("world").tagName).toBe("STRONG");

@@ -306,6 +306,12 @@ export function findPane(machines: Record<string, MachineView>, ref: PaneRef): P
   return undefined;
 }
 
+/** The Workspace holding `ref`'s pane. */
+export function findWorkspace(machines: Record<string, MachineView>, ref: PaneRef): WorkspaceView | undefined {
+  const session = machines[ref.machine_id]?.sessions.find((s) => s.name === ref.session);
+  return session?.workspaces.find((ws) => ws.tabs.some((t) => t.panes.some((p) => p.pane_id === ref.pane_id)));
+}
+
 /** Claude started in the selected pane, shown on the Terminal with no lens chosen, while new agents
  *  open on the Terminal: stay on the Terminal the user is typing in until they switch. */
 function claudeStarted(s: Pick<AppState, "machines" | "selected" | "lens" | "lensOverride">, v: MachineView): boolean {

@@ -14,6 +14,16 @@ Right-click a Claude Pane row:
 
 The fork opens on the Chat lens with a banner saying where it came from, and **Back to original**.
 
+## From one of your messages
+
+Hover a message you sent in the Chat lens and click **Fork from here** (the branch icon). Herdr writes a copy of the
+transcript that ends just before that message, opens a new Tab running claude on it, and puts the message in its
+Composer: edit it and send to try that turn another way. The original is untouched.
+
+- Works while the original is busy: the copy ends before one of your messages, never inside a tool call.
+- Not on the first message: nothing comes before it.
+- The copy is a new session file next to the original's, so it is in `claude --resume`'s list too.
+
 ## What to expect
 
 - **Only from an idle or done pane.** A fork taken in the middle of a tool call runs that call again, so the menu

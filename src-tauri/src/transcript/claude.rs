@@ -137,6 +137,7 @@ fn user_item(text: &str, ts: &Option<String>) -> Option<ChatItem> {
         });
     }
     user_text(text).map(|text| ChatItem::User {
+        id: None,
         images: vec![],
         skills: vec![],
         ts: ts.clone(),
@@ -561,6 +562,7 @@ impl ClaudeParser {
                         _ => items.insert(
                             0,
                             ChatItem::User {
+                                id: None,
                                 ts: ts.clone(),
                                 text: String::new(),
                                 images: refs,
@@ -571,6 +573,13 @@ impl ClaudeParser {
                 }
             }
             _ => {}
+        }
+        if let Some(uuid) = v.get("uuid").and_then(Value::as_str) {
+            for item in &mut items {
+                if let ChatItem::User { id, .. } = item {
+                    *id = Some(uuid.to_string());
+                }
+            }
         }
         if items.is_empty() {
             ParserOutput::None
@@ -662,6 +671,17 @@ mod tests {
             other => panic!("{other:?}"),
         }
     }
+    #[test]
+    fn a_user_item_carries_its_line_uuid() {
+        let items = run(r#"{"type":"user","uuid":"u9","message":{"content":"hello"}}"#);
+        assert!(
+            matches!(&items[0], ChatItem::User { id: Some(id), text, .. } if id == "u9" && text == "hello")
+        );
+        let items = run(
+            r#"{"type":"user","uuid":"u8","message":{"content":[{"type":"text","text":"hi"}]}}"#,
+        );
+        assert!(matches!(&items[0], ChatItem::User { id: Some(id), .. } if id == "u8"));
+    }
     fn run(text: &str) -> Vec<ChatItem> {
         let mut p = ClaudeParser::default();
         let mut out = vec![];
@@ -681,6 +701,7 @@ mod tests {
             items,
             vec![
                 User {
+                    id: Some("u1".into()),
                     images: vec![],
                     skills: vec![],
                     ts: None,
@@ -716,6 +737,7 @@ mod tests {
                     is_error: true
                 },
                 User {
+                    id: None,
                     images: vec![],
                     skills: vec![],
                     ts: None,
@@ -734,6 +756,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,
@@ -744,6 +767,7 @@ mod tests {
         assert_eq!(
             more,
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,
@@ -757,6 +781,7 @@ mod tests {
         assert_eq!(
             run(&line),
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,
@@ -767,6 +792,7 @@ mod tests {
         assert_eq!(
             run(&bare),
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,
@@ -904,6 +930,7 @@ mod tests {
         assert_eq!(
             run(&typed),
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,
@@ -960,6 +987,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: Some("q1".into()),
                 ts: Some("2026-10-04T08:51:36.240Z".into()),
                 text: "ssh lên demo2 để check".into(),
                 skills: vec![],
@@ -974,6 +1002,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: Some("q1".into()),
                 ts: Some("2026-10-04T08:51:36.240Z".into()),
                 text: "[Image #1] look".into(),
                 skills: vec![],
@@ -1094,6 +1123,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: Some("u1".into()),
                 ts: None,
                 text: "look".into(),
                 skills: vec![],
@@ -1120,6 +1150,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: Some("u2".into()),
                 ts: None,
                 text: "".into(),
                 skills: vec![],
@@ -1138,6 +1169,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: None,
                 ts: None,
                 text: "x".into(),
                 images: vec![],
@@ -1153,6 +1185,7 @@ mod tests {
         assert_eq!(
             items,
             vec![User {
+                id: Some("u3".into()),
                 ts: None,
                 text: "plain".into(),
                 images: vec![],

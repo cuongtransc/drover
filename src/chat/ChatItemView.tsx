@@ -1,8 +1,9 @@
 import { memo, useContext, useState } from "react";
 import Markdown from "react-markdown";
 import type { ChatItem } from "../lib/types";
-import { BrainIcon, ChevronIcon } from "../ui/icons";
+import { BrainIcon, ChevronIcon, GitBranchIcon } from "../ui/icons";
 import { CopyButton } from "./CopyButton";
+import { ChatForkContext } from "./forkContext";
 import { mdComponents, rehypePlugins, remarkPlugins } from "./markdown";
 import { checklist, checklistSummary, type ChecklistRow } from "./checklist";
 import { BackgroundContext, taskBadge } from "./backgroundTaskState";
@@ -147,6 +148,7 @@ export const ChatItemView = memo(function ChatItemView({
   /** A tool call the live turn is still waiting on: spins at the end of its row. */
   running?: boolean;
 }) {
+  const fork = useContext(ChatForkContext);
   switch (item.kind) {
     case "user":
       return (
@@ -156,6 +158,17 @@ export const ChatItemView = memo(function ChatItemView({
             <div className="chat-user-line">
               <div className="chat-bubble">{item.text}</div>
               {copy && <CopyButton text={item.text} />}
+              {fork && item.id && (
+                <button
+                  type="button"
+                  className="chat-copy"
+                  aria-label="Fork from here"
+                  title="Fork from here: a new tab with the conversation before this message, the message waiting in its Composer"
+                  onClick={() => fork(item)}
+                >
+                  <GitBranchIcon />
+                </button>
+              )}
             </div>
           )}
           {!!item.skills?.length && <SkillChips chips={item.skills.map((s) => ({ name: s.name, path: s.path, status: "loaded" }))} />}

@@ -4,6 +4,7 @@ import type { Located, PaneRef, PaneView, WorkspaceView } from "../lib/types";
 import { findPane, useApp } from "../store/app";
 import { prunePaneKeys } from "./protect";
 import { launchAgent } from "./launchAgent";
+import { writeDraft } from "../chat/drafts";
 
 type Call = (method: string, params: unknown) => Promise<unknown>;
 
@@ -122,13 +123,21 @@ export async function forkSession(
     root_pane: { pane_id: string };
   };
   const fork = { machine_id: ref.machine_id, session: ref.session, pane_id: res.root_pane.pane_id };
-  const key = paneKey(fork);
   const title = pane.title.trim();
+  await openFork(call, fork, { of: ref, from: title || "a Claude session", at: now.getTime(), worktree: tree, path: where.path }, [
+    "--resume", session.value, "--fork-session", "--name", forkName(title), ...(tree ? ["--worktree", tree] : []),
+  ]);
+}
+
+const forkName = (title: string) => (title ? `Fork · ${title}` : "Fork");
+
+/** Records the fork, shows it on Chat and starts claude in it with `args`. */
+async function openFork(call: Call, fork: PaneRef, origin: ForkOrigin, args: string[]): Promise<void> {
+  const key = paneKey(fork);
   // Opens on Chat whatever new agents open on: its banner says what it is and leads back.
-  useForks.getState().add(key, { of: ref, from: title || "a Claude session", at: now.getTime(), worktree: tree, path: where.path });
+  useForks.getState().add(key, origin);
   useApp.getState().setLensOverride(key, "chat");
   useApp.getState().select(fork);
-  const args = ["--resume", session.value, "--fork-session", "--name", title ? `Fork · ${title}` : "Fork", ...(tree ? ["--worktree", tree] : [])];
   try {
     await launchAgent(call, fork, "claude", { name: "fork", args, timeoutMs: FORK_START_MS });
   } catch (e) {
@@ -136,4 +145,44 @@ export async function forkSession(
     useForks.getState().remove(key);
     throw e;
   }
+}
+
+/** What `chat_fork` wrote: the new session, or all null when nothing came before the message. */
+export interface ForkCut {
+  id: string | null;
+  path: string | null;
+  cwd: string | null;
+}
+
+/**
+ * Opens a tab beside `ref` running claude on a copy of its transcript cut just before
+ * `message`, with that message waiting in the new Composer to be edited and sent. The cut ends
+ * before a user message, never inside a tool call, so a busy original can be forked this way.
+ */
+export async function forkFromMessage(
+  ref: PaneRef,
+  ws: WorkspaceView,
+  pane: PaneView,
+  message: { id: string; text: string; ts?: string },
+  { call, locate, cut }: { call: Call; locate: (p: PaneRef) => Promise<Located>; cut: (path: string, entryId: string) => Promise<ForkCut> },
+): Promise<void> {
+  if (pane.agent !== "claude") throw new Error("Only Claude sessions can be forked");
+  if (pane.untracked) throw new Error("Herdr does not track this Claude session");
+  const where = await locate(ref);
+  if (where.pending) throw new Error("Nothing to fork yet: send it a first message");
+  if (where.ambiguous) throw new Error("Herdr is not sure which session this pane runs, so it cannot fork it");
+  const made = await cut(where.path, message.id);
+  if (!made.id) throw new Error("Nothing comes before the first message to fork from");
+
+  const cwd = made.cwd ?? pane.cwd;
+  const res = (await call("tab.create", { workspace_id: ws.workspace_id, ...(cwd ? { cwd } : {}), label: "fork", focus: false })) as {
+    root_pane: { pane_id: string };
+  };
+  const fork = { machine_id: ref.machine_id, session: ref.session, pane_id: res.root_pane.pane_id };
+  writeDraft(paneKey(fork), message.text);
+  const title = pane.title.trim();
+  const at = message.ts ? Date.parse(message.ts) : NaN;
+  await openFork(call, fork, { of: ref, from: title || "a Claude session", at: Number.isNaN(at) ? Date.now() : at, worktree: null }, [
+    "--resume", made.id, "--name", forkName(title),
+  ]);
 }

@@ -139,7 +139,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
-| **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
+| **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; **Fork from here** on a message of the user's in the Chat lens opens one on a copy of the Transcript cut just before it, the message waiting in its Composer. Its Chat lens says where it came from | `src/agents/forkSession.ts`, `src-tauri/src/transcript/fork.rs` |
 | **Side question** | A `/btw <question>` sent from a Claude pane's Composer: its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
 | **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane Tab) is off, and closing its Tab, Workspace or Session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |

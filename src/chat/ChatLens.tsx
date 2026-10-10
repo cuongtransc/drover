@@ -1,9 +1,9 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
-import { chatLocate, chatPage } from "../lib/ipc";
+import { chatFork, chatLocate, chatPage, herdrCall } from "../lib/ipc";
 import { paneKey, type AppError, type ChatEvent, type ChatItem, type Located, type PaneRef, type PaneView } from "../lib/types";
-import { useApp } from "../store/app";
+import { findPane, findWorkspace, useApp } from "../store/app";
 import { onOpenFailure, openChat, watchMachine } from "./chatSession";
 import { PromptPanel } from "./PromptPanel";
 import { pendingQuestions } from "./prompt/askedPreviews";
@@ -24,7 +24,9 @@ import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
 import { ArrowDownIcon, GitBranchIcon } from "../ui/icons";
 import { useLensSettings } from "../settings/lens";
-import { useForks } from "../agents/forkSession";
+import { forkFromMessage, useForks } from "../agents/forkSession";
+import { ChatForkContext } from "./forkContext";
+import { showToast } from "../ui/Toast";
 import { forgetTranscript, rememberedTranscript, rememberTranscript, TranscriptPicker } from "./TranscriptPicker";
 
 /** How long an open that has not answered yet may go without saying the transcript is loading. */
@@ -385,8 +387,29 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   }, [pendingJump, rows]);
 
   const err = openError ?? state.error;
+  // Fork from before one of the user's messages: Claude only, and only a session herdr tracks.
+  const forkable = view.agent === "claude" && !view.untracked;
+  const onFork = useMemo(
+    () =>
+      forkable
+        ? (item: Extract<ChatItem, { kind: "user" }>) => {
+            const machines = useApp.getState().machines;
+            const ws = findWorkspace(machines, pane);
+            if (!item.id || !ws) return;
+            const call = (m: string, p: unknown) => herdrCall(pane.machine_id, pane.session, m, p);
+            forkFromMessage(pane, ws, findPane(machines, pane) ?? view, { id: item.id, text: item.text, ts: item.ts }, {
+              call,
+              locate: chatLocate,
+              cut: (path, entryId) => chatFork(pane.machine_id, "claude", path, entryId),
+            }).catch((e) => showToast(`Fork failed: ${(e as { message?: string })?.message ?? String(e)}`));
+          }
+        : null,
+    [forkable, pane, view],
+  );
+
   return (
     <ChatPaneContext.Provider value={pane}>
+    <ChatForkContext.Provider value={onFork}>
     <ChatOpenContext.Provider value={opened}>
     <BackgroundContext.Provider value={background}>
     <div className="chat-lens" data-width={chatWidth}>
@@ -463,6 +486,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     </div>
     </BackgroundContext.Provider>
     </ChatOpenContext.Provider>
+    </ChatForkContext.Provider>
     </ChatPaneContext.Provider>
   );
 }

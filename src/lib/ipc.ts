@@ -106,6 +106,9 @@ export const chatOpen = (p: PaneRef, path: string | null, events: Channel<ChatEv
   invoke<Located>("chat_open", { machineId: p.machine_id, session: p.session, paneId: p.pane_id, path, events });
 export const chatLocate = (p: PaneRef) =>
   invoke<Located>("chat_locate", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
+/** Writes a copy of the Transcript at `path` cut just before `entryId` as a new session next to it. */
+export const chatFork = (machineId: string, agent: string, path: string, entryId: string) =>
+  invoke<{ id: string | null; path: string | null; cwd: string | null }>("chat_fork", { machineId, agent, path, entryId });
 export const completeCommands = (p: PaneRef) =>
   invoke<SlashCommand[]>("complete_commands", { machineId: p.machine_id, session: p.session, paneId: p.pane_id });
 /** Claude Code's own prompts for the Pane's folder (`~/.claude/history.jsonl` on its Machine), oldest first. */
