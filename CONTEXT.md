@@ -4,6 +4,14 @@ A desktop client for [herdr](https://github.com/herdrdev/herdr) that browses and
 
 ## Language
 
+**Herdr app**:
+This desktop client, shipped as `Herdr.app` (`Herdr Dev.app` from `mise run dev`); the repo is herdr-app.
+_Avoid_: Herdr, herdr (alone), the app's server
+
+**herdr**:
+The terminal multiplexer this app drives on each Machine, through its CLI and a Session's socket; its code is not in this repo.
+_Avoid_: Herdr (capitalised), the app, the backend
+
 **Machine**:
 A computer where herdr runs: either `local` or a remote one reached by an SSH target (an alias from `~/.ssh/config` or `user@host`).
 _Avoid_: host, PC, server, remote
@@ -182,4 +190,5 @@ _Avoid_: INPUT, Needs you, waiting, To do
 ## Flagged ambiguities
 
 - "space" (user's word) resolved: it is herdr's **Workspace**.
+- "Herdr" names both the **Herdr app** (its product name) and **herdr**: bare "herdr" is always **herdr**; the client is the **Herdr app**.
 - "session" means a herdr named **Session**, never an agent's conversation; that is a **Transcript**.
