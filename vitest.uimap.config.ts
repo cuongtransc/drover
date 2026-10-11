@@ -6,9 +6,7 @@ import browser from "./vitest.browser.config";
 // (mergeConfig would add to its include, not replace it).
 export default {
   ...browser,
-  // Pre-bundled up front: found mid-run, Vite re-optimizes and reloads the page, which loads a
-  // second React and fails the first run on a fresh checkout.
-  optimizeDeps: { include: ["@tauri-apps/plugin-dialog", "@tanstack/react-virtual", "@xterm/xterm", "@xterm/addon-fit"] },
+  // optimizeDeps comes from the browser config: every package the source imports, pre-bundled.
   test: {
     ...browser.test,
     include: ["src/docs/*.capture.tsx"],
