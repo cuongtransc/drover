@@ -67,14 +67,20 @@ run = "open $APP"
 [tasks."app:install"]
 description = "Build without LTO (profile.local) and install it into /Applications"
 depends = ["build:local"]
-run = ["rm -rf /Applications/Drover.app", "ditto $LOCAL_APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
+run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $LOCAL_APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 [tasks."app:install:release"]
 description = "Build the release bundle, as shipped, and install it into /Applications"
 depends = ["build"]
-run = ["rm -rf /Applications/Drover.app", "ditto $APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
+run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 # Ad-hoc signed builds get a new identity each time, so macOS asks again for every permission.
+# Before the first Drover install: Drover's identifier starts with empty folders. app:install
+# runs it while Drover has no state yet, so a reinstall never does.
+[tasks."app:migrate-id"]
+description = "One-time: copy the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders"
+run = "scripts/migrate-id.sh"
+
 [tasks."sign:setup"]
 description = "One-time: create the local signing identity app:install signs Drover.app with"
 run = "scripts/sign-setup.sh"
@@ -125,9 +131,14 @@ run = "cargo test"
 description = "Tests for the local signing scripts (macOS)"
 run = "scripts/sign.test.sh"
 
+# A throwaway HOME; never the real ~/Library.
+[tasks."test:migrate"]
+description = "Tests for the state migration script"
+run = "sh scripts/migrate-id.test.sh"
+
 [tasks.test]
 description = "Frontend, backend and signing script tests"
-depends = ["test:frontend", "test:backend", "test:sign"]
+depends = ["test:frontend", "test:backend", "test:sign", "test:migrate"]
 
 # Starts isolated `drover-test-*` sessions on the local herdr and always
 # stops and deletes them. The SSH test only runs when DROVER_SSH_TEST is set.
