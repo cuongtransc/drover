@@ -65,7 +65,7 @@ pub fn inotify_cmd(abs: &str, hidden: &HiddenFolders) -> String {
     let find_names = hidden.find_names();
     // The root stays on the command line (not in the list) so `ps` shows what is watched.
     format!(
-        "exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 & exec inotifywait -m -r -e close_write,create,delete,moved_to,moved_from,delete_self,move_self --format '%e|%w%f'{exclude} --fromfile - {q} 3<&- <<HERDR_WATCH\n$(find -H {q} -mindepth 1 \\( {find_names} \\) -prune -printf '@%p\\n' 2>/dev/null)\nHERDR_WATCH\n"
+        "exec 3<&0; (cat; kill $$) <&3 >/dev/null 2>&1 & exec inotifywait -m -r -e close_write,create,delete,moved_to,moved_from,delete_self,move_self --format '%e|%w%f'{exclude} --fromfile - {q} 3<&- <<DROVER_WATCH\n$(find -H {q} -mindepth 1 \\( {find_names} \\) -prune -printf '@%p\\n' 2>/dev/null)\nDROVER_WATCH\n"
     )
 }
 
@@ -265,7 +265,7 @@ mod tests {
         // Events inside a heavy folder below the root are dropped, the folder's own creation is not.
         assert!(cmd.contains(r"--exclude '^/r/p q/(.*/)?(\.git|node_modules|\.venv|venv|__pycache__|target|dist|build|\.next|\.worktrees)/'"), "{cmd}");
         // Heavy folders present now get no watches at all.
-        assert!(cmd.contains(" --fromfile - '/r/p q' 3<&- <<HERDR_WATCH\n$(find -H '/r/p q' -mindepth 1 \\( -name '.git' -o -name 'node_modules' -o -name '.venv' -o -name 'venv' -o -name '__pycache__' -o -name 'target' -o -name 'dist' -o -name 'build' -o -name '.next' -o -name '.worktrees' \\) -prune -printf '@%p\\n' 2>/dev/null)\nHERDR_WATCH\n"), "{cmd}");
+        assert!(cmd.contains(" --fromfile - '/r/p q' 3<&- <<DROVER_WATCH\n$(find -H '/r/p q' -mindepth 1 \\( -name '.git' -o -name 'node_modules' -o -name '.venv' -o -name 'venv' -o -name '__pycache__' -o -name 'target' -o -name 'dist' -o -name 'build' -o -name '.next' -o -name '.worktrees' \\) -prune -printf '@%p\\n' 2>/dev/null)\nDROVER_WATCH\n"), "{cmd}");
         assert!(inotify_cmd("/it's", &HiddenFolders::default()).contains(r"'/it'\''s'"));
     }
 

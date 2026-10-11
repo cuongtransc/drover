@@ -6,8 +6,8 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
-const FROM: &str = "herdrapp-test-rename-a";
-const TO: &str = "herdrapp-test-rename-b";
+const FROM: &str = "drover-test-rename-a";
+const TO: &str = "drover-test-rename-b";
 
 fn herdr(args: &[&str]) -> String {
     let out = Command::new("herdr")

@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const HERDR: &str = "/opt/homebrew/bin/herdr";
-const SESSION: &str = "herdrapp-test-attach";
+const SESSION: &str = "drover-test-attach";
 
 /// Stops and deletes the test session, even when the test fails.
 struct SessionGuard;
