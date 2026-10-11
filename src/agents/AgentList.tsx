@@ -222,7 +222,7 @@ function AgentCard({
     : [];
   const laneToggleText = lanes && (
     <>
-      {lanes.rows.length} lanes
+      {lanes.rows.length} {lanes.rows.length === 1 ? "lane" : "lanes"}
       <ChevronIcon className={"icon chev" + (lanes.open ? " open" : "")} />
     </>
   );

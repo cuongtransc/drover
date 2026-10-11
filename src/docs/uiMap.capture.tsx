@@ -29,13 +29,15 @@ const local: MachineView = {
   ],
 };
 const ssh: MachineView = { id: "lan", label: "build-server", kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [] };
+// Relative to the capture, so the Working line reads about 1m 23s whatever the day.
+const ago = (s: number) => new Date(Date.now() - s * 1000).toISOString();
 const chat: ChatItem[] = [
   { kind: "user", text: "Make the tab bar compact: I want more room for the content." },
-  { kind: "assistant_text", markdown: "Measuring the Header and the Open strip.", ts: "2026-10-10T01:00:00Z" },
-  { kind: "tool_call", id: "c1", name: "Bash", input_summary: "grep -n titlebar src/styles.css", input: { command: "grep" }, ts: "2026-10-10T01:00:02Z" },
+  { kind: "assistant_text", markdown: "Measuring the Header and the Open strip.", ts: ago(146) },
+  { kind: "tool_call", id: "c1", name: "Bash", input_summary: "grep -n titlebar src/styles.css", input: { command: "grep" }, ts: ago(144) },
   { kind: "tool_result", call_id: "c1", output: "80:  --titlebar: 46px;", is_error: false },
-  { kind: "assistant_text", markdown: "One **Top bar** of 46px instead of two bars: the content gains 33px.\n\n| Bar | Height |\n|---|---|\n| Before | 79px |\n| After | 46px |", ts: "2026-10-10T01:00:09Z" },
-  { kind: "user", text: "OK, go ahead", ts: "2026-10-10T01:01:00Z" },
+  { kind: "assistant_text", markdown: "One **Top bar** of 46px instead of two bars: the content gains 33px.\n\n| Bar | Height |\n|---|---|\n| Before | 79px |\n| After | 46px |", ts: ago(137) },
+  { kind: "user", text: "OK, go ahead", ts: ago(83) },
 ];
 
 vi.mock("@tauri-apps/api/core", async (orig) => ({
@@ -47,6 +49,8 @@ vi.mock("@tauri-apps/api/core", async (orig) => ({
       case "chat_locate": return { agent: "claude", path: "/h/s.jsonl", ambiguous: false, candidates: ["/h/s.jsonl"], pending: false };
       case "chat_git_status": return { folder: "herdr-app", path: "/Users/me/herdr-app", branch: "feat/compact-tabs", dirty: true, upstream: null, ahead: 0, behind: 0,
         staged: 0, modified: 2, untracked: 0, changed: 2, changes: [{ code: " M", path: "src/styles.css" }, { code: " M", path: "src/App.tsx" }] };
+      // The lane store names the orchestrator that owns lane-docs, so its row shows the Lane toggle.
+      case "lanes_list": return [{ lane_id: "docs", herdr_session: "ct", pane_id: "p2", owner: "ct/p1" }];
       case "herdr_call": return {};
       case "files_list_all": return { paths: ["src/App.tsx", "src/styles.css", "CONTEXT.md"], capped: false, refused: false };
       case "files_list_dir": return [{ name: "docs", kind: "dir" }, { name: "src", kind: "dir" }, { name: "CONTEXT.md", kind: "file" }, { name: "package.json", kind: "file" }];
