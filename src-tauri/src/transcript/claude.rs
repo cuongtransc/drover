@@ -818,6 +818,7 @@ mod tests {
         assert_eq!(
             run(&lines),
             vec![User {
+                id: None,
                 images: vec![],
                 skills: vec![],
                 ts: None,

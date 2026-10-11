@@ -601,6 +601,7 @@ mod tests {
             "{ev:?}"
         );
         let user = |t: &str| ChatItem::User {
+            id: None,
             ts: None,
             text: t.into(),
             images: vec![],
