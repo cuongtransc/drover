@@ -17,6 +17,7 @@ import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
 import { btwQuestion, useBtw } from "./btw";
+import { useComposerFill, useRewind } from "./rewind";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
 // Key names verified against herdr's key parser (pane.send_keys accepts esc, ctrl+c,
@@ -189,6 +190,9 @@ export function Composer({
   const [sending, setSending] = useState(false);
   // Claude's /btw panel takes the pane's keys until the Chat lens has read the answer and closed it.
   const asking = useBtw((s) => s.asides[key]?.phase === "asking");
+  // So does Claude's Rewind screen while an edit of the last message drives it.
+  const editing = useRewind((s) => !!s.edits[key] && s.edits[key].phase !== "failed");
+  const fill = useComposerFill((s) => s.fill[key]);
   // Read only while the box is empty (that is when the suggestion shows, and Tab takes it), and
   // not while a send is on its way: Claude's box would still show the old suggestion.
   const { suggestion, clear: clearSuggestion } = useClaudeSuggestion(pane, agent, status, text === "" && !sending);
@@ -302,7 +306,7 @@ export function Composer({
     });
 
   const uploading = images.some((a) => a.path === null);
-  const canSend = !uploading && !asking && (text.trim() !== "" || images.length > 0);
+  const canSend = !uploading && !asking && !editing && (text.trim() !== "" || images.length > 0);
 
   const submit = async (sent: string, paths: string[]) => {
     const target = pane.pane_id;
@@ -348,6 +352,21 @@ export function Composer({
       .finally(() => setSending(false));
   };
 
+  // The last message, taken back by an edit, ready to change; what was typed stays below it.
+  useEffect(() => {
+    if (fill === undefined) return;
+    setText((cur) => (cur.trim() ? `${fill}\n\n${cur}` : fill));
+    useComposerFill.setState((s) => {
+      const { [key]: _, ...rest } = s.fill;
+      return { fill: rest };
+    });
+    box.current?.focus();
+    requestAnimationFrame(() => {
+      const el = box.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    });
+  }, [fill, key]);
+
   /** Puts `/btw ` before what is typed (once) and returns to the box, caret at the end. */
   const startBtw = () => {
     setText((cur) => (/^\s*\/btw\s/.test(cur) ? cur : `/btw ${cur.replace(/^\s+/, "")}`));
@@ -360,7 +379,7 @@ export function Composer({
 
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {
-    if (sending || asking) return;
+    if (sending || asking || editing) return;
     clearSuggestion();
     setSending(true);
     call("agent.prompt", { target: pane.pane_id, text: reply })
@@ -555,7 +574,7 @@ export function Composer({
           >
             <StopIcon />
           </button>
-          <button className="send" aria-label="Send" title={asking ? "Wait for the /btw answer" : undefined} disabled={!canSend} onClick={send}>
+          <button className="send" aria-label="Send" title={asking ? "Wait for the /btw answer" : editing ? "Wait for the edit to finish" : undefined} disabled={!canSend} onClick={send}>
             <SendIcon />
           </button>
           {menuAt && (

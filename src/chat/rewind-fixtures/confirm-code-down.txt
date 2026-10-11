@@ -1,0 +1,39 @@
+
+
+❯ Remember the word BANANA. Reply with just OK.
+
+⏺ OK
+
+✻ Worked for 1s · done 1:36 AM
+
+❯ Remember APPLE. Reply OK.
+
+⏺ OK
+
+✻ Worked for 3s · done 1:36 AM
+
+❯ Use the Write tool to create the file note.txt containing the single word hello. Then reply DONE.
+
+  Made 1 scratchpad edit +1
+
+⏺ DONE
+
+✻ Crunched for 5s · done 1:36 AM
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Rewind
+
+   Confirm you want to restore to the point before you sent this message:
+
+   │ Use the Write tool to create the file note.txt containing the single word hello. Then reply DONE.
+   │ (7s ago)
+
+   The conversation will be forked.
+   The code will be unchanged.
+
+     1. Restore code and conversation
+   ❯ 2. Restore conversation
+     3. Restore code
+     4. Summarize from here
+   ↓ 5. Summarize up to here
+
+   ⚠ Rewinding does not affect files edited manually or via bash.

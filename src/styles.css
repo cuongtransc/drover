@@ -1244,6 +1244,9 @@ kbd {
 }
 .btw-error { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--err-fg); font-size: 13px; }
 .btw-error > span { flex: 1; min-width: 0; }
+.edit-choose { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; font-size: 13px; color: var(--fg); }
+.edit-choose p { margin: 0; }
+.edit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .chat-working {
   flex: none; display: flex; align-items: center; gap: 8px; width: 100%; max-width: var(--chat-max); margin: 0 auto;
   padding: 6px 28px 0; box-sizing: border-box; color: var(--fg-3); font-size: 12px;

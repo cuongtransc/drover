@@ -24,6 +24,7 @@ import { SUGGESTION_POLL_MS } from "./useClaudeSuggestion";
 import { useApp } from "../store/app";
 import { recordPrompt } from "./promptHistory";
 import { useBtw } from "./btw";
+import { useComposerFill, useRewind } from "./rewind";
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const png = () => new File([new Uint8Array([137, 80, 78, 71])], "image.png", { type: "image/png" });
 const sendButton = () => screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
@@ -83,6 +84,31 @@ describe("Composer", () => {
   it("has no /btw key for other agents", () => {
     render(<Composer pane={pane} agent="codex" />);
     expect(screen.queryByRole("button", { name: "/btw" })).toBeNull();
+  });
+
+  it("takes the message an edit hands back, ready to change and send", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    act(() => useComposerFill.setState({ fill: { "devtuf/default/w1:p1": "fix the bug in parser.rs" } }));
+    await waitFor(() => expect(box.value).toBe("fix the bug in parser.rs"));
+    expect(document.activeElement).toBe(box);
+    expect(useComposerFill.getState().fill["devtuf/default/w1:p1"]).toBeUndefined();
+  });
+
+  it("keeps what was typed below the message an edit hands back", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    fireEvent.change(box, { target: { value: "half a thought" } });
+    act(() => useComposerFill.setState({ fill: { "devtuf/default/w1:p1": "fix the bug" } }));
+    await waitFor(() => expect(box.value).toBe("fix the bug\n\nhalf a thought"));
+  });
+
+  it("holds sends while an edit drives Claude's Rewind screen", () => {
+    useRewind.setState({ edits: { "devtuf/default/w1:p1": { phase: "running" } } });
+    render(<Composer pane={pane} agent="claude" />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "next" } });
+    expect(sendButton().disabled).toBe(true);
+    useRewind.setState({ edits: {} });
   });
 
   it("leaves a /btw to other agents alone", async () => {
