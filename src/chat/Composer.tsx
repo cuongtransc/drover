@@ -152,7 +152,7 @@ export function Composer({
   );
   const historyScope = cwd ? `${pane.machine_id}:${cwd}` : key;
   // A Claude pane recalls Claude's own history for the folder, as its terminal does (prompts typed
-  // there and from before Herdr kept any), then what was sent here since it was read. Herdr's
+  // there and from before Drover kept any), then what was sent here since it was read. Drover's
   // store stands in for pi, and when Claude's history cannot be read or is empty.
   const [claudeHistory, setClaudeHistory] = useState<string[]>([]);
   const sentHere = useRef<string[]>([]);
@@ -172,7 +172,7 @@ export function Composer({
   const history = useMemo(
     () =>
       new HistoryCursor(() =>
-        // Herdr's store already holds what was sent here; Claude's file may not yet.
+        // Drover's store already holds what was sent here; Claude's file may not yet.
         claudeHistory.length > 0
           ? recallList(claudeHistory, sessionPrompts, sentHere.current)
           : recallList(readHistory(historyScope), sessionPrompts, []),

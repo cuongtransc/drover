@@ -16,7 +16,7 @@ close. Send is held while Claude answers, because Claude's own panel takes the k
 
 ## What happens underneath
 
-Claude draws the answer over its terminal, so Herdr reads it off the pane's screen, scrolls a long answer to its end,
+Claude draws the answer over its terminal, so Drover reads it off the pane's screen, scrolls a long answer to its end,
 then closes Claude's panel with Esc straight away: while that panel is open, Claude holds back the running turn's
 updates.
 
@@ -26,7 +26,7 @@ drops the whole thread. Claude itself also remembers earlier `/btw` exchanges wh
 ## Limits
 
 - The answer shows as Claude drew it: plain monospace text, no Markdown rendering.
-- It depends on how Claude's screen looks (checked against Claude Code 2.1.295). If Herdr cannot read the answer,
+- It depends on how Claude's screen looks (checked against Claude Code 2.1.295). If Drover cannot read the answer,
   the panel says so and offers **Open terminal**, where Claude's own panel still shows it.
 - A bare `/btw` only prints Claude's usage line.
 

@@ -361,7 +361,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         dispatch({ type: "prepend", items: pages.flat(), before: first });
       }
       if (found) setPendingJump(callId);
-      else setJumpNotice("Task call not found in the transcript: it started before the part Herdr can read.");
+      else setJumpNotice("Task call not found in the transcript: it started before the part Drover can read.");
     } catch (e) {
       setJumpNotice(`Could not load older messages: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
