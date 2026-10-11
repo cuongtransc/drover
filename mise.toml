@@ -1,4 +1,4 @@
-# Herdr — Tauri 2 (pnpm + cargo). `mise tasks` lists them, `mise run <task>` runs one.
+# Drover — Tauri 2 (pnpm + cargo). `mise tasks` lists them, `mise run <task>` runs one.
 min_version = "2026.9.0"
 
 [settings]
@@ -13,8 +13,8 @@ pnpm = "11"
 rust = "stable"
 
 [env]
-APP = "src-tauri/target/release/bundle/macos/Herdr.app"
-LOCAL_APP = "src-tauri/target/local/bundle/macos/Herdr.app"
+APP = "src-tauri/target/release/bundle/macos/Drover.app"
+LOCAL_APP = "src-tauri/target/local/bundle/macos/Drover.app"
 
 # Frontend dependencies install before any `mise run` when the lockfile changed.
 # By hand: `mise deps`.
@@ -42,19 +42,19 @@ echo 'next: mise run dev'
 """
 
 # Its own identifier (tauri.dev.conf.json): a separate data dir and ssh control sockets, so it
-# runs beside the installed Herdr.app without sharing machines or ending its ssh masters.
+# runs beside the installed Drover.app without sharing machines or ending its ssh masters.
 [tasks.dev]
 description = "Run the app with hot reload, apart from the installed app"
 run = "pnpm tauri dev --config src-tauri/tauri.dev.conf.json"
 
 [tasks.build]
-description = "Build the release bundle (Herdr.app)"
+description = "Build the release bundle (Drover.app)"
 run = "pnpm tauri build --bundles app"
 
 # The release build minus LTO (src-tauri/Cargo.toml [profile.local]): same behaviour, about 3x
 # faster to rebuild. For the bundle a release ships, use `build`.
 [tasks."build:local"]
-description = "Build the bundle without LTO (Herdr.app under target/local)"
+description = "Build the bundle without LTO (Drover.app under target/local)"
 run = "pnpm tauri build --bundles app -- --profile local"
 
 [tasks.start]
@@ -67,16 +67,16 @@ run = "open $APP"
 [tasks."app:install"]
 description = "Build without LTO (profile.local) and install it into /Applications"
 depends = ["build:local"]
-run = ["rm -rf /Applications/Herdr.app", "ditto $LOCAL_APP /Applications/Herdr.app", "scripts/sign-app.sh /Applications/Herdr.app"]
+run = ["rm -rf /Applications/Drover.app", "ditto $LOCAL_APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 [tasks."app:install:release"]
 description = "Build the release bundle, as shipped, and install it into /Applications"
 depends = ["build"]
-run = ["rm -rf /Applications/Herdr.app", "ditto $APP /Applications/Herdr.app", "scripts/sign-app.sh /Applications/Herdr.app"]
+run = ["rm -rf /Applications/Drover.app", "ditto $APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 # Ad-hoc signed builds get a new identity each time, so macOS asks again for every permission.
 [tasks."sign:setup"]
-description = "One-time: create the local signing identity app:install signs Herdr.app with"
+description = "One-time: create the local signing identity app:install signs Drover.app with"
 run = "scripts/sign-setup.sh"
 
 # Call it `mise run fmt`: bare `mise fmt` is mise's own mise.toml formatter.

@@ -393,13 +393,13 @@ fn socket_at_column(line: &str, col: usize) -> Option<&str> {
 /// [`use_runtime_dir_for`]); unset (tests) it is the installed app's.
 static RUNTIME_DIR_NAME: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
 
-/// `herdr-app-dev` for a dev build (identifier ending `.dev`, `mise run dev`), so its ssh
+/// `drover-dev` for a dev build (identifier ending `.dev`, `mise run dev`), so its ssh
 /// control sockets never meet the installed app's: quitting a dev build ends its masters.
 pub fn runtime_dir_name(identifier: &str) -> &'static str {
     if identifier.ends_with(".dev") {
-        "herdr-app-dev"
+        "drover-dev"
     } else {
-        "herdr-app"
+        "drover"
     }
 }
 
@@ -409,7 +409,7 @@ pub fn use_runtime_dir_for(identifier: &str) {
 }
 
 fn runtime_dir_path() -> PathBuf {
-    let name = RUNTIME_DIR_NAME.get().copied().unwrap_or("herdr-app");
+    let name = RUNTIME_DIR_NAME.get().copied().unwrap_or("drover");
     PathBuf::from(format!("/tmp/{name}-{}", unsafe { libc::getuid() }))
 }
 
@@ -454,7 +454,7 @@ fn secure_dir(dir: &std::path::Path) -> AppResult<()> {
     verify_private_dir(dir)
 }
 
-/// Create (mode 0700) and verify `/tmp/herdr-app-<uid>` (`herdr-app-dev-<uid>` for a dev build), holding ssh control sockets and
+/// Create (mode 0700) and verify `/tmp/drover-<uid>` (`drover-dev-<uid>` for a dev build), holding ssh control sockets and
 /// forwarded herdr sockets. Every caller must go through this; there is no unverified path.
 pub fn secure_runtime_dir() -> AppResult<PathBuf> {
     let dir = runtime_dir_path();
@@ -487,11 +487,8 @@ mod tests {
 
     #[test]
     fn a_dev_build_keeps_its_sockets_apart_from_the_installed_app() {
-        assert_eq!(runtime_dir_name("dev.cuongnb.herdrapp"), "herdr-app");
-        assert_eq!(
-            runtime_dir_name("dev.cuongnb.herdrapp.dev"),
-            "herdr-app-dev"
-        );
+        assert_eq!(runtime_dir_name("dev.cuongtransc.drover"), "drover");
+        assert_eq!(runtime_dir_name("dev.cuongtransc.drover.dev"), "drover-dev");
     }
 
     #[test]

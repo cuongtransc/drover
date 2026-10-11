@@ -1,9 +1,9 @@
 //! Needs a real herdr (`/opt/homebrew/bin/herdr`). Run with
 //! `cargo test --test attach_herdr -- --ignored --test-threads=1`.
-use herdr_app_lib::attach::{attach_argv, AttachEvent, AttachKey, AttachManager, Sink};
-use herdr_app_lib::herdr::rpc;
-use herdr_app_lib::transport::local::LocalTransport;
-use herdr_app_lib::transport::{parse_session_list, MachineInfo, Transport};
+use drover_lib::attach::{attach_argv, AttachEvent, AttachKey, AttachManager, Sink};
+use drover_lib::herdr::rpc;
+use drover_lib::transport::local::LocalTransport;
+use drover_lib::transport::{parse_session_list, MachineInfo, Transport};
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};

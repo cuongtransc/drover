@@ -1,8 +1,8 @@
 //! Needs Remote Login enabled and a real herdr. Run with
 //! `HERDR_APP_SSH_TEST=1 cargo test --test ssh_localhost -- --ignored --test-threads=1`.
-use herdr_app_lib::herdr::rpc;
-use herdr_app_lib::transport::ssh::{master_alive, master_argv, master_exit, SshTransport};
-use herdr_app_lib::transport::{exec, parse_session_list, probe_argv, Transport};
+use drover_lib::herdr::rpc;
+use drover_lib::transport::ssh::{master_alive, master_argv, master_exit, SshTransport};
+use drover_lib::transport::{exec, parse_session_list, probe_argv, Transport};
 use serde_json::json;
 use std::process::{Command, Stdio};
 use std::time::Duration;

@@ -1,7 +1,7 @@
 //! Needs a real herdr on PATH. Run with
 //! `cargo test --test session_rename_herdr -- --ignored --test-threads=1`.
-use herdr_app_lib::machines::MachineManager;
-use herdr_app_lib::transport::parse_session_list;
+use drover_lib::machines::MachineManager;
+use drover_lib::transport::parse_session_list;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
