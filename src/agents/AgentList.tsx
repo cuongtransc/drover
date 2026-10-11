@@ -215,7 +215,10 @@ function AgentCard({
                 const inTab = new Set(tab.panes.map((p) => paneKey({ machine_id: machineId, session, pane_id: p.pane_id })));
                 const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks).filter((p) => inTab.has(p.key));
                 const busy = busyIn(machineId, session, [{ ...ws, tabs: [tab] }], new Set(prot.map((p) => p.key)));
-                a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", call("tab.close", { tab_id: tab.tab_id }), prot, { busy });
+                const closeTab = call("tab.close", { tab_id: tab.tab_id });
+                // Asks only when closing ends work or a protected pane (ui-ux-guidelines §4.3).
+                if (prot.length === 0 && busy.length === 0) a.guard(closeTab);
+                else a.confirm("Close tab", `Close tab "${tab.label}" and all its panes?`, "Close", closeTab, prot, { busy });
               },
             },
       ]
@@ -360,7 +363,9 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           onSelect: () => {
             const prot = protectedIn(machineId, session, [ws], useProtect.getState().marks);
             const busy = busyIn(machineId, session, [ws], new Set(prot.map((p) => p.key)));
-            a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", call("workspace.close", { workspace_id: ws.workspace_id }), prot, { busy });
+            const closeWs = call("workspace.close", { workspace_id: ws.workspace_id });
+            if (prot.length === 0 && busy.length === 0) a.guard(closeWs);
+            else a.confirm("Close workspace", `Close workspace "${ws.label}" and all its panes?`, "Close", closeWs, prot, { busy });
           },
         },
       ]

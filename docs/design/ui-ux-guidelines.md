@@ -189,9 +189,9 @@ a bookmarked Workspace). **Never** bind bare letters, Ctrl-, Alt- or Esc at `win
 ### 4.3 Destructive actions
 
 One rule for closing a pane, a tab and a workspace: confirm when it can end a running process or
-an agent's work (blocked or working), otherwise act at once. A pane follows it (`busyWhy`: an
-agent working or blocked, a shell running a command; Cancel is the default); tabs and workspaces
-still always confirm.
+an agent's work (blocked or working), or a protected pane, otherwise act at once. Panes, tabs and
+workspaces all follow it (`busyWhy` / `busyIn`: an agent working or blocked, a shell running a
+command); the dialog names those panes and Cancel is the default. Stopping a Session always confirms.
 
 ### 4.4 Counts and pills
 

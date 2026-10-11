@@ -416,13 +416,25 @@ describe("AgentList", () => {
       expect(busyIn(screen.getByRole("dialog", { name: "Close tab" }))).toEqual(["Tag v1.4.0 · running a command"]);
     });
 
-    it("keeps the plain confirmation, Close first, when nothing runs", () => {
+    it("closes a workspace at once when nothing runs and nothing is protected", () => {
       render(<AgentList />);
       fireEvent.contextMenu(screen.getByText("checkout-api", { selector: ".ws-label" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "Close workspace" }));
-      const dialog = screen.getByRole("dialog", { name: "Close workspace" });
-      expect(busyIn(dialog)).toEqual([]);
-      expect(document.activeElement?.textContent).toBe("Close");
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(herdrCall).toHaveBeenCalledWith("local", "default", "workspace.close", { workspace_id: "w1" });
+    });
+
+    it("closes a tab of several panes at once when they are all idle", () => {
+      // Tag v1.4.0's shell is back at its prompt (herdr says not busy); Ship flag's pi is idle.
+      const idle: MachineView = { ...m, sessions: [{ ...m.sessions[0], workspaces: m.sessions[0].workspaces.map((w) =>
+        w.workspace_id !== "w2" ? w : { ...w, tabs: w.tabs.map((t) => ({ ...t, panes: t.panes.map((p) => (p.pane_id === "p3" ? { ...p, busy: false } : p)) })) }) }, m.sessions[1]] };
+      useApp.setState({ machines: { local: idle } });
+      usePaneFilter.setState({ filter: "all" });
+      render(<AgentList />);
+      fireEvent.contextMenu(screen.getByText("Ship flag"));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Close tab" }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(herdrCall).toHaveBeenCalledWith("local", "default", "tab.close", { tab_id: "w2:t2" });
     });
 
     it("names a protected pane once, among the protected", () => {
