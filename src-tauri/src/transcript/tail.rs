@@ -192,6 +192,14 @@ impl State {
                 *items = v;
                 self.events.push(Self::reset_event(&items));
             }
+            ParserOutput::Truncate { keep, items: v } => {
+                // A Reset replaces the whole list, so Appends not sent yet need not be.
+                self.appended.clear();
+                let mut items = self.items.lock().unwrap();
+                items.truncate(keep);
+                items.extend(v);
+                self.events.push(Self::reset_event(&items));
+            }
         }
     }
 
@@ -733,6 +741,56 @@ mod tests {
         assert!(matches!(ev.last().unwrap(), ChatEvent::Reset { items, .. } if items.len() == 1));
         drop(ev);
         drop(h);
+    }
+    #[test]
+    fn a_truncate_keeps_the_head_and_sends_one_reset() {
+        struct Cut;
+        impl Parser for Cut {
+            fn push_line(&mut self, line: &str, _: &mut dyn ImageSink) -> ParserOutput {
+                let user = |t: &str| ChatItem::User {
+                    ts: None,
+                    text: t.into(),
+                    images: vec![],
+                    skills: vec![],
+                };
+                if line == "CUT" {
+                    ParserOutput::Truncate {
+                        keep: 1,
+                        items: vec![user("x")],
+                    }
+                } else {
+                    ParserOutput::Append(vec![user(line)])
+                }
+            }
+        }
+        let text = |i: &ChatItem| match i {
+            ChatItem::User { text, .. } => text.clone(),
+            other => format!("{other:?}"),
+        };
+        let mut st = state(Box::new(Cut));
+        st.sent_first = true;
+        st.line("a");
+        st.line("b");
+        st.line("CUT");
+        assert_eq!(
+            st.items
+                .lock()
+                .unwrap()
+                .iter()
+                .map(text)
+                .collect::<Vec<_>>(),
+            ["a", "x"]
+        );
+        assert!(
+            st.appended.is_empty(),
+            "the Reset covers what was not sent yet"
+        );
+        match st.events.as_slice() {
+            [ChatEvent::Reset { items, total: 2 }] => {
+                assert_eq!(items.iter().map(text).collect::<Vec<_>>(), ["a", "x"])
+            }
+            other => panic!("{other:?}"),
+        }
     }
     #[tokio::test]
     async fn invalid_utf8_lines_do_not_stop_the_stream() {

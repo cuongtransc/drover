@@ -30,6 +30,14 @@ pub struct ClaudeParser {
     typed: Option<String>,
     /// The line being parsed showed `typed`.
     typed_now: bool,
+    /// Items shown so far: where the next line's items start.
+    shown: usize,
+    /// Where each of the user's messages starts, by its parent entry. A later message under the
+    /// same parent is the same one edited and sent again (Claude's rewind): the branch from the
+    /// earlier one on is left behind.
+    prompts: HashMap<String, usize>,
+    /// The `parentUuid` of the user line being parsed.
+    line_parent: Option<String>,
 }
 
 /// Most unfinished calls and ended task ids kept; the oldest are forgotten past it.
@@ -339,6 +347,12 @@ impl ClaudeParser {
             }
         };
         let kind = v.get("type").and_then(Value::as_str).unwrap_or("");
+        if kind == "user" {
+            self.line_parent = v
+                .get("parentUuid")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
         // /compact writes no assistant turn; the boundary carries what the context holds now.
         if let Some(n) = v
             .get("compactMetadata")
@@ -580,18 +594,43 @@ impl ClaudeParser {
     }
 }
 
+impl ClaudeParser {
+    /// `out` as the active branch shows it: a message of the user's sent again under the parent
+    /// of an earlier one drops that earlier one and everything after it.
+    fn follow_branch(&mut self, out: ParserOutput) -> ParserOutput {
+        let parent = self.line_parent.take();
+        let ParserOutput::Append(items) = out else {
+            return out;
+        };
+        let start = self.shown;
+        let words = items.iter().any(|i| matches!(i, ChatItem::User { .. }));
+        if let (true, Some(parent)) = (words, parent) {
+            if let Some(&old) = self.prompts.get(&parent) {
+                self.prompts.retain(|_, at| *at < old);
+                self.prompts.insert(parent, old);
+                self.shown = old + items.len();
+                return ParserOutput::Truncate { keep: old, items };
+            }
+            self.prompts.insert(parent, start);
+        }
+        self.shown += items.len();
+        ParserOutput::Append(items)
+    }
+}
+
 impl Parser for ClaudeParser {
     fn push_line(&mut self, line: &str, images: &mut dyn ImageSink) -> ParserOutput {
         let out = self.parse_line(line, images);
+        let out = self.follow_branch(out);
         let typed_now = std::mem::take(&mut self.typed_now);
-        if matches!(&out, ParserOutput::Append(items) if items.iter().any(|i| matches!(i, ChatItem::User { .. })))
+        if matches!(&out, ParserOutput::Append(items) | ParserOutput::Truncate { items, .. } if items.iter().any(|i| matches!(i, ChatItem::User { .. })))
             && !typed_now
         {
             self.typed = None;
         }
         // A queued message shown as the user's words has been read, whatever the queue
         // records said: it must not also wait in the queue.
-        if let ParserOutput::Append(items) = &out {
+        if let ParserOutput::Append(items) | ParserOutput::Truncate { items, .. } = &out {
             for item in items {
                 if let ChatItem::User { text, .. } = item {
                     self.leave_queue(text);
@@ -661,6 +700,85 @@ mod tests {
             },
             other => panic!("{other:?}"),
         }
+    }
+    /// What the Chat lens shows after `lines`, applying every kind of output as the tail does.
+    fn shown(lines: &[&str]) -> Vec<String> {
+        let mut p = ClaudeParser::default();
+        let mut items: Vec<ChatItem> = vec![];
+        for l in lines {
+            match p.push_line(l, &mut Vec::<(String, String, Vec<u8>)>::new()) {
+                ParserOutput::Append(v) => items.extend(v),
+                ParserOutput::Reset(v) => items = v,
+                ParserOutput::Truncate { keep, items: v } => {
+                    items.truncate(keep);
+                    items.extend(v);
+                }
+                ParserOutput::None => {}
+            }
+        }
+        items
+            .iter()
+            .map(|i| match i {
+                ChatItem::User { text, .. } => format!("U {text}"),
+                ChatItem::AssistantText { markdown, .. } => format!("A {markdown}"),
+                ChatItem::ToolCall { id, .. } => format!("T {id}"),
+                ChatItem::ToolResult { call_id, .. } => format!("R {call_id}"),
+                other => format!("{other:?}"),
+            })
+            .collect()
+    }
+    const U1: &str =
+        r#"{"type":"user","uuid":"u1","parentUuid":null,"message":{"content":"Remember APPLE"}}"#;
+    const A1: &str = r#"{"type":"assistant","uuid":"a1","parentUuid":"u1","message":{"content":[{"type":"text","text":"OK1"}]}}"#;
+    const U2: &str =
+        r#"{"type":"user","uuid":"u2","parentUuid":"a1","message":{"content":"Remember BANANA"}}"#;
+    const A2: &str = r#"{"type":"assistant","uuid":"a2","parentUuid":"u2","message":{"content":[{"type":"text","text":"OK2"}]}}"#;
+    #[test]
+    fn a_message_edited_and_sent_again_drops_the_abandoned_branch() {
+        // Claude's rewind (Esc Esc) writes the new message beside the old one, under the same parent.
+        let u3 = r#"{"type":"user","uuid":"u3","parentUuid":"a1","message":{"content":"Remember CHERRY instead"}}"#;
+        let a3 = r#"{"type":"assistant","uuid":"a3","parentUuid":"u3","message":{"content":[{"type":"text","text":"OK3"}]}}"#;
+        assert_eq!(
+            shown(&[U1, A1, U2, A2, u3, a3]),
+            [
+                "U Remember APPLE",
+                "A OK1",
+                "U Remember CHERRY instead",
+                "A OK3"
+            ]
+        );
+    }
+    #[test]
+    fn a_second_rewind_to_the_same_point_drops_the_branch_before_it() {
+        let u3 = r#"{"type":"user","uuid":"u3","parentUuid":"a1","message":{"content":"CHERRY"}}"#;
+        let a3 = r#"{"type":"assistant","uuid":"a3","parentUuid":"u3","message":{"content":[{"type":"text","text":"OK3"}]}}"#;
+        let u4 = r#"{"type":"user","uuid":"u4","parentUuid":"a1","message":{"content":"DATE"}}"#;
+        assert_eq!(
+            shown(&[U1, A1, U2, A2, u3, a3, u4]),
+            ["U Remember APPLE", "A OK1", "U DATE"]
+        );
+    }
+    #[test]
+    fn rewinding_to_the_first_message_starts_over() {
+        let u0 =
+            r#"{"type":"user","uuid":"u0","parentUuid":null,"message":{"content":"start again"}}"#;
+        // A first message has no parent to share: nothing is dropped.
+        assert_eq!(
+            shown(&[U1, A1, u0]),
+            ["U Remember APPLE", "A OK1", "U start again"]
+        );
+    }
+    #[test]
+    fn parallel_tool_results_under_one_parent_are_not_a_rewind() {
+        let a = r#"{"type":"assistant","uuid":"a","parentUuid":"u1","message":{"content":[{"type":"tool_use","id":"T1","name":"Bash","input":{"command":"ls"}}]}}"#;
+        let b = r#"{"type":"assistant","uuid":"b","parentUuid":"a","message":{"content":[{"type":"tool_use","id":"T2","name":"Bash","input":{"command":"pwd"}}]}}"#;
+        let r1 = r#"{"type":"user","uuid":"r1","parentUuid":"a","message":{"content":[{"type":"tool_result","tool_use_id":"T1","content":"x"}]}}"#;
+        let r2 = r#"{"type":"user","uuid":"r2","parentUuid":"b","message":{"content":[{"type":"tool_result","tool_use_id":"T2","content":"y"}]}}"#;
+        let r1b = r#"{"type":"user","uuid":"r1b","parentUuid":"a","message":{"content":[{"type":"tool_result","tool_use_id":"T9","content":"z"}]}}"#;
+        assert_eq!(
+            shown(&[U1, a, b, r1, r2, r1b]),
+            ["U Remember APPLE", "T T1", "T T2", "R T1", "R T2", "R T9"]
+        );
     }
     fn run(text: &str) -> Vec<ChatItem> {
         let mut p = ClaudeParser::default();
