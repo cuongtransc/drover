@@ -69,6 +69,22 @@ describe("Composer", () => {
     await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
   });
 
+  it("starts a side question from its /btw key, keeping what was typed", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    fireEvent.change(box, { target: { value: "why that file?" } });
+    fireEvent.click(screen.getByRole("button", { name: "/btw" }));
+    expect(box.value).toBe("/btw why that file?");
+    expect(document.activeElement).toBe(box);
+    fireEvent.click(screen.getByRole("button", { name: "/btw" }));
+    expect(box.value).toBe("/btw why that file?");
+  });
+
+  it("has no /btw key for other agents", () => {
+    render(<Composer pane={pane} agent="codex" />);
+    expect(screen.queryByRole("button", { name: "/btw" })).toBeNull();
+  });
+
   it("leaves a /btw to other agents alone", async () => {
     const ask = vi.fn().mockResolvedValue(undefined);
     useBtw.setState({ asides: {}, ask });

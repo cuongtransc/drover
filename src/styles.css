@@ -1233,8 +1233,13 @@ kbd {
 .btw-question { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 13px; }
 .btw-panel .chat-copy { opacity: 1; }
 .btw-status { padding: 10px 12px; color: var(--fg-2); font-size: 13px; }
+.btw-body { overflow: auto; min-height: 0; }
+.btw-earlier { border-bottom: 1px solid var(--line); }
+.btw-earlier > summary { padding: 6px 12px; color: var(--fg-2); font-size: 13px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btw-earlier > summary:hover { color: var(--fg); }
+.btw-earlier > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .btw-answer {
-  margin: 0; padding: 10px 12px; overflow: auto; min-height: 0; white-space: pre-wrap; overflow-wrap: anywhere;
+  margin: 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere;
   font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--fg); user-select: text; -webkit-user-select: text;
 }
 .btw-error { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--err-fg); font-size: 13px; }

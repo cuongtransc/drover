@@ -5,7 +5,7 @@ Code's own command: no interruption, and the question and answer stay out of the
 
 ## How
 
-In the Composer of a Claude pane, send:
+In the Composer of a Claude pane, click the **/btw** key beside Esc (it puts `/btw ` before what you typed), or send:
 
 ```
 /btw why did you pick that file?
@@ -18,7 +18,10 @@ close. Send is held while Claude answers, because Claude's own panel takes the k
 
 Claude draws the answer over its terminal, so Herdr reads it off the pane's screen, scrolls a long answer to its end,
 then closes Claude's panel with Esc straight away: while that panel is open, Claude holds back the running turn's
-updates. Only the latest `/btw` of a pane is kept.
+updates.
+
+Each pane keeps its questions as a thread while the app runs: earlier ones sit folded above the latest, and close
+drops the whole thread. Claude itself also remembers earlier `/btw` exchanges when answering the next one.
 
 ## Limits
 

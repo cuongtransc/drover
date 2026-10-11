@@ -174,17 +174,26 @@ export interface Aside {
 }
 
 interface BtwState {
+  /** The pane's latest question: while it is asking, Claude's panel holds the pane's keys. */
   asides: Record<string, Aside>;
+  /** The pane's earlier questions in this app run, oldest first: the thread above the latest. */
+  history: Record<string, Aside[]>;
   /** Follows the `/btw` just sent to `pane` until its answer is read or fails. */
   ask: (pane: PaneRef, question: string, call: Call, timing?: BtwTiming) => Promise<void>;
 }
 
 export const useBtw = create<BtwState>((set, get) => ({
   asides: {},
+  history: {},
   ask: async (pane, question, call, timing) => {
     const key = paneKey(pane);
     const signal: BtwSignal = { cancelled: false };
-    set((s) => ({ asides: { ...s.asides, [key]: { question, phase: "asking", signal } } }));
+    set((s) => {
+      const prev = s.asides[key];
+      // An answered or failed question joins the thread; one still asking is replaced.
+      const history = prev && prev.phase !== "asking" ? { ...s.history, [key]: [...(s.history[key] ?? []), prev] } : s.history;
+      return { asides: { ...s.asides, [key]: { question, phase: "asking", signal } }, history };
+    });
     const settle = (patch: Partial<Aside>) => {
       // a newer question, or a close, replaced this one
       if (get().asides[key]?.signal !== signal) return;
@@ -198,15 +207,16 @@ export const useBtw = create<BtwState>((set, get) => ({
   },
 }));
 
-/** Drops the pane's aside; one still answering is cancelled in Claude too. */
+/** Drops the pane's thread; a question still answering is cancelled in Claude too. */
 export async function closeBtw(pane: PaneRef, call: Call): Promise<void> {
   const key = paneKey(pane);
   const aside = useBtw.getState().asides[key];
-  if (!aside) return;
   useBtw.setState((s) => {
-    const { [key]: _, ...rest } = s.asides;
-    return { asides: rest };
+    const { [key]: _, ...asides } = s.asides;
+    const { [key]: _h, ...history } = s.history;
+    return { asides, history };
   });
+  if (!aside) return;
   if (aside.phase !== "asking") return;
   aside.signal.cancelled = true;
   if (aside.signal.opened && !aside.signal.closing) await call("pane.send_keys", { pane_id: pane.pane_id, keys: ["esc"] }).catch(() => {});
