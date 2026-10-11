@@ -1,10 +1,14 @@
-# herdr-app
+# Drover
 
 A desktop client for [herdr](https://github.com/herdrdev/herdr) that browses and drives agent panes on the local computer and on remote computers.
 
 Words shared with herdr, `cta` and the rest of the workstation (Session, Workspace, Claude session, Orchestrator, Lane, Lane brief, Decision brief, Agent Board…) are defined once in ct-workstation's `CONTEXT.md` ([map](https://g.devopsz.com/cocp/ct-workstation/src/branch/main/CONTEXT-MAP.md)); this file adds the app's own words and its screen.
 
 ## Language
+
+**Drover**:
+This desktop app (`Drover.app`; `Drover Dev.app` from `mise run dev`). Named Herdr before ADR 0007.
+_Avoid_: Herdr, herdr-app, the client
 
 **Machine**:
 A computer where herdr runs: either `local` or a remote one reached by an SSH target (an alias from `~/.ssh/config` or `user@host`).
@@ -185,4 +189,5 @@ _Avoid_: INPUT, Needs you, waiting, To do
 ## Flagged ambiguities
 
 - "space" (user's word) resolved: it is herdr's **Workspace**.
+- "Herdr" (capitalised) was this app's old name: in dated docs it means **Drover**; bare "herdr" is always the multiplexer.
 - "session" means a herdr named **Session**, never an agent's conversation; that is a **Transcript**.
