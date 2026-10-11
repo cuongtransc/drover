@@ -20,6 +20,8 @@ const QUIET: Duration = if cfg!(test) {
     Duration::from_secs(2)
 };
 const MAX_LINE: usize = 32 * 1024 * 1024;
+/// An open that takes this long to its first Reset is logged, with where the time went.
+const SLOW_OPEN: Duration = Duration::from_millis(500);
 
 pub type Sink = Arc<dyn Fn(ChatEvent) + Send + Sync>;
 
@@ -112,6 +114,11 @@ struct State {
     consumed: u64,
     /// When the last byte arrived; None until the first.
     last_byte: Option<Instant>,
+    /// For the slow-open log: the file, when the tail started, and the time spent parsing
+    /// the backlog.
+    path: String,
+    began: Instant,
+    parse_time: Duration,
     /// Dropped with the State, so any end of the parse thread (Eof, closed channel, panic,
     /// failed spawn) marks the tail done.
     _done: DoneOnDrop,
@@ -123,6 +130,20 @@ impl Drop for DoneOnDrop {
     fn drop(&mut self) {
         self.0.store(true, Ordering::Release);
     }
+}
+
+/// The log line for an open that took `took` to its first Reset, if that is slow.
+fn slow_open(took: Duration, parse: Duration, bytes: u64, items: usize) -> Option<String> {
+    if took < SLOW_OPEN {
+        return None;
+    }
+    let ms = |d: Duration| d.as_millis();
+    Some(format!(
+        "{} ms to the first Reset: {bytes} bytes, {items} items, {} ms parsing, {} ms reading",
+        ms(took),
+        ms(parse),
+        ms(took.saturating_sub(parse))
+    ))
 }
 
 /// The header line is `wc -c` output: the size, maybe space-padded.
@@ -141,7 +162,11 @@ impl State {
     fn line(&mut self, line: &str) {
         // Parse into a local list so the store is locked only to put, never during a parse.
         let mut found: Vec<(String, String, Vec<u8>)> = Vec::new();
+        let began = Instant::now();
         let out = self.parser.push_line(line, &mut found);
+        if !self.sent_first {
+            self.parse_time += began.elapsed();
+        }
         if !found.is_empty() {
             let mut images = self.images.lock().unwrap();
             for (r, media_type, bytes) in found {
@@ -180,6 +205,13 @@ impl State {
                 return;
             }
             let ev = Self::reset_event(&self.items.lock().unwrap());
+            if let ChatEvent::Reset { total, .. } = &ev {
+                let bytes = self.size.unwrap_or(self.consumed);
+                if let Some(line) = slow_open(self.began.elapsed(), self.parse_time, bytes, *total)
+                {
+                    tracing::warn!("chat open slow: {}: {line}", self.path);
+                }
+            }
             self.events.clear();
             self.appended.clear();
             self.sent_first = true;
@@ -260,6 +292,9 @@ pub fn spawn_tail(
         size: None,
         consumed: 0,
         last_byte: None,
+        path: path.clone(),
+        began: Instant::now(),
+        parse_time: Duration::ZERO,
         _done: DoneOnDrop(done.clone()),
     };
     let link = state.link.clone();
@@ -341,7 +376,9 @@ async fn read(
 ) {
     // The remote command ends (and kills tail) when its stdin reaches EOF, i.e. when the
     // handle drops: closing stdin is the only reliable cleanup over ssh without a tty.
-    let script = r#"wc -c < "$1" 2>/dev/null || echo 0; tail -c +1 -F "$1" & p=$!; cat >/dev/null; kill $p 2>/dev/null"#;
+    // The backlog comes from `head`, then `tail` follows from the byte after it: macOS's
+    // `tail -c +1` reads ~28 MB/s, which made a 50 MB transcript take 1.8 s to open.
+    let script = r#"s=$(wc -c < "$1" 2>/dev/null) || s=0; s=$((s + 0)); echo "$s"; head -c "$s" "$1" 2>/dev/null; tail -c +$((s + 1)) -F "$1" & p=$!; cat >/dev/null; kill $p 2>/dev/null"#;
     let argv = t.wrap(
         &["sh".into(), "-c".into(), script.into(), "sh".into(), path],
         false,
@@ -476,6 +513,102 @@ mod tests {
             images.put("r".into(), "image/png".into(), vec![1]);
             ParserOutput::None
         }
+    }
+
+    #[test]
+    fn a_slow_open_is_logged_with_where_the_time_went() {
+        let ms = Duration::from_millis;
+        assert_eq!(slow_open(ms(499), ms(100), 1_000, 10), None);
+        assert_eq!(
+            slow_open(ms(1931), ms(101), 50_910_806, 7985).as_deref(),
+            Some("1931 ms to the first Reset: 50910806 bytes, 7985 items, 101 ms parsing, 1830 ms reading")
+        );
+    }
+
+    /// Runs the command with a `tail` shim first on PATH that records its arguments.
+    struct ShimTail(std::path::PathBuf);
+    #[async_trait::async_trait]
+    impl Transport for ShimTail {
+        fn wrap(&self, argv: &[String], _: bool) -> Vec<String> {
+            let path = format!(
+                "PATH={}:{}",
+                self.0.display(),
+                std::env::var("PATH").unwrap_or_default()
+            );
+            [vec!["env".to_string(), path], argv.to_vec()].concat()
+        }
+        async fn local_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<std::path::PathBuf> {
+            unreachable!()
+        }
+        async fn release_socket(
+            &self,
+            _: &crate::transport::SessionEntry,
+        ) -> crate::error::AppResult<()> {
+            unreachable!()
+        }
+    }
+
+    // macOS's `tail -c +1` reads ~28 MB/s, so a 50 MB transcript took 1.8 s to open: the
+    // backlog is read by something else, and `tail` only follows what comes after it.
+    #[tokio::test]
+    async fn tail_reads_none_of_the_backlog() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        std::fs::write(&p, "a\nb\n").unwrap();
+        let shim = d.path().join("tail");
+        let log = d.path().join("tail.args");
+        let real = ["/usr/bin/tail", "/bin/tail"]
+            .into_iter()
+            .find(|t| std::path::Path::new(t).exists())
+            .unwrap();
+        std::fs::write(
+            &shim,
+            format!(
+                "#!/bin/sh\necho \"$@\" > '{}'\nexec {real} \"$@\"\n",
+                log.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&shim, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let got: Arc<Mutex<Vec<ChatEvent>>> = Arc::default();
+        let g = got.clone();
+        let _h = spawn_tail(
+            Arc::new(ShimTail(d.path().to_path_buf())),
+            p.to_string_lossy().into(),
+            Box::new(Lines),
+            Arc::new(move |e| g.lock().unwrap().push(e)),
+        );
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        use std::io::Write;
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&p)
+            .unwrap()
+            .write_all(b"c\n")
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        let args = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(args.trim(), format!("-c +5 -F {}", p.display()));
+        let ev = got.lock().unwrap();
+        assert!(
+            matches!(&ev[0], ChatEvent::Reset { total: 2, .. }),
+            "{ev:?}"
+        );
+        let user = |t: &str| ChatItem::User {
+            ts: None,
+            text: t.into(),
+            images: vec![],
+            skills: vec![],
+        };
+        assert!(
+            ev.iter()
+                .any(|e| matches!(e, ChatEvent::Append { items } if items == &vec![user("c")])),
+            "{ev:?}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -787,6 +920,9 @@ mod tests {
             size: None,
             consumed: 0,
             last_byte: None,
+            path: String::new(),
+            began: Instant::now(),
+            parse_time: Duration::ZERO,
             _done: DoneOnDrop(Arc::default()),
         }
     }
