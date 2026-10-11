@@ -151,10 +151,10 @@ run = "cargo test -- --ignored --test-threads=1"
 # Warns, never fails: words the glossaries list under _Avoid_ in living docs and UI strings
 # (specs/plans under docs/superpowers and the ADRs are history and left out).
 [tasks."lint:terms"]
-description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator)"
+description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator, Herdr)"
 run = """
-hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' | grep -v -F '.test.' \\
-  | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project' || true)
+hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' -e '^CONTEXT.md$' | grep -v -F '.test.' \\
+  | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project|\\bHerdr\\b' | grep -v 'named Herdr' || true)
 if [ -n "$hits" ]; then echo "lint:terms (warning) — see CONTEXT.md:"; echo "$hits"; else echo "lint:terms: clean"; fi
 """
 

@@ -1,5 +1,5 @@
 {
- "captured": "2026-10-11",
+ "captured": "2026-10-12",
  "width": 1440,
  "height": 900,
  "parts": [
@@ -660,13 +660,13 @@
    "what": "Esc, Ctrl+C, ⇧Tab sent to the agent as keys.",
    "code": ".composer-keys in Composer",
    "rect": {
-    "x": 1231.375,
+    "x": 1183.359375,
     "y": 761,
-    "w": 157.625,
+    "w": 205.640625,
     "h": 24
    },
    "badge": {
-    "x": 1215.375,
+    "x": 1167.359375,
     "y": 773
    }
   },
