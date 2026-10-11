@@ -2,6 +2,8 @@
 
 A desktop client for [herdr](https://github.com/herdrdev/herdr) that browses and drives agent panes on the local computer and on remote computers.
 
+Words shared with herdr, `cta` and the rest of the workstation (Session, Workspace, Claude session, Orchestrator, Lane, Lane brief, Decision brief, Agent Board…) are defined once in ct-workstation's `CONTEXT.md` ([map](https://g.devopsz.com/cocp/ct-workstation/src/branch/main/CONTEXT-MAP.md)); this file adds the app's own words and its screen.
+
 ## Language
 
 **Machine**:
@@ -13,8 +15,8 @@ A named persistent herdr session on a Machine; it owns exactly one herdr socket 
 _Avoid_: server, instance
 
 **Workspace**:
-A group of Tabs inside a Session: one repo, task or investigation, as herdr means it. The sidebar lists a Session's Workspaces with agent work under it as its projects; in the code it stays a Workspace.
-_Avoid_: space
+A group of Tabs inside a Session: one repo, task or investigation, as herdr means it. The sidebar lists a Session's Workspaces with agent work under it as Workspace rows.
+_Avoid_: space, project
 
 **Workspace folder**:
 The folder the app remembers for a Workspace; Agents started from the app's UI run in a new Tab there. herdr itself does not know it.
@@ -25,7 +27,7 @@ A named, nestable set of Sessions the user arranges in the sidebar; it can hold 
 _Avoid_: folder, project
 
 **Bookmark**:
-A project (a Workspace, by its Session and its label) the user pinned to the top of the sidebar, so
+A Workspace (by its Session and its label) the user pinned to the top of the sidebar, so
 it is one click away however deep its Session sits, folded or filtered out (ADR 0006). It outlives
 its Workspace: closed, it waits under the same name. Before ADR 0006 a Bookmark was a Session.
 _Avoid_: favourite, pin
@@ -129,7 +131,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Sidebar** | The left column: Bookmarks, Sessions, Machines | `src/sidebar/Sidebar.tsx` |
 | **Layout controls** / **Board button** | Beside the traffic lights: ⌘B / ⇧⌘B, and the Agent Board with its count | `src/main/LayoutControls.tsx`, `.board-btn` |
 | **Session row** | A Session in the Sidebar | `SessionRow` |
-| **Project row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
+| **Workspace row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
 | **Sessions filter** | All \| Active on the Sessions header | `useSessionFilter` (`src/sidebar/activeFilter.ts`) |
 | **Fold line** | "N hidden · idle or stopped" with Show, under what the Active filter keeps | `.filter-hidden` in `GroupTree` |
 | **Agents column** | The middle column, headed by the Session name and PANES (its rows are Panes: agents and shells) | `src/agents/AgentList.tsx` |

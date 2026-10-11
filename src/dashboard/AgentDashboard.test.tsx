@@ -116,7 +116,7 @@ describe("AgentDashboard", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(useApp.getState().dashboardOpen).toBe(false);
     act(() => useApp.setState({ dashboardOpen: true }));
-    fireEvent.click(screen.getByRole("button", { name: /close dashboard/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close agent board/i }));
     expect(useApp.getState().dashboardOpen).toBe(false);
   });
 

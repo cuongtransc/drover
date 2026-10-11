@@ -1473,7 +1473,7 @@ button.composer-model:disabled { cursor: default; }
 @keyframes pop-in { from { opacity: 0; transform: scale(0.97); } }
 @keyframes slide-in { from { opacity: 0; transform: translateX(16px); } }
 
-/* ---------- Agent Dashboard ---------- */
+/* ---------- Agent Board ---------- */
 /* Covers the Agents column and the main area; the sidebar stays usable and the panes underneath
    stay mounted. */
 .dashboard {

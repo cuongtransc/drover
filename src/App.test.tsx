@@ -77,13 +77,14 @@ describe("App shell", () => {
     expect(board.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(board);
     expect(board.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("dialog", { name: "Agent Dashboard" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Agent Board" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close Agent Board" })).toBeTruthy();
     expect(screen.getByText("Select a pane")).toBeTruthy();
-    // ⌘K searches the dashboard instead of opening the palette.
+    // ⌘K searches the Agent Board instead of opening the palette.
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(screen.queryByRole("dialog", { name: "Command palette" })).toBeNull();
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Agent Dashboard" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Agent Board" })).toBeNull();
   });
 
   it("⌘+ and ⌘− size the open terminal's font, and leave the page alone without a pane", () => {
@@ -308,9 +309,9 @@ describe("App shell", () => {
       render(<App />);
       expect(screen.getByRole("button", { name: "Board, 1 needs you (⇧⌘D)" })).toBeTruthy();
       fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
-      expect(screen.getByRole("dialog", { name: "Agent Dashboard" })).toBeTruthy();
+      expect(screen.getByRole("dialog", { name: "Agent Board" })).toBeTruthy();
       fireEvent.keyDown(window, { key: "D", metaKey: true, shiftKey: true });
-      expect(screen.queryByRole("dialog", { name: "Agent Dashboard" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Agent Board" })).toBeNull();
       (invoke as any).mockImplementation(() => Promise.resolve([]));
     });
     it("drops its word when the sidebar is hidden, keeping the count and its name", () => {

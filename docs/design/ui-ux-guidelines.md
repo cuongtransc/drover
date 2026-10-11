@@ -172,7 +172,7 @@ blocked rows.
 | ⇧⌘D (proposed, §7.2) | Open the Agent Board |
 
 Reserved for later, in this order: ⌘N (new…), ⌘W (close pane, with confirmation), ⌘1–⌘9 (jump to
-a bookmarked project). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:
+a bookmarked Workspace). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:
 `keyHandler.ts` forwards everything but ⌘ chords to the terminal, and that contract stays. A new
 ⌘ shortcut is also gated while the palette or a dialog is open.
 
@@ -276,7 +276,7 @@ copy of §7.1–§7.3; a Design-canvas `.dc.html`, sample data; screenshots are 
 
 ### 7.2 The Agent Board entry
 
-The bordered, tinted "Agent Dashboard" strip above SESSIONS is read as the list's title, and nobody
+The old bordered, tinted strip above SESSIONS that opened the Board is read as the list's title, and nobody
 expects it to open a Kanban view. It goes. In its place:
 
 - a labelled **Board** button with a columns (Kanban) icon in the titlebar control cluster, next to
@@ -300,20 +300,20 @@ trail after the last (possibly nested) Group with no header, reading as its chil
   fill means selection. A 1px `--line` and 12px separate sections. A section's controls sit at the
   header's right end, well apart from its chevron: SESSIONS' `Active N` toggle (it never hides
   a Bookmark) and MACHINES' `+`, which centres over the machines' status dots.
-- **Bookmarks are shortcuts to projects, not a container** (ADR 0006). Their rows sit under the
+- **Bookmarks are shortcuts to Workspaces, not a container** (ADR 0006). Their rows sit under the
   section header like any section's rows, without a guide line or fold chevron, and keep the user's
-  order: the project's status dot in the slot, its name, its Session muted after it, then Blocked /
+  order: the Workspace's status dot in the slot, its name, its Session muted after it, then Blocked /
   Review or its lanes. A click opens the pane behind it. Active never hides one; one whose Workspace
-  is gone stays, muted, saying `closed`. A project row's menu bookmarks it.
+  is gone stays, muted, saying `closed`. A Workspace row's menu bookmarks it.
 - **Two columns, one step.** Every row's first glyph sits in a 16px slot at x=16, centred in it: a
-  fold chevron, a Bookmark's project dot, a machine icon, a quota tile, or nothing for a Session with
-  no projects. Every name starts at x=40 (a Group's after its folder, at 64). A child level steps
+  fold chevron, a Bookmark's Workspace dot, a machine icon, a quota tile, or nothing for a Session with
+  no Workspaces. Every name starts at x=40 (a Group's after its folder, at 64). A child level steps
   24, so its slot sits under its parent's first letter, with a 1px `--line-2` guide under the
   parent's glyph. `sidebarTree.browser.test.tsx` holds these numbers.
-- **A click folds, like a folder in VS Code.** Every click on a Group or on a Session with projects
+- **A click folds, like a folder in VS Code.** Every click on a Group or on a Session with Workspaces
   folds or unfolds it (a Session also opens), as do the chevron in its slot and ←/→ on the focused
   row. One rule, no click-then-click-again or double-click variants. Folded, a Session
-  keeps its Blocked and Review projects and the one holding the selected pane, and counts the rest in
+  keeps its Blocked and Review Workspaces and the one holding the selected pane, and counts the rest in
   a last child row, `N more`, which unfolds it. Fold state persists per Session.
 - **One selected row.** Selecting a Session highlights the row that was clicked. Its twin (the same
   Session in the other section) shows only the quieter "current" mark (`--hover` fill), so two rows
@@ -324,19 +324,19 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 
 **Rows.**
 
-- A bookmarked project keeps its row in the tree too (Q4); that row carries a small star after its
+- A bookmarked Workspace keeps its row in the tree too (Q4); that row carries a small star after its
   name.
 - Machine badge only for remote Machines; local Sessions show none.
-- **A Session is the user's area; its projects show under it.** Under each Session the tree lists its
+- **A Session is the user's area; its Workspaces show under it.** Under each Session the tree lists its
   Workspaces with agent work (Blocked, Review, or In progress; every Workspace under All, the quiet
   ones muted), on the Session's guide line: status dot, name, then the word (Blocked / Review) or
   the lane count. State is the orchestrator's: a lane's Done is not the user's, a blocked lane is. A
-  click opens the pane behind the row (the one asking, else the orchestrator), and that project row
+  click opens the pane behind the row (the one asking, else the orchestrator), and that Workspace row
   is the lit one.
-- So in the tree the project rows carry what needs the user and the Session row has no count or
-  tint; a Bookmark row carries its project's word, as its row in the tree does.
+- So in the tree the Workspace rows carry what needs the user and the Session row has no count or
+  tint; a Bookmark row carries its Workspace's word, as its row in the tree does.
 - SESSIONS starts on **Active**; the "N hidden · idle or stopped · Show" line lists the rest.
-  Like PANES, Active keeps a Session and a project for the Active window after its agent (not a lane)
+  Like PANES, Active keeps a Session and a Workspace for the Active window after its agent (not a lane)
   stopped, muted with its age (`12m`): the user just looked at it and is likely to return. Rows
   keep the user's order: never re-sort by status (spatial memory).
 - The Machines section stays at the bottom and folds by default once more than one Machine exists.
@@ -380,7 +380,7 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 - **Q3. Long-running shell commands?** Shown as a normal quiet row, not folded, with no status mark
   (§7.1). herdr gives shells no status, so the app shows that the process runs without claiming
   how it is doing.
-- **Q4. A bookmarked project in the tree too?** Yes, as `CONTEXT.md` defines a Bookmark
+- **Q4. A bookmarked Workspace in the tree too?** Yes, as `CONTEXT.md` defines a Bookmark
   (independent of where it sits): the tree stays complete and unbookmarking never moves anything.
-  Only the clicked row is "selected"; the tree's project row carries a star (§7.3). (Before ADR 0006
+  Only the clicked row is "selected"; the tree's Workspace row carries a star (§7.3). (Before ADR 0006
   this asked the same of a bookmarked Session.)

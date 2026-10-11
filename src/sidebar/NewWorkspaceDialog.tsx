@@ -68,7 +68,7 @@ export function NewWorkspaceDialog({
         }}
       >
         <h3>New workspace in {session}</h3>
-        <PathInput machineId={machineId} label="Directory" autoFocus value={cwd} placeholder="/path/to/project" onChange={setCwd} />
+        <PathInput machineId={machineId} label="Folder" autoFocus value={cwd} placeholder="/path/to/repo" onChange={setCwd} />
         <label>
           Label (optional)
           <input spellCheck={false} autoCorrect="off" autoCapitalize="off" value={label} onChange={(e) => setLabel(e.target.value)} />

@@ -76,7 +76,7 @@ export function NewSessionDialog({
         )}
         <label>
           Name
-          <input spellCheck={false} autoCorrect="off" autoCapitalize="off" autoFocus value={name} placeholder="my-project" onChange={(e) => setName(e.target.value)} />
+          <input spellCheck={false} autoCorrect="off" autoCapitalize="off" autoFocus value={name} placeholder="p-ai" onChange={(e) => setName(e.target.value)} />
         </label>
         {error && <p className="error dialog-error">{error}</p>}
         <div className="actions">

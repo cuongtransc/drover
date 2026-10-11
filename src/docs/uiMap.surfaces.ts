@@ -20,7 +20,7 @@ export const SURFACES: Surface[] = [
   { group: "Sidebar", name: "Bookmarks", selector: "[aria-label='Bookmarks']", at: [0, 0], d: [142, 39], what: "Workspaces pinned to the top; a closed one waits under the same name.", code: "useLayout().bookmarks" },
   { group: "Sidebar", name: "Sessions filter", selector: ".sidebar .active-toggle", at: [0, 0.5], d: [-13, 0], what: "All | Active on the Sessions header.", code: "useSessionFilter (src/sidebar/activeFilter.ts)" },
   { group: "Sidebar", name: "Session row", selector: "li.session > .row", at: [0, 0.5], d: [122, 0], what: "A Session in the Sidebar.", code: "SessionRow" },
-  { group: "Sidebar", name: "Project row", selector: ".project-row", at: [0, 0.5], d: [120, 0], what: "A Workspace with agent work, under its Session row.", code: "ProjectRows" },
+  { group: "Sidebar", name: "Workspace row", selector: ".project-row", at: [0, 0.5], d: [120, 0], what: "A Workspace with agent work, under its Session row.", code: "ProjectRows" },
   { group: "Sidebar", name: "Fold line", selector: ".filter-hidden", at: [0, 0.5], d: [172, 0], what: "“N hidden · idle or stopped”: what the Active filter hides, with Show.", code: ".filter-hidden in GroupTree" },
   { group: "Sidebar", name: "Machines", selector: "li.machine", at: [0, 0.5], d: [142, 0], what: "The machines herdr runs on, local and over SSH.", code: "li.machine in Sidebar" },
   { group: "Agents column", name: "Agents column", selector: "aside.agents", at: [0.5, 0.39], what: "The middle column, headed by the Session name and PANES.", code: "src/agents/AgentList.tsx" },

@@ -83,7 +83,7 @@ export interface AppState {
   /** Panes (by paneKey) whose agent is still starting, shown under a loading overlay. Not persisted. */
   starting: Record<string, AgentStart>;
   setStarting: (key: string, start: AgentStart | null) => void;
-  /** Whether the Agent Dashboard overlay is open. Not persisted. */
+  /** Whether the Agent Board overlay is open. Not persisted. */
   dashboardOpen: boolean;
   setDashboardOpen: (open: boolean) => void;
   /** Done panes the user has looked at (by paneKey); a seen Done pane counts as Idle on the
