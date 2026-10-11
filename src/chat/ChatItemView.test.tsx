@@ -3,8 +3,24 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ chatImage: vi.fn().mockResolvedValue(new Uint8Array([1]).buffer) }));
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
+import { ChatEditContext } from "./editContext";
 import { BackgroundContext } from "./backgroundTaskState";
 describe("ChatItemView", () => {
+  it("offers Edit on the user's last message only", () => {
+    const onEdit = vi.fn();
+    const last = { kind: "user", text: "fix it" } as const;
+    const earlier = { kind: "user", text: "look first" } as const;
+    render(
+      <ChatEditContext.Provider value={{ last, onEdit }}>
+        <ChatItemView item={earlier} copy />
+        <ChatItemView item={last} copy />
+      </ChatEditContext.Provider>,
+    );
+    const buttons = screen.getAllByRole("button", { name: "Edit" });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0]);
+    expect(onEdit).toHaveBeenCalledWith("fix it");
+  });
   it("renders markdown", () => {
     render(<ChatItemView item={{ kind: "assistant_text", markdown: "Hello **world**" }} />);
     expect(screen.getByText("world").tagName).toBe("STRONG");

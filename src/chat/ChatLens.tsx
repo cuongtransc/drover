@@ -1,9 +1,9 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
-import { chatLocate, chatPage } from "../lib/ipc";
+import { chatLocate, chatPage, herdrCall } from "../lib/ipc";
 import { paneKey, type AppError, type ChatEvent, type ChatItem, type Located, type PaneRef, type PaneView } from "../lib/types";
-import { useApp } from "../store/app";
+import { findPane, useApp } from "../store/app";
 import { onOpenFailure, openChat, watchMachine } from "./chatSession";
 import { PromptPanel } from "./PromptPanel";
 import { pendingQuestions } from "./prompt/askedPreviews";
@@ -19,6 +19,9 @@ import { QueuedMessages } from "./QueuedMessages";
 import { BackgroundTasks } from "./BackgroundTasks";
 import { BackgroundContext, stableBackground, taskEnds, type BackgroundState } from "./backgroundTaskState";
 import { BtwPanel } from "./BtwPanel";
+import { EditPanel } from "./EditPanel";
+import { ChatEditContext } from "./editContext";
+import { editLast } from "./rewind";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
 import { usePendingTranscript } from "./pendingTranscript";
@@ -385,8 +388,33 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   }, [pendingJump, rows]);
 
   const err = openError ?? state.error;
+  // Edit takes the user's last message back through Claude's Rewind: Claude only, a session
+  // herdr tracks, and not while the lens previews another session's history (a new fork).
+  const editable = view.agent === "claude" && !view.untracked && !preview;
+  const lastUser = useMemo(() => {
+    for (let i = items.length - 1; i >= 0; i--) if (items[i].kind === "user") return items[i];
+    return null;
+  }, [items]);
+  const edit = useMemo(
+    () =>
+      editable
+        ? {
+            last: lastUser,
+            onEdit: (text: string) =>
+              void editLast(
+                pane,
+                text,
+                (m, p) => herdrCall(pane.machine_id, pane.session, m, p),
+                () => findPane(useApp.getState().machines, pane)?.status,
+              ),
+          }
+        : null,
+    [editable, lastUser, pane],
+  );
+
   return (
     <ChatPaneContext.Provider value={pane}>
+    <ChatEditContext.Provider value={edit}>
     <ChatOpenContext.Provider value={opened}>
     <BackgroundContext.Provider value={background}>
     <div className="chat-lens" data-width={chatWidth}>
@@ -452,6 +480,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       {view.agent && <BackgroundTasks tasks={state.background} onJump={jumpToCall} />}
       <QueuedMessages texts={state.queued} />
       <BtwPanel pane={pane} />
+      <EditPanel pane={pane} />
       <WorkingIndicator status={view.status} start={start} />
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />
@@ -463,6 +492,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     </div>
     </BackgroundContext.Provider>
     </ChatOpenContext.Provider>
+    </ChatEditContext.Provider>
     </ChatPaneContext.Provider>
   );
 }

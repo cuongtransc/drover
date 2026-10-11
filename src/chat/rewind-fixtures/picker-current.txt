@@ -1,0 +1,40 @@
+
+
+⏺ OK
+
+✻ Baked for 2s · done 1:36 AM
+
+❯ Remember the word BANANA. Reply with just OK.
+
+⏺ OK
+
+✻ Worked for 1s · done 1:36 AM
+
+❯ Remember APPLE. Reply OK.
+
+⏺ OK
+
+✻ Worked for 3s · done 1:36 AM
+
+❯ Use the Write tool to create the file note.txt containing the single word hello. Then reply DONE.
+
+  Made 1 scratchpad edit +1
+
+⏺ DONE
+
+✻ Crunched for 5s · done 1:36 AM
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Rewind
+
+   Restore the code and/or conversation to the point before…
+
+     ↑ 3 more
+     Use the Write tool to create the file note.txt containing the single word hello. Then reply DONE.
+     note.txt +1
+
+   ❯ (current)
+
+
+
+
+   Enter to continue · Esc to cancel

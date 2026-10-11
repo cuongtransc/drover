@@ -141,6 +141,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
 | **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
 | **Side question** | A `/btw <question>` sent from a Claude pane's Composer (or started with its **/btw** key): its answer, read off Claude's screen (it never reaches the transcript), shows in a panel above the Composer, earlier ones folded above it; Claude's own panel is closed right after | `src/chat/btw.ts`, `src/chat/BtwPanel.tsx` |
+| **Edit** | The pencil on the user's last message in a Claude pane's Chat lens: Claude's Rewind goes back to before it (stopping a working Claude first, asking what to restore when it changed files) and the message returns to the Composer | `src/chat/rewind.ts`, `src/chat/EditPanel.tsx` |
 | **Protected pane** | A lock on a Pane row: Close pane (Close tab on a one-pane Tab) is off, and closing its Tab, Workspace or Session names it first; orchestrators start protected | `src/agents/protect.ts` |
 | **Lane toggle** | "N lanes ›" on an orchestrator's Pane row | `.lane-toggle` in `AgentList.tsx` |
 | **Triage HUD** | The queue shown by ⌘J | `src/main/TriageHud.tsx`, `src/main/triage.ts` |

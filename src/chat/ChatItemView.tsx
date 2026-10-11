@@ -1,8 +1,9 @@
 import { memo, useContext, useState } from "react";
 import Markdown from "react-markdown";
 import type { ChatItem } from "../lib/types";
-import { BrainIcon, ChevronIcon } from "../ui/icons";
+import { BrainIcon, ChevronIcon, PencilIcon } from "../ui/icons";
 import { CopyButton } from "./CopyButton";
+import { ChatEditContext } from "./editContext";
 import { mdComponents, rehypePlugins, remarkPlugins } from "./markdown";
 import { checklist, checklistSummary, type ChecklistRow } from "./checklist";
 import { BackgroundContext, taskBadge } from "./backgroundTaskState";
@@ -147,6 +148,7 @@ export const ChatItemView = memo(function ChatItemView({
   /** A tool call the live turn is still waiting on: spins at the end of its row. */
   running?: boolean;
 }) {
+  const edit = useContext(ChatEditContext);
   switch (item.kind) {
     case "user":
       return (
@@ -156,6 +158,17 @@ export const ChatItemView = memo(function ChatItemView({
             <div className="chat-user-line">
               <div className="chat-bubble">{item.text}</div>
               {copy && <CopyButton text={item.text} />}
+              {edit && edit.last === item && (
+                <button
+                  type="button"
+                  className="chat-copy"
+                  aria-label="Edit"
+                  title="Edit: go back to before this message and change it (stops Claude first if it is working)"
+                  onClick={() => edit.onEdit(item.text)}
+                >
+                  <PencilIcon />
+                </button>
+              )}
             </div>
           )}
           {!!item.skills?.length && <SkillChips chips={item.skills.map((s) => ({ name: s.name, path: s.path, status: "loaded" }))} />}
