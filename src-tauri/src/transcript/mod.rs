@@ -180,6 +180,11 @@ pub enum ParserOutput {
     None,
     Append(Vec<ChatItem>),
     Reset(Vec<ChatItem>),
+    /// Keep the first `keep` items, drop the rest and add `items`: a branch left behind.
+    Truncate {
+        keep: usize,
+        items: Vec<ChatItem>,
+    },
 }
 
 pub trait Parser: Send {

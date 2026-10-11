@@ -393,6 +393,7 @@ mod tests {
             .flat_map(|o| match o {
                 ParserOutput::Append(v) => v,
                 ParserOutput::Reset(v) => v,
+                ParserOutput::Truncate { items, .. } => items,
                 ParserOutput::None => vec![],
             })
             .collect()
