@@ -40,15 +40,33 @@ check "keeps a target that exists: exit 0" run
 check "keeps a target that exists: content" grep -q '"m":2' "$tmp/home/Library/Application Support/$new/machines.json"
 check "keeps a target that exists: says so" grep -q "migrate-id: kept Library/Application Support/$new (already there)" "$tmp/out"
 
-fresh_home
-cp /bin/sleep "$tmp/migrate-test-$$"
+# A stand-in app process. Its name stays within the 15 characters Linux's `pgrep -x` compares.
+app=mt$$
+cp /bin/sleep "$tmp/$app"
 # macOS kills a copied system binary until it is signed again.
-command -v codesign >/dev/null && codesign -s - -f "$tmp/migrate-test-$$" 2>/dev/null
-"$tmp/migrate-test-$$" 30 &
+if command -v codesign >/dev/null; then codesign -s - -f "$tmp/$app" || exit 1; fi
+"$tmp/$app" 60 &
 pid=$!
-sleep 0.2
-check "refuses while an app runs: exit 1" sh -c "! HOME='$tmp/home' MIGRATE_ID_APPS='migrate-test-$$' '$here/migrate-id.sh' >'$tmp/out' 2>&1"
-check "refuses while an app runs: says which" grep -q "migrate-id: quit migrate-test-$$ first" "$tmp/out"
+i=0
+until pgrep -x "$app" >/dev/null; do
+  i=$((i + 1))
+  [ "$i" -le 50 ] || { echo "FAIL the stand-in app never showed up in pgrep"; exit 1; }
+  sleep 0.1
+done
+run_busy() { HOME="$tmp/home" MIGRATE_ID_APPS="$app" "$here/migrate-id.sh" >"$tmp/out" 2>&1; }
+
+fresh_home
+check "refuses while an app runs: exit 1" sh -c "! HOME='$tmp/home' MIGRATE_ID_APPS='$app' '$here/migrate-id.sh' >'$tmp/out' 2>&1"
+check "refuses while an app runs: says which" grep -q "migrate-id: quit $app first" "$tmp/out"
 check "refuses while an app runs: copies nothing" test ! -e "$tmp/home/Library/WebKit/$new"
+
+fresh_home
+mkdir -p "$tmp/home/Library/WebKit/$new" "$tmp/home/Library/Application Support/$new"
+: >"$tmp/home/Library/Preferences/$new.plist"
+check "an app running is fine when nothing is left to copy: exit 0" run_busy
+check "an app running is fine when nothing is left to copy: says kept" grep -q "migrate-id: kept Library/WebKit/$new (already there)" "$tmp/out"
+
+rm -rf "$tmp/home"; mkdir -p "$tmp/home"
+check "an app running is fine with no old state at all" run_busy
 
 [ "$fails" -eq 0 ] && echo "migrate tests: all passed" || { echo "migrate tests: $fails failed"; exit 1; }
