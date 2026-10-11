@@ -818,6 +818,12 @@ describe("AgentList lanes by owner (ctc lane list)", () => {
     ]);
   });
 
+  it("says 1 lane, not 1 lanes", async () => {
+    vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:p8"), owned("w1:pB", null), owned("w1:pC", null)]);
+    render(<AgentList />);
+    expect((await screen.findByRole("button", { name: "1 lane" })).closest("li")).toBe(card(/^Rate limits/).closest("li"));
+  });
+
   it("marks a lane orphan when its owner pane is gone", async () => {
     vi.mocked(lanesList).mockResolvedValue([owned("w1:pA", "default/w1:gone"), owned("w1:pB", "default/w1:p8"), owned("w1:pC", "default/w1:p8")]);
     render(<AgentList />);
