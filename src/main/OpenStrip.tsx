@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { createPortal } from "react-dom";
 import { ContextMenu, type MenuItem } from "../sidebar/ContextMenu";
@@ -67,6 +67,18 @@ export const OpenStrip = memo(function OpenStrip() {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ key: string; side: Side } | null>(null);
   const tabs = entries(machines, items);
+  const strip = useRef<HTMLDivElement>(null);
+  // The strip hides its scrollbar, so the open tab is scrolled into view when it changes or opens.
+  useLayoutEffect(() => {
+    const el = strip.current;
+    const tab = el?.querySelector<HTMLElement>(".files-tab-item.active");
+    if (!el || !tab) return;
+    const t = tab.getBoundingClientRect();
+    const s = el.getBoundingClientRect();
+    const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    if (t.left < s.left + pad) el.scrollLeft += t.left - s.left - pad;
+    else if (t.right > s.left + el.clientWidth - pad) el.scrollLeft += t.right - s.left - el.clientWidth + pad;
+  }, [active, tabs.length]);
   if (tabs.length === 0) return null;
   const twice = (label: string) => tabs.filter((t) => t.label === label).length > 1;
 
@@ -84,7 +96,17 @@ export const OpenStrip = memo(function OpenStrip() {
 
   return (
     // the strip's empty end is the top bar's, and drags the window
-    <div className="files-tabs agent-tabs" role="tablist" aria-label="Open items" data-tauri-drag-region>
+    <div
+      ref={strip}
+      className="files-tabs agent-tabs"
+      role="tablist"
+      aria-label="Open items"
+      data-tauri-drag-region
+      // a mouse wheel scrolls the tabs sideways; a trackpad's sideways swipe already does
+      onWheel={(e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY;
+      }}
+    >
       {tabs.map(({ key, label, title, where, pane }) => {
         const isActive = key === active;
         const state = `${isActive ? " active" : ""}${key === preview ? " preview" : ""}`;

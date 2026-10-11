@@ -676,6 +676,10 @@ kbd {
   border-bottom: 1px solid var(--line); background: var(--surface-chrome);
 }
 .topbar .files-tabs { flex: 1; min-width: 0; align-items: center; gap: 4px; padding: 0 6px; background: none; border-bottom: 0; }
+/* No scrollbar when the tabs overflow: it took 10px under them and pushed them off the bar's centre.
+   The strip scrolls by trackpad or wheel, and keeps the open tab in view. */
+.topbar .files-tabs { scrollbar-width: none; }
+.topbar .files-tabs::-webkit-scrollbar { display: none; }
 /* A tab is a pill as tall as a row, with an edge, so the tabs stand apart; the open one is filled
    and semibold, not only coloured. */
 .topbar .files-tab-item {

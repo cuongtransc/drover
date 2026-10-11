@@ -71,3 +71,48 @@ it("keeps its height with no tab open, for the window to be dragged by", async (
   expect(main.querySelector(".topbar")!.getBoundingClientRect().height).toBe(46);
   expect(main.querySelector(".topbar")!.hasAttribute("data-tauri-drag-region")).toBe(true);
 });
+
+// Many tabs overflow the strip: no scrollbar may take room under them (it pushed them up, off the
+// Lens switch's centre), the open tab stays in view, and a mouse wheel scrolls the strip.
+function openMany(n: number) {
+  const panes = Array.from({ length: n }, (_, i) => pane(`q${i}`, `A long agent tab title ${i}`));
+  const many: MachineView = { ...m, sessions: [{ ...m.sessions[0], workspaces: [{ ...m.sessions[0].workspaces[0], tabs: [
+    { tab_id: "w1:t1", label: "1", number: 1, status: "working", panes } ] }] }] };
+  useApp.setState({ machines: { local: many }, openItems: NO_ITEMS, selected: null });
+  for (const p of panes) {
+    const ref = { machine_id: "local", session: "ct", pane_id: p.pane_id };
+    useApp.getState().select(ref);
+    useApp.getState().pinItem(itemKey({ kind: "agent", ref }));
+  }
+}
+
+it("centres overflowing tabs on the Lens switch, with no scrollbar under them", async () => {
+  openMany(8);
+  const main = mount(700);
+  await act(async () => createRoot(main).render(<TopBar lens />));
+  const strip = main.querySelector<HTMLElement>(".files-tabs")!;
+  expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth);
+  expect(strip.clientHeight).toBe(strip.offsetHeight);
+  const centre = (r: DOMRect) => r.top + r.height / 2;
+  const tab = main.querySelector(".files-tab-item")!.getBoundingClientRect();
+  const seg = main.querySelector(".seg")!.getBoundingClientRect();
+  expect(Math.abs(centre(tab) - centre(seg))).toBeLessThanOrEqual(1);
+});
+
+it("keeps the open tab in view and scrolls the strip with a mouse wheel", async () => {
+  openMany(8);
+  const main = mount(700);
+  await act(async () => createRoot(main).render(<TopBar lens />));
+  const strip = main.querySelector<HTMLElement>(".files-tabs")!;
+  const inView = () => {
+    const s = strip.getBoundingClientRect();
+    const t = strip.querySelector(".files-tab-item.active")!.getBoundingClientRect();
+    return t.left >= s.left - 1 && t.right <= s.right + 1;
+  };
+  expect(inView()).toBe(true);
+  await act(async () => useApp.getState().activateItem(itemKey({ kind: "agent", ref: { machine_id: "local", session: "ct", pane_id: "q0" } })));
+  expect(strip.scrollLeft).toBe(0);
+  expect(inView()).toBe(true);
+  strip.dispatchEvent(new WheelEvent("wheel", { deltaY: 120, bubbles: true, cancelable: true }));
+  expect(strip.scrollLeft).toBeGreaterThan(0);
+});
