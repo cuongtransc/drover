@@ -36,6 +36,12 @@ it is one click away however deep its Session sits, folded or filtered out (ADR 
 its Workspace: closed, it waits under the same name. Before ADR 0006 a Bookmark was a Session.
 _Avoid_: favourite, pin
 
+**Kept workspace**:
+A Workspace (by its Session and its label) the app remembers with its Workspace folder after herdr
+removes it, so it can be opened again from its Session (ADR 0008). The user turns it on per
+Workspace; a Bookmark is always one. Closed, it waits under **Closed** in the Agents column.
+_Avoid_: saved workspace, pinned workspace, dormant workspace
+
 **Tab**:
 A layout of Panes inside a Workspace. Its label says its role: `orch-*` the orchestrator, `lane-<slug>` a worker it dispatched (a lane's git worktree stays a Tab, never a Workspace of its own), `brief-*` a decision, or a one-word purpose for a shell (`dev`, `test`, `server`, `logs`). A bare number is herdr's default and names nothing.
 
@@ -141,6 +147,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Agents column** | The middle column, headed by the Session name and PANES (its rows are Panes: agents and shells) | `src/agents/AgentList.tsx` |
 | **Workspace header** | A Workspace's name over its Pane rows; + starts an agent in it | `.ws-head` in `AgentList.tsx` |
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
+| **Closed section** | CLOSED and its count at the end of the Agents column, folded by default: the Session's closed Kept workspaces, a click opens one again | `src/agents/ClosedSection.tsx` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
 | **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |
@@ -175,6 +182,7 @@ _Avoid_: INPUT, Needs you, waiting, To do
 - A **Machine** has zero or more **Sessions**
 - A **Session** is in at most one **Group**; a **Group** has zero or more **Sessions** and **Groups**
 - A **Workspace** may be a **Bookmark**; a **Bookmark** names at most one live **Workspace** (none while it is closed)
+- A **Workspace** may be a **Kept workspace**; every **Bookmark** is a **Kept workspace**; a **Kept workspace** names at most one live **Workspace** (none while it is closed)
 - A running **Session** has one or more **Workspaces**; a **Workspace** has one or more **Tabs**; a **Tab** has one or more **Panes**
 - Each **Pane** has exactly one **Terminal**
 - A **Pane** has at most one **Agent**; an **Agent** has at most one **Transcript** the app can find
