@@ -49,6 +49,7 @@ import { useLensSettings } from "../settings/lens";
 import { useForks } from "../agents/forkSession";
 import { paneKey } from "../lib/types";
 import { useApp } from "../store/app";
+import { useBtw } from "./btw";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
@@ -310,6 +311,17 @@ describe("ChatLens", () => {
     act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
     const nav = screen.getByRole("navigation", { name: "Conversation outline" });
     expect([...nav.querySelectorAll("ol button")].map((b) => b.textContent)).toEqual(["fix the header", "now the footer"]);
+  });
+
+  it("puts the /btw column in the outline's place while it is open", () => {
+    render(<ChatLens pane={pane} view={{ ...idlePi, agent: "claude" }} />);
+    screen.getByRole("navigation", { name: "Conversation outline" });
+    act(() => useBtw.getState().openBtw(pane));
+    const column = screen.getByRole("region", { name: "Side question" });
+    expect(column.previousElementSibling?.classList.contains("chat-main")).toBe(true);
+    expect(screen.queryByRole("navigation", { name: "Conversation outline" })).toBeNull();
+    act(() => useBtw.setState({ open: {} }));
+    screen.getByRole("navigation", { name: "Conversation outline" });
   });
 
   it("keeps the turn picked in the outline lit until the transcript is scrolled", () => {

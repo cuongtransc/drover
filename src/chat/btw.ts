@@ -178,6 +178,12 @@ interface BtwState {
   asides: Record<string, Aside>;
   /** The pane's earlier questions in this app run, oldest first: the thread above the latest. */
   history: Record<string, Aside[]>;
+  /** Panes whose /btw column is open, asked or not yet. */
+  open: Record<string, boolean>;
+  /** Bumped each time the column is asked for, so its box takes the focus again. */
+  focus: Record<string, number>;
+  /** Opens the pane's /btw column, its box focused. */
+  openBtw: (pane: PaneRef) => void;
   /** Follows the `/btw` just sent to `pane` until its answer is read or fails. */
   ask: (pane: PaneRef, question: string, call: Call, timing?: BtwTiming) => Promise<void>;
 }
@@ -185,6 +191,12 @@ interface BtwState {
 export const useBtw = create<BtwState>((set, get) => ({
   asides: {},
   history: {},
+  open: {},
+  focus: {},
+  openBtw: (pane) => {
+    const key = paneKey(pane);
+    set((s) => ({ open: { ...s.open, [key]: true }, focus: { ...s.focus, [key]: (s.focus[key] ?? 0) + 1 } }));
+  },
   ask: async (pane, question, call, timing) => {
     const key = paneKey(pane);
     const signal: BtwSignal = { cancelled: false };
@@ -192,7 +204,7 @@ export const useBtw = create<BtwState>((set, get) => ({
       const prev = s.asides[key];
       // An answered or failed question joins the thread; one still asking is replaced.
       const history = prev && prev.phase !== "asking" ? { ...s.history, [key]: [...(s.history[key] ?? []), prev] } : s.history;
-      return { asides: { ...s.asides, [key]: { question, phase: "asking", signal } }, history };
+      return { asides: { ...s.asides, [key]: { question, phase: "asking", signal } }, history, open: { ...s.open, [key]: true } };
     });
     const settle = (patch: Partial<Aside>) => {
       // a newer question, or a close, replaced this one
@@ -207,14 +219,15 @@ export const useBtw = create<BtwState>((set, get) => ({
   },
 }));
 
-/** Drops the pane's thread; a question still answering is cancelled in Claude too. */
+/** Closes the pane's column and drops its thread; a question still answering is cancelled in Claude too. */
 export async function closeBtw(pane: PaneRef, call: Call): Promise<void> {
   const key = paneKey(pane);
   const aside = useBtw.getState().asides[key];
   useBtw.setState((s) => {
     const { [key]: _, ...asides } = s.asides;
     const { [key]: _h, ...history } = s.history;
-    return { asides, history };
+    const { [key]: _o, ...open } = s.open;
+    return { asides, history, open };
   });
   if (!aside) return;
   if (aside.phase !== "asking") return;
