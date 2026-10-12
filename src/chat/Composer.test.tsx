@@ -70,6 +70,26 @@ describe("Composer", () => {
     await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
   });
 
+  it("sends a /btw of several lines on one line, which Claude still takes as /btw", () => {
+    useBtw.setState({ asides: {}, ask: vi.fn().mockResolvedValue(undefined) });
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "/btw why?\n1. a\n2. b\n3. c" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "/btw why? 1. a 2. b 3. c" });
+  });
+
+  it("holds Send for a /btw too long for Claude to take as one", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    fireEvent.change(box, { target: { value: "/btw " + "why ".repeat(300) } });
+    const send = screen.getByRole<HTMLButtonElement>("button", { name: "Send" });
+    expect(send.disabled).toBe(true);
+    expect(send.title).toMatch(/Too long for \/btw/);
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(herdrCall).not.toHaveBeenCalled();
+  });
+
   it("opens the side column from its /btw key, leaving the draft here alone", () => {
     useBtw.setState({ open: {} });
     render(<Composer pane={pane} agent="claude" />);

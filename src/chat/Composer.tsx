@@ -17,7 +17,7 @@ import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useFitHeight } from "./useFitHeight";
 import { useCompletions } from "./useCompletions";
-import { btwQuestion, closeBtw, useBtw } from "./btw";
+import { BTW_TOO_LONG, btwPrompt, btwQuestion, closeBtw, useBtw } from "./btw";
 import { useComposerFill, useRewind } from "./rewind";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
@@ -292,7 +292,12 @@ export function Composer({
     });
 
   const uploading = images.some((a) => a.path === null);
-  const canSend = !uploading && !asking && !editing && (text.trim() !== "" || images.length > 0);
+  // A /btw goes on one line, as Claude shows it; past what Claude takes as typed it would land in the
+  // main conversation instead, so it is held back.
+  const btw = agent === "claude" && images.length === 0 ? btwQuestion(text) : null;
+  const btwText = btw === null ? null : btwPrompt(btw);
+  const btwTooLong = btw !== null && btwText === null;
+  const canSend = !uploading && !asking && !editing && !btwTooLong && (text.trim() !== "" || images.length > 0);
 
   const submit = async (sent: string, paths: string[]) => {
     const target = pane.pane_id;
@@ -320,7 +325,7 @@ export function Composer({
     clearSuggestion();
     setSending(true);
     // Optimistic clear; restore the draft if the prompt did not go through (unless the user typed meanwhile).
-    submit(sent, sentImages.map((a) => a.path as string))
+    submit(btwText ?? sent, sentImages.map((a) => a.path as string))
       .then(
         () => {
           sentImages.forEach(revoke);
@@ -568,7 +573,7 @@ export function Composer({
           >
             <StopIcon />
           </button>
-          <button className="send" aria-label="Send" title={asking ? "Wait for the /btw answer" : editing ? "Wait for the edit to finish" : undefined} disabled={!canSend} onClick={send}>
+          <button className="send" aria-label="Send" title={asking ? "Wait for the /btw answer" : editing ? "Wait for the edit to finish" : btwTooLong ? BTW_TOO_LONG : undefined} disabled={!canSend} onClick={send}>
             <SendIcon />
           </button>
           {menuAt && (

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { btwQuestion, closeBtw, mergeScroll, parseBtwScreen, runBtw, useBtw } from "./btw";
+import { BTW_MAX_CHARS, btwPrompt, btwQuestion, closeBtw, mergeScroll, parseBtwScreen, runBtw, useBtw } from "./btw";
 
 // Screens read through herdr `pane.read --source visible --format text` from claude 2.1.295, 2026-10-10.
 const BORDER = "▔".repeat(98) + " ◐ medium · /effort ▔";
@@ -71,6 +71,18 @@ const lone = (from: number, to: number) =>
     "    ↑/↓ to scroll · c to copy · f to fork · Esc to close",
     ...PROMPT,
   ].join("\n");
+
+describe("btwPrompt", () => {
+  it("puts the question on one line, as Claude shows it", () => {
+    expect(btwPrompt("why that file?\n1. lock it at 1?\n2. keep 2?\n\nand ESCALATED?")).toBe("/btw why that file? 1. lock it at 1? 2. keep 2? and ESCALATED?");
+  });
+
+  it("is null past what Claude takes as typed: a longer paste would land in the main conversation", () => {
+    const fits = "q".repeat(BTW_MAX_CHARS - "/btw ".length);
+    expect(btwPrompt(fits)).toBe(`/btw ${fits}`);
+    expect(btwPrompt(fits + "q")).toBeNull();
+  });
+});
 
 describe("btwQuestion", () => {
   it("takes the question after /btw", () => {
