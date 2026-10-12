@@ -186,11 +186,13 @@ describe("Sidebar", () => {
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
     act(() => useApp.getState().upsertMachine({ ...m, sessions: m.sessions.map((s) => s.name === "ai-radar" ? { ...s, name: "radar" } : s) }));
+    expect(useLayout.getState().layout.kept).toEqual({ [oldKey]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([oldKey]);
     await act(async () => resolve());
     expect(useLayout.getState().layout.kept).toEqual({ [newKey]: { folder: "/app" } });
     expect(useLayout.getState().layout.bookmarks).toEqual([newKey]);
   });
-  it("rolls layout keys back if a Session rename fails", async () => {
+  it("leaves layout keys unchanged if a Session rename fails", async () => {
     const key = projectKey("box", "ai-radar", "app");
     useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, key, true, "/app") });
     vi.mocked(sessionRename).mockRejectedValue(new Error("rename failed"));
@@ -202,6 +204,39 @@ describe("Sidebar", () => {
     await waitFor(() => expect(screen.getByText("rename failed")).toBeTruthy());
     expect(useLayout.getState().layout.kept).toEqual({ [key]: { folder: "/app" } });
     expect(useLayout.getState().layout.bookmarks).toEqual([key]);
+  });
+  it("leaves both Sessions' kept entries and Bookmarks unchanged when renaming into an existing Session fails", async () => {
+    const destination = { ...m.sessions[1], name: "radar" };
+    const machine = { ...m, sessions: [...m.sessions, destination] };
+    useApp.setState({ machines: { box: machine } });
+    const layout = {
+      tree: [],
+      bookmarks: ["box/ai-radar/app", "box/ai-radar/source", "box/radar/app", "box/radar/destination"],
+      kept: {
+        "box/ai-radar/app": { folder: "/source-app" },
+        "box/ai-radar/source": { folder: "/source" },
+        "box/radar/app": { folder: "/destination-app" },
+        "box/radar/destination": { folder: "/destination" },
+      },
+    };
+    useLayout.setState({ layout });
+    let reject!: (e: Error) => void;
+    vi.mocked(sessionRename).mockReturnValue(new Promise<void>((_, r) => (reject = r)));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await act(async () => reject(new Error("destination exists")));
+    expect(screen.getByText("destination exists")).toBeTruthy();
+    expect(useLayout.getState().layout).toEqual(layout);
+    // A subsequent real deletion must not be hidden by a leaked pending marker.
+    act(() => useApp.getState().upsertMachine({ ...machine, sessions: machine.sessions.filter((s) => s.name !== "ai-radar") }));
+    expect(useLayout.getState().layout.kept).toEqual({
+      "box/radar/app": { folder: "/destination-app" },
+      "box/radar/destination": { folder: "/destination" },
+    });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/radar/app", "box/radar/destination"]);
   });
   it("bookmarking the second duplicate stores the first workspace's folder", () => {
     const duplicate = structuredClone(m);
@@ -215,6 +250,23 @@ describe("Sidebar", () => {
     fireEvent.contextMenu(screen.getAllByRole("button", { name: "drover" })[1]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
     expect(useLayout.getState().layout.kept).toEqual({ "box/default/drover": { folder: "/x" } });
+  });
+  it("bookmarking from an open duplicate menu uses the surviving first workspace's folder", () => {
+    const duplicate = structuredClone(m);
+    const first = duplicate.sessions[0].workspaces[0];
+    const second = structuredClone(first);
+    second.workspace_id = "w2";
+    second.tabs[0].panes[0].cwd = "/second";
+    duplicate.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { box: duplicate } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByRole("button", { name: "drover" })[1]);
+    const snapshot = structuredClone(duplicate);
+    snapshot.sessions[0].workspaces.shift();
+    act(() => useApp.getState().upsertMachine(snapshot));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ "box/default/drover": { folder: "/second" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/default/drover"]);
   });
   it("bookmarking a project keeps its workspace with its folder", () => {
     render(<Sidebar />);

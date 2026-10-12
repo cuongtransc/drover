@@ -3,7 +3,7 @@ import { paneKey } from "../lib/types";
 import type { MachineView, PaneRef, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
 import { pruneFolders, workspaceFolder, type WorkspaceRef } from "../workspaces/folder";
 import { shareEqual } from "./share";
-import { forgetMachine, forgetSessions, sessionKey, useLayout } from "../sidebar/groups";
+import { forgetMachine, forgetSessions, sessionKey, useLayout, type SessionKey } from "../sidebar/groups";
 import { backfillKept } from "../workspaces/kept";
 import { newAgentOnTerminal } from "../settings/lens";
 import { useFiles, filesKey } from "../files/store";
@@ -23,6 +23,18 @@ import {
   type OpenItem,
   type OpenItems,
 } from "./openItems";
+
+// A renamed snapshot can arrive before the rename request resolves. Keep the
+// source layout intact until the caller can migrate it after backend acceptance.
+const pendingSessionRenames = new Set<SessionKey>();
+
+export function beginSessionRename(key: SessionKey): void {
+  pendingSessionRenames.add(key);
+}
+
+export function endSessionRename(key: SessionKey): void {
+  pendingSessionRenames.delete(key);
+}
 
 export interface SessionRef {
   machine_id: string;
@@ -151,7 +163,9 @@ export const useApp = create<AppState>((set, get) => ({
     useLayout.getState().update((l) => backfillKept(l, v, (s, w) => workspaceFolder(v.id, s, w)));
     // Only a connected snapshot is authoritative about which Sessions exist.
     if (v.state === "connected" && prev) {
-      const gone = prev.filter((p) => !v.sessions.some((s) => s.name === p.name)).map((p) => sessionKey(v.id, p.name));
+      const gone = prev.filter((p) => !v.sessions.some((s) => s.name === p.name))
+        .map((p) => sessionKey(v.id, p.name))
+        .filter((key) => !pendingSessionRenames.has(key));
       if (gone.length) useLayout.getState().update((l) => forgetSessions(l, gone));
     }
     set((s) => {

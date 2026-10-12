@@ -14,7 +14,7 @@ import {
   sessionStop,
 } from "../lib/ipc";
 import type { MachineView } from "../lib/types";
-import { useApp } from "../store/app";
+import { beginSessionRename, endSessionRename, useApp } from "../store/app";
 import { protectedIn, useProtect } from "../agents/protect";
 import { busyIn } from "../agents/paneFilter";
 import { StatusDot } from "./StatusDot";
@@ -98,20 +98,15 @@ export function SessionRow({ node }: { node: RSession }) {
               onSelect: () =>
                 a.rename("Rename session", session.name, (to) => {
                   const toKey = sessionKey(machineId, to);
-                  // The backend publishes the renamed snapshot before its promise resolves.
-                  // Move now so upsertMachine cannot forget the old Session's entries.
-                  useLayout.getState().update((l) => renameSessionKey(l, key, toKey));
-                  return sessionRename(machineId, session.name, to).then(
-                    () => {
-                      moveSessionFolders(machineId, session.name, to);
-                      const v = useApp.getState().viewed;
-                      if (v?.machine_id === machineId && v.session === session.name) view({ machine_id: machineId, session: to });
-                    },
-                    (err) => {
-                      useLayout.getState().update((l) => renameSessionKey(l, toKey, key));
-                      throw err;
-                    },
-                  );
+                  // Preserve the source through an early snapshot, without changing
+                  // either Session's layout if the backend rejects the rename.
+                  beginSessionRename(key);
+                  return sessionRename(machineId, session.name, to).then(() => {
+                    moveSessionFolders(machineId, session.name, to);
+                    useLayout.getState().update((l) => renameSessionKey(l, key, toKey));
+                    const v = useApp.getState().viewed;
+                    if (v?.machine_id === machineId && v.session === session.name) view({ machine_id: machineId, session: to });
+                  }).finally(() => endSessionRename(key));
                 }),
             }]),
             {

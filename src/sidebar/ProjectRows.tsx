@@ -48,9 +48,6 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
   onUnfold?: () => void;
 }) {
   const openProject = useApp((s) => s.openProject);
-  // Bookmarks name the first Workspace with a label, even when another duplicate was clicked.
-  // The Session row owns the SessionView; this component only has its name.
-  const sessionView = useApp((s) => s.machines[machineId]?.sessions.find((x) => x.name === session) ?? null);
   const setOrigin = useViewOrigin((s) => s.set);
   const bookmarks = useLayout((s) => s.layout.bookmarks);
   const a = useActions();
@@ -78,7 +75,10 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
           icon: marked ? StarOffIcon : StarIcon,
           onSelect: () =>
             useLayout.getState().update((l) =>
-              setBookmarked(l, key, !marked, firstWorkspaceFolder(machineId, session, sessionView?.workspaces ?? [], r.label)),
+              // Resolve duplicates when selected: a snapshot can change the first
+              // Workspace while this menu is open.
+              setBookmarked(l, key, !marked, firstWorkspaceFolder(machineId, session,
+                useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)?.workspaces ?? [], r.label)),
             ),
         };
         return (
