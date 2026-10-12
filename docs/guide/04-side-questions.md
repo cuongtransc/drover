@@ -5,14 +5,14 @@ Code's own command: no interruption, and the question and answer stay out of the
 
 ## How
 
-In the Composer of a Claude pane, click the **/btw** key beside Esc. A column opens at the right of the chat, in the
+In the Composer of a Claude pane, click the **/btw** key. A column opens at the right of the chat, in the
 outline's place, with its own box at the bottom, level with the Composer: type the question there and press Enter. The
 Composer stays for the main session, and what you had typed in it stays there.
 
 Sending `/btw why did you pick that file?` from the Composer works too, and opens the same column.
 
 The column shows the question, **Answering…** with **Cancel**, then the answer with **Copy** and close. Esc in its box
-closes it. Both boxes hold their send while Claude answers, because Claude's own panel takes the keys meanwhile; you
+closes it, and so does the **/btw** key, which shows pressed while the column is open. Both boxes hold their send while Claude answers, because Claude's own panel takes the keys meanwhile; you
 can still type.
 
 Drag the column's left edge to widen it (double-click for 360px). In a chat narrower than 900px, the column floats

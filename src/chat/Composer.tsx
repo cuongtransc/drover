@@ -16,17 +16,14 @@ import { aliasTitle, contextMeter, formatTokens, modelLabel, type ContextMeter }
 import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
-import { btwQuestion, useBtw } from "./btw";
+import { btwQuestion, closeBtw, useBtw } from "./btw";
 import { useComposerFill, useRewind } from "./rewind";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
 // Key names verified against herdr's key parser (pane.send_keys accepts esc, ctrl+c,
-// shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`).
-const KEYS: { label: string; key: string }[] = [
-  { label: "Esc", key: "esc" },
-  { label: "Ctrl+C", key: "ctrl+c" },
-  { label: "⇧Tab", key: "shift+tab" },
-];
+// shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`). Only Esc: Ctrl+C does
+// nothing Esc does not, and twice in a row exits Claude; ⇧Tab's mode change went almost unused.
+const KEYS: { label: string; key: string }[] = [{ label: "Esc", key: "esc" }];
 
 // Agents whose TUI turns a bracketed-pasted image path into an image attachment (as when
 // pasting a screenshot in a terminal); `agent.prompt` frames text and path as one paste,
@@ -190,6 +187,7 @@ export function Composer({
   const [sending, setSending] = useState(false);
   // Claude's /btw panel takes the pane's keys until the Chat lens has read the answer and closed it.
   const asking = useBtw((s) => s.asides[key]?.phase === "asking");
+  const btwOpen = useBtw((s) => !!s.open[key]);
   // So does Claude's Rewind screen while an edit of the last message drives it.
   const editing = useRewind((s) => !!s.edits[key] && s.edits[key].phase !== "failed");
   const fill = useComposerFill((s) => s.fill[key]);
@@ -197,6 +195,13 @@ export function Composer({
   // not while a send is on its way: Claude's box would still show the old suggestion.
   const { suggestion, clear: clearSuggestion } = useClaudeSuggestion(pane, agent, status, text === "" && !sending);
   const offered = text === "" ? suggestion : null;
+  /** Puts the suggestion in the box, caret at the end, as Tab does in Claude's own input. */
+  const takeSuggestion = (s: string) => {
+    setText(s);
+    setCaret(s.length);
+    box.current?.focus();
+    requestAnimationFrame(() => box.current?.setSelectionRange(s.length, s.length));
+  };
   // Past half the window the share replaces the raw count; from 75% it warns (modelLabel.ts).
   const meter = contextMeter(meta);
   const full = meter && meter.level !== "low" ? meter : null;
@@ -367,8 +372,8 @@ export function Composer({
     });
   }, [fill, key]);
 
-  /** Opens the /btw column beside the chat; what is typed here stays for the main session. */
-  const startBtw = () => useBtw.getState().openBtw(pane);
+  /** Opens the /btw column beside the chat, or closes it again; what is typed here stays for the main session. */
+  const toggleBtw = () => (btwOpen ? void closeBtw(pane, call) : useBtw.getState().openBtw(pane));
 
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {
@@ -407,9 +412,17 @@ export function Composer({
             <button
               className="keycap"
               title="Ask on the side: Claude answers from the conversation without stopping or steering its turn, and the answer stays out of the transcript"
-              onClick={startBtw}
+              aria-pressed={btwOpen}
+              onClick={toggleBtw}
             >
               /btw
+            </button>
+          )}
+          {/* The suggestion already shows in the empty box; this only takes it, as Tab does. Mounted
+              for Claude whether or not one is offered, so the row doesn't shift. */}
+          {agent === "claude" && (
+            <button className="keycap" title="Put Claude's suggestion in the box (Tab)" disabled={!offered} onClick={() => offered && takeSuggestion(offered)}>
+              Use suggestion
             </button>
           )}
           {KEYS.map((k) => (
@@ -523,10 +536,7 @@ export function Composer({
             // After the completion list: Tab takes the suggestion into the empty box, as in Claude's own input.
             if (offered && e.key === "Tab" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              setText(offered);
-              setCaret(offered.length);
-              requestAnimationFrame(() => box.current?.setSelectionRange(offered.length, offered.length));
-              return;
+              return takeSuggestion(offered);
             }
             // Backspace in an empty box takes back the last pasted image, as in the agents' own TUIs.
             if (e.key === "Backspace" && e.currentTarget.value === "" && images.length > 0 && !e.nativeEvent.isComposing) {

@@ -40,7 +40,7 @@ export const SURFACES: Surface[] = [
   { group: "Main area", name: "Queued messages", selector: ".chat-queued .chat-bubble", at: [0, 0.5], d: [-66, 0], what: "Sent mid-turn, not read by the agent yet.", code: "src/chat/QueuedMessages.tsx" },
   { group: "Main area", name: "Working line", selector: ".chat-working", at: [0, 0.5], d: [121, 2], what: "The spinner and “Working 1m 23s”, counted from the prompt, while the agent works.", code: "src/chat/WorkingIndicator.tsx" },
   { group: "Main area", name: "Composer chips", selector: ".composer-quick", at: [1, 0.5], d: [19, 0], what: "Quick replies above the message box.", code: ".composer-quick in Composer" },
-  { group: "Main area", name: "Composer keys", selector: ".composer-keys", at: [0, 0.5], d: [-16, 0], what: "Esc, Ctrl+C, ⇧Tab sent to the agent as keys.", code: ".composer-keys in Composer" },
+  { group: "Main area", name: "Composer keys", selector: ".composer-keys", at: [0, 0.5], d: [-16, 0], what: "/btw (on while the box holds one), Use suggestion (Tab), and Esc sent to the agent as a key.", code: ".composer-keys in Composer" },
   { group: "Main area", name: "Composer", selector: ".composer-box", at: [0, 0], d: [511, 21], what: "The message box.", code: "src/chat/Composer.tsx" },
   { group: "Main area", name: "Git status line", selector: ".composer-git", at: [1, 0.5], d: [20, 0], what: "Folder, branch and changed files of the Pane's directory.", code: "GitStatusLine (src/chat/GitStatus.tsx)" },
   { group: "Main area", name: "Model label", selector: ".composer-model", at: [0, 0.5], d: [-18, 0], what: "Model · reasoning effort · context used.", code: ".composer-model, src/chat/modelLabel.ts" },
