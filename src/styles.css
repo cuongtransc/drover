@@ -240,8 +240,9 @@ kbd {
   background: var(--surface-2); color: var(--fg-2); font-size: 12px; font-weight: 500; cursor: pointer;
   transition: background var(--t-fast), color var(--t-fast), transform var(--t-fast);
 }
-.keycap:hover { background: var(--surface-3); color: var(--fg); }
-.keycap:active { transform: translateY(1px); border-bottom-width: 1px; }
+.keycap:hover:not(:disabled) { background: var(--surface-3); color: var(--fg); }
+.keycap:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
+.keycap:disabled { background: transparent; color: var(--fg-3); cursor: default; } /* quiet, still 4.5:1 */
 
 /* ---------- Shell ---------- */
 .app { position: relative; display: flex; height: 100%; }
@@ -1276,8 +1277,6 @@ kbd {
 }
 .composer-quick-reply:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
 .composer-quick-reply:disabled { opacity: 0.5; cursor: default; }
-/* Claude's suggestion, taken into the box like Tab: dashed, as it is a draft and not a send. */
-.composer-quick-reply.suggestion { max-width: min(360px, 100%); border-style: dashed; color: var(--fg); }
 .composer-box:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent), var(--shadow-composer); }
 .composer-menu-wrap {
   position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 5; display: flex; flex-direction: column;

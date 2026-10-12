@@ -632,7 +632,7 @@
     19,
     0
    ],
-   "what": "Claude's suggestion (a click puts it in the box, like Tab) and quick replies above the message box.",
+   "what": "Quick replies above the message box.",
    "code": ".composer-quick in Composer",
    "rect": {
     "x": 589,
@@ -657,16 +657,16 @@
     -16,
     0
    ],
-   "what": "/btw, and Esc sent to the agent as a key.",
+   "what": "/btw; Tab takes Claude's suggestion into the box; Esc goes to the agent as a key.",
    "code": ".composer-keys in Composer",
    "rect": {
-    "x": 1300.96875,
+    "x": 1255.609375,
     "y": 761,
-    "w": 88.03125,
+    "w": 133.390625,
     "h": 24
    },
    "badge": {
-    "x": 1284.96875,
+    "x": 1239.609375,
     "y": 773
    }
   },

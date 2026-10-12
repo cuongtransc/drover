@@ -434,24 +434,29 @@ describe("Composer suggestion", () => {
     await act(async () => finish());
   });
 
-  it("shows the suggestion as a chip that puts it in the box without sending", async () => {
+  it("has a Tab key that puts the suggestion in the box without sending, and no copy of its text", async () => {
     render(<Composer pane={pane} agent="claude" status="done" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    const chip = await screen.findByRole("button", { name: "run the tests again" });
-    expect(chip.title).toBe("Take Claude's suggestion (Tab)");
-    fireEvent.click(chip);
+    const tab = screen.getByRole("button", { name: "Tab" }) as HTMLButtonElement;
+    await waitFor(() => expect(tab.disabled).toBe(false));
+    expect(tab.title).toBe("Take Claude's suggestion");
+    expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
+    fireEvent.click(tab);
     expect(box.value).toBe("run the tests again");
     expect(document.activeElement).toBe(box);
     expect(vi.mocked(herdrCall).mock.calls.map((c) => c[2])).not.toContain("agent.prompt");
-    expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
+    expect(tab.disabled).toBe(true);
   });
 
-  it("hides the suggestion chip while something is typed", async () => {
-    render(<Composer pane={pane} agent="claude" status="idle" />);
+  it("disables the Tab key while something is typed, and has none for other agents", async () => {
+    const { rerender } = render(<Composer pane={pane} agent="claude" status="idle" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    await screen.findByRole("button", { name: "run the tests again" });
+    const tab = screen.getByRole("button", { name: "Tab" }) as HTMLButtonElement;
+    await waitFor(() => expect(tab.disabled).toBe(false));
     fireEvent.change(box, { target: { value: "my own" } });
-    expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
+    expect(tab.disabled).toBe(true);
+    rerender(<Composer pane={pane} agent="codex" status="idle" />);
+    expect(screen.queryByRole("button", { name: "Tab" })).toBeNull();
   });
 
   it("leaves Tab alone while something is typed", async () => {

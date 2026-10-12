@@ -394,13 +394,8 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer-top">
-        {((showQuick && quickReplies.length > 0) || compact || offered) && (
+        {((showQuick && quickReplies.length > 0) || compact) && (
           <div className="composer-quick" role="group" aria-label="Quick replies">
-            {offered && (
-              <button className="composer-quick-reply suggestion" title="Take Claude's suggestion (Tab)" onClick={() => takeSuggestion(offered)}>
-                {offered}
-              </button>
-            )}
             {compact && (
               <button
                 className={`composer-quick-reply compact ctx-${compact}`}
@@ -426,6 +421,13 @@ export function Composer({
               onClick={startBtw}
             >
               /btw
+            </button>
+          )}
+          {/* The suggestion already shows in the empty box; this only takes it, as Tab does. Mounted
+              for Claude whether or not one is offered, so the row doesn't shift. */}
+          {agent === "claude" && (
+            <button className="keycap" title="Take Claude's suggestion" disabled={!offered} onClick={() => offered && takeSuggestion(offered)}>
+              Tab
             </button>
           )}
           {KEYS.map((k) => (
