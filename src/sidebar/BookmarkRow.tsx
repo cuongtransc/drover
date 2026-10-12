@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import { useApp } from "../store/app";
 import { CheckIcon, StarOffIcon } from "../ui/icons";
@@ -43,11 +43,17 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
   const word = row ? WORD[row.state] : undefined;
   const lanes = row && row.state === "working" && row.lanes > 0 ? `${row.lanes} ${row.lanes === 1 ? "lane" : "lanes"}` : null;
   const node = b.node;
+  // Stay disabled until workspace.create settles, so a double click makes one Workspace (ADR 0008).
+  const [pending, setPending] = useState(false);
   const open = () => {
+    if (pending) return;
     // A closed Bookmark whose Workspace is kept opens it again in the folder it was kept with (ADR 0008).
     if (!row && kept && node && node.machine.state === "connected" && node.session.running) {
+      setPending(true);
       setOrigin("bookmarks");
-      a?.guard(() => reopenKept(node.machine.id, node.session.name, { key: b.key, label: b.label, folder: kept.folder }));
+      a?.guard(() =>
+        reopenKept(node.machine.id, node.session.name, { key: b.key, label: b.label, folder: kept.folder }).finally(() => setPending(false)),
+      );
       return;
     }
     if (!row?.target || !node) return;
@@ -63,6 +69,7 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
         className={"row bm-row " + (row ? row.state : "closed") + (lit ? " active" : "") + indicatorClass(drag, `bookmark:${b.key}`)}
         aria-current={lit ? "true" : undefined}
         aria-label={[b.label, b.sessionName, word?.toLowerCase() ?? lanes ?? (row ? null : "closed")].filter(Boolean).join(", ")}
+        disabled={pending}
         onClick={open}
         onContextMenu={(e) => a?.menu(e, [unbookmark])}
       >

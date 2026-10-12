@@ -24,6 +24,7 @@ const work = { kind: "group" as const, id: "g1", label: "Work", children: [{ kin
 
 describe("Sidebar", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     useApp.setState({ machines: { box: m }, order: ["box"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: EMPTY_LAYOUT });
     useSessionFilter.setState({ filter: "all" });
@@ -162,6 +163,16 @@ describe("Sidebar", () => {
     fireEvent.click(closed);
     expect(useApp.getState().selected).toBeNull();
   });
+  it("does not reopen a running Session's closed Bookmark that was never kept", () => {
+    // The Session is live and running, so the only thing stopping the reopen is the absent kept entry.
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: { tree: [], bookmarks: [key] } });
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" });
+    fireEvent.click(closed);
+    expect(herdrCall).not.toHaveBeenCalled();
+    expect(useApp.getState().selected).toBeNull();
+  });
   it("bookmarking a project keeps its workspace with its folder", () => {
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByRole("button", { name: "drover" }));
@@ -171,12 +182,31 @@ describe("Sidebar", () => {
   it("reopens a closed bookmarked workspace that is kept", async () => {
     const key = projectKey("box", "default", "old");
     useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
-    vi.mocked(herdrCall).mockResolvedValue({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    let release!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockReturnValue(new Promise((resolve) => (release = resolve)));
     render(<Sidebar />);
     fireEvent.click(within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" }));
-    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+    // Origin and the herdr call happen before workspace.create settles, so moving setOrigin after
+    // the await would fail here.
     expect(herdrCall).toHaveBeenCalledWith("box", "default", "workspace.create", { cwd: "/c/old", label: "old", focus: false });
     expect(useViewOrigin.getState().from).toBe("bookmarks");
+    release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+  });
+  it("reopens a closed kept Bookmark once when it is double clicked", async () => {
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    let release!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" }) as HTMLButtonElement;
+    fireEvent.click(closed);
+    fireEvent.click(closed);
+    expect(herdrCall).toHaveBeenCalledTimes(1);
+    expect(closed.disabled).toBe(true);
+    release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+    await waitFor(() => expect(closed.disabled).toBe(false));
   });
   it("views a running session on click", () => {
     render(<Sidebar />);
