@@ -782,12 +782,15 @@ describe("Composer prompt history", () => {
   };
 
   it("recalls Claude's own history for the folder, then what was sent since, as Claude's terminal does", async () => {
-    vi.mocked(claudePromptHistory).mockResolvedValue(["from the terminal", "from yesterday"]);
+    // Claude's history arrives inside act: resolved under waitFor it landed outside act, and its
+    // render then waited on React's scheduler, which could run after the Up below (CI, 2026-10-12).
+    let arrive!: (h: string[]) => void;
+    vi.mocked(claudePromptHistory).mockReturnValue(new Promise((r) => (arrive = r)));
     recordPrompt("devtuf/default/w1:p1", "only in Drover");
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
-    await waitFor(() => expect(claudePromptHistory).toHaveBeenCalledWith(pane));
-    await act(async () => {});
+    expect(claudePromptHistory).toHaveBeenCalledWith(pane);
+    await act(async () => arrive(["from the terminal", "from yesterday"]));
     up(box);
     expect(box.value).toBe("from yesterday");
     up(box);
