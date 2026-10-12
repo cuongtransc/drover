@@ -70,37 +70,27 @@ describe("Composer", () => {
     await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
   });
 
-  it("starts a side question from its /btw key, keeping what was typed", () => {
+  it("opens the side column from its /btw key, leaving the draft here alone", () => {
+    useBtw.setState({ open: {} });
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
-    fireEvent.change(box, { target: { value: "why that file?" } });
+    fireEvent.change(box, { target: { value: "and rename the Header" } });
     const btw = screen.getByRole("button", { name: "/btw" });
     expect(btw.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(btw);
-    expect(box.value).toBe("/btw why that file?");
-    expect(document.activeElement).toBe(box);
+    expect(useBtw.getState().open["devtuf/default/w1:p1"]).toBe(true);
     expect(btw.getAttribute("aria-pressed")).toBe("true");
+    expect(box.value).toBe("and rename the Header");
+    expect(herdrCall).not.toHaveBeenCalled();
   });
 
-  it("takes /btw off again from its key, keeping the question", () => {
+  it("closes the side column from its /btw key, pressed while it is open", () => {
+    useBtw.setState({ open: { "devtuf/default/w1:p1": true } });
     render(<Composer pane={pane} agent="claude" />);
-    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     const btw = screen.getByRole("button", { name: "/btw" });
-    fireEvent.change(box, { target: { value: "why that file?" } });
-    fireEvent.click(btw);
-    fireEvent.click(btw);
-    expect(box.value).toBe("why that file?");
-    expect(btw.getAttribute("aria-pressed")).toBe("false");
-    expect(document.activeElement).toBe(box);
-  });
-
-  it("shows /btw pressed when it is typed by hand, and not once it is deleted", () => {
-    render(<Composer pane={pane} agent="claude" />);
-    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
-    const btw = screen.getByRole("button", { name: "/btw" });
-    fireEvent.change(box, { target: { value: "/btw why?" } });
     expect(btw.getAttribute("aria-pressed")).toBe("true");
-    fireEvent.change(box, { target: { value: "why?" } });
+    fireEvent.click(btw);
+    expect(useBtw.getState().open["devtuf/default/w1:p1"]).toBeUndefined();
     expect(btw.getAttribute("aria-pressed")).toBe("false");
   });
 
@@ -835,12 +825,15 @@ describe("Composer prompt history", () => {
   };
 
   it("recalls Claude's own history for the folder, then what was sent since, as Claude's terminal does", async () => {
-    vi.mocked(claudePromptHistory).mockResolvedValue(["from the terminal", "from yesterday"]);
+    // Claude's history arrives inside act: resolved under waitFor it landed outside act, and its
+    // render then waited on React's scheduler, which could run after the Up below (CI, 2026-10-12).
+    let arrive!: (h: string[]) => void;
+    vi.mocked(claudePromptHistory).mockReturnValue(new Promise((r) => (arrive = r)));
     recordPrompt("devtuf/default/w1:p1", "only in Drover");
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
-    await waitFor(() => expect(claudePromptHistory).toHaveBeenCalledWith(pane));
-    await act(async () => {});
+    expect(claudePromptHistory).toHaveBeenCalledWith(pane);
+    await act(async () => arrive(["from the terminal", "from yesterday"]));
     up(box);
     expect(box.value).toBe("from yesterday");
     up(box);

@@ -16,7 +16,7 @@ import { aliasTitle, contextMeter, formatTokens, modelLabel, type ContextMeter }
 import { ModelMenu } from "./ModelMenu";
 import { useClaudeSuggestion } from "./useClaudeSuggestion";
 import { useCompletions } from "./useCompletions";
-import { btwQuestion, useBtw } from "./btw";
+import { btwQuestion, closeBtw, useBtw } from "./btw";
 import { useComposerFill, useRewind } from "./rewind";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
@@ -24,8 +24,6 @@ import { IMAGE_EXTS } from "../terminal/imagePaste";
 // shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`). Only Esc: Ctrl+C does
 // nothing Esc does not, and twice in a row exits Claude; ⇧Tab's mode change went almost unused.
 const KEYS: { label: string; key: string }[] = [{ label: "Esc", key: "esc" }];
-/** What the /btw key puts before the text, and takes off again. */
-const BTW_PREFIX = /^\s*\/btw\s/;
 
 // Agents whose TUI turns a bracketed-pasted image path into an image attachment (as when
 // pasting a screenshot in a terminal); `agent.prompt` frames text and path as one paste,
@@ -65,7 +63,7 @@ function ContextRing({ pct }: { pct: number }) {
 const bracketedPaste = (text: string) => `\x1b[200~${text}\x1b[201~`;
 
 /** An `agent.*` call as the `pane.*` call that does the same, for an agent herdr does not track. */
-function asPaneCall(method: string, params: unknown): [string, unknown] {
+export function asPaneCall(method: string, params: unknown): [string, unknown] {
   const p = params as { target?: string; text?: string; keys?: string[] };
   // agent.prompt pastes the text, then submits it.
   if (method === "agent.prompt") return ["pane.send_input", { pane_id: p.target, text: bracketedPaste(p.text ?? ""), keys: ["enter"] }];
@@ -189,6 +187,7 @@ export function Composer({
   const [sending, setSending] = useState(false);
   // Claude's /btw panel takes the pane's keys until the Chat lens has read the answer and closed it.
   const asking = useBtw((s) => s.asides[key]?.phase === "asking");
+  const btwOpen = useBtw((s) => !!s.open[key]);
   // So does Claude's Rewind screen while an edit of the last message drives it.
   const editing = useRewind((s) => !!s.edits[key] && s.edits[key].phase !== "failed");
   const fill = useComposerFill((s) => s.fill[key]);
@@ -373,17 +372,8 @@ export function Composer({
     });
   }, [fill, key]);
 
-  // On while the box holds a /btw, however it got there; sending empties the box and turns it off.
-  const btwOn = BTW_PREFIX.test(text);
-  /** Puts `/btw ` before what is typed, or takes it off again, and returns to the box, caret at the end. */
-  const toggleBtw = () => {
-    setText((cur) => (BTW_PREFIX.test(cur) ? cur.replace(BTW_PREFIX, "") : `/btw ${cur.replace(/^\s+/, "")}`));
-    box.current?.focus();
-    requestAnimationFrame(() => {
-      const el = box.current;
-      if (el) el.setSelectionRange(el.value.length, el.value.length);
-    });
-  };
+  /** Opens the /btw column beside the chat, or closes it again; what is typed here stays for the main session. */
+  const toggleBtw = () => (btwOpen ? void closeBtw(pane, call) : useBtw.getState().openBtw(pane));
 
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {
@@ -422,7 +412,7 @@ export function Composer({
             <button
               className="keycap"
               title="Ask on the side: Claude answers from the conversation without stopping or steering its turn, and the answer stays out of the transcript"
-              aria-pressed={btwOn}
+              aria-pressed={btwOpen}
               onClick={toggleBtw}
             >
               /btw

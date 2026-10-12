@@ -1214,17 +1214,25 @@ kbd {
 .chat-queued .chat-bubble { background: transparent; border-style: dashed; color: var(--fg-2); }
 .chat-queued-label { flex: none; color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
 /* Running background shells and Agents above the Composer; text uses only the contrast-tested tokens, no fill. */
-.chat-background { flex: none; margin: 0 auto; padding: 0 28px; list-style: none; width: 100%; max-width: var(--chat-max); box-sizing: border-box; max-height: 20vh; overflow-y: auto; }
+.chat-background { flex: none; margin: 0 auto; padding: 0 28px; width: 100%; max-width: var(--chat-max); box-sizing: border-box; }
+.chat-background > ul { margin: 0; padding: 0; list-style: none; max-height: 20vh; overflow-y: auto; }
 /* Same 28px inset and 8px gap as .chat-working, so the spinners share one x; the kind label gets a column that fits "Agent". */
-.chat-background-row {
-  display: grid; grid-template-columns: 12px 40px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; width: 100%; margin: 0; padding: 2px 0;
+.chat-background-summary, .chat-background-row {
+  display: grid; align-items: center; column-gap: 8px; width: 100%; margin: 0; padding: 2px 0;
   border: 0; background: transparent; font: inherit; font-size: 12px; text-align: left; cursor: pointer; color: var(--fg-2);
 }
+.chat-background-summary { grid-template-columns: 12px minmax(0, 1fr) auto; }
+.chat-background-row { grid-template-columns: 12px 40px minmax(0, 1fr) auto; }
+.chat-background-count { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-background-summary:hover .chat-background-count { text-decoration: underline; }
+/* Larger than the text so it reads, with no line height of its own so the row stays one line high. */
+.chat-background-chev { display: inline-block; margin-left: 6px; font-size: 15px; line-height: 0; transition: transform var(--t) var(--ease); }
+.chat-background-summary[aria-expanded="true"] .chat-background-chev { transform: rotate(90deg); }
 .chat-background-kind, .chat-background-time { color: var(--fg-3); white-space: nowrap; }
 .chat-background-time { text-align: right; }
 .chat-background-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .chat-background-row:hover .chat-background-desc { text-decoration: underline; }
-/* Claude's /btw answer, read off its screen: sits above the Composer, scrolls on its own. */
+/* A card above the Composer (Edit's progress); the /btw column below shares its parts. */
 .btw-panel {
   flex: none; width: calc(100% - 40px); max-width: calc(var(--chat-max) - 40px); margin: 0 auto 4px; box-sizing: border-box;
   border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--surface-1);
@@ -1233,7 +1241,7 @@ kbd {
 .btw-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--line); }
 .btw-tag { flex: none; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--accent); }
 .btw-question { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 13px; }
-.btw-panel .chat-copy { opacity: 1; }
+.btw-panel .chat-copy, .btw-side .chat-copy { opacity: 1; }
 .btw-status { padding: 10px 12px; color: var(--fg-2); font-size: 13px; }
 .btw-body { overflow: auto; min-height: 0; }
 .btw-earlier { border-bottom: 1px solid var(--line); }
@@ -1246,6 +1254,33 @@ kbd {
 }
 .btw-error { display: flex; align-items: center; gap: 8px; padding: 8px 12px; color: var(--err-fg); font-size: 13px; }
 .btw-error > span { flex: 1; min-width: 0; }
+/* The /btw thread, in the outline's place beside the chat: its box sits level with the Composer's.
+   A chat too narrow to give it 360px keeps its width and the column floats over its right side. */
+.btw-side {
+  flex: none; position: relative; min-height: 0; display: flex; flex-direction: column; box-sizing: border-box;
+  background: var(--surface-1); border-left: 1px solid var(--line);
+}
+.btw-side .btw-head { padding: 10px 8px 10px 14px; }
+.btw-side .btw-question { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.btw-side .btw-body { flex: 1; }
+.btw-hint { padding: 10px 14px; color: var(--fg-2); font-size: 13px; }
+.btw-compose {
+  flex: none; display: flex; align-items: flex-end; gap: 8px; margin: 8px 12px 16px; padding: 8px 8px 8px 12px;
+  background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  transition: border-color var(--t-fast);
+}
+.btw-compose:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.btw-compose textarea {
+  flex: 1; min-width: 0; resize: none; padding: 4px 0; border: 0; background: none; color: var(--fg);
+  font: inherit; font-size: 13px; line-height: 1.5; max-height: calc(1.5em * 8); overflow-y: auto;
+}
+.btw-compose textarea:focus-visible { outline: none; box-shadow: none; }
+.btw-compose textarea::placeholder { color: var(--fg-3); }
+.btw-compose .send { width: 26px; height: 26px; border-radius: 7px; margin-left: 0; }
+.chat-lens { position: relative; }
+@container (max-width: 899px) {
+  .btw-side { position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; max-width: 100%; box-shadow: var(--shadow-dialog); }
+}
 .edit-choose { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; font-size: 13px; color: var(--fg); }
 .edit-choose p { margin: 0; }
 .edit-actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1865,6 +1900,10 @@ button.composer-model:disabled { cursor: default; }
 .files-outline-toggle .icon { width: 12px; height: 12px; transition: transform var(--t-fast); }
 .files-outline-toggle.open .icon { transform: rotate(90deg); }
 .files-outline-toggle[role="button"]:hover { background: var(--active); color: var(--fg); }
+/* A folder opened as an item: its names, as rows like the tree's. */
+.files-folder { list-style: none; margin: 0; padding: 4px 0; overflow: auto; font-size: 12.5px; }
+.files-folder .files-tree-row { width: 100%; padding-left: 12px; border: 0; background: none; font: inherit; text-align: left; }
+.files-folder .files-tree-row:focus-visible { background: var(--active); color: var(--fg); outline: none; box-shadow: inset 2px 0 0 var(--accent); }
 .files-notice { flex: 1; display: grid; place-content: center; justify-items: center; gap: 4px; color: var(--fg-3); font-size: 13px; }
 .files-notice-size { font-size: 12px; font-variant-numeric: tabular-nums; }
 .files-markdown-image { max-width: 100%; }

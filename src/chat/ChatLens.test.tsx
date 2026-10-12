@@ -49,6 +49,7 @@ import { useLensSettings } from "../settings/lens";
 import { useForks } from "../agents/forkSession";
 import { paneKey } from "../lib/types";
 import { useApp } from "../store/app";
+import { useBtw } from "./btw";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
@@ -80,6 +81,12 @@ beforeEach(() => {
       return method === "pane.read" ? { text: shown } : {};
     });
 });
+
+/** Opens the folded background strip and returns its list. */
+function openStrip() {
+  fireEvent.click(screen.getByRole("button", { name: /in background/ }));
+  return screen.getByRole("list", { name: "Background tasks" });
+}
 
 describe("ChatLens", () => {
   it("lets a new Claude be chatted with before its transcript exists", async () => {
@@ -209,9 +216,9 @@ describe("ChatLens", () => {
         background: [{ call_id: "t1", kind: "bash", description: "Run CI", started: "2026-10-10T17:08:00.000Z" }],
       }),
     );
-    expect(screen.getByRole("list", { name: "Background tasks" }).textContent).toContain("Run CI");
+    expect(screen.getByRole("button", { name: /1 shell in background/ })).toBeTruthy();
     rerender(<ChatLens pane={pane} view={{ ...view, agent: null }} />);
-    expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /in background/ })).toBeNull();
   });
 
   it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
@@ -312,6 +319,17 @@ describe("ChatLens", () => {
     expect([...nav.querySelectorAll("ol button")].map((b) => b.textContent)).toEqual(["fix the header", "now the footer"]);
   });
 
+  it("puts the /btw column in the outline's place while it is open", () => {
+    render(<ChatLens pane={pane} view={{ ...idlePi, agent: "claude" }} />);
+    screen.getByRole("navigation", { name: "Conversation outline" });
+    act(() => useBtw.getState().openBtw(pane));
+    const column = screen.getByRole("region", { name: "Side question" });
+    expect(column.previousElementSibling?.classList.contains("chat-main")).toBe(true);
+    expect(screen.queryByRole("navigation", { name: "Conversation outline" })).toBeNull();
+    act(() => useBtw.setState({ open: {} }));
+    screen.getByRole("navigation", { name: "Conversation outline" });
+  });
+
   it("keeps the turn picked in the outline lit until the transcript is scrolled", () => {
     const { container } = render(<ChatLens pane={pane} view={idlePi} />);
     const items = [
@@ -374,7 +392,7 @@ describe("ChatLens", () => {
       );
       const head = screen.getByRole("button", { name: /^Worked/ });
       expect(head.getAttribute("aria-expanded")).toBe("false");
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Run CI/ }));
       expect(screen.getByRole("button", { name: /^Worked/ }).getAttribute("aria-expanded")).toBe("true");
     });
 
@@ -385,7 +403,7 @@ describe("ChatLens", () => {
       try {
         await load();
         bgMeta();
-        fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+        fireEvent.click(within(openStrip()).getByRole("button", { name: /Run CI/ }));
         const cards = () => (scroll.mock.contexts as HTMLElement[]).map((el) => el.dataset.call);
         await waitFor(() => expect(cards()).toContain("bg1"));
       } finally {
@@ -435,7 +453,7 @@ describe("ChatLens", () => {
           background: [{ call_id: "bg9", kind: "bash", description: "Old job", started: null }],
         }),
       );
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Old job/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Old job/ }));
       await waitFor(() => expect(screen.getAllByRole("button", { name: /^Worked/ })[0].getAttribute("aria-expanded")).toBe("true"));
       expect(vi.mocked(chatPage).mock.calls.map((c) => c[1])).toEqual([4, 2]);
     });
@@ -454,7 +472,7 @@ describe("ChatLens", () => {
           background: [{ call_id: "gone", kind: "bash", description: "Lost job", started: null }],
         }),
       );
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Lost job/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Lost job/ }));
       expect(await screen.findByText(/Task call not found in the transcript/)).toBeTruthy();
     });
 
