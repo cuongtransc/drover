@@ -66,12 +66,18 @@ describe("idleWatch", () => {
 });
 
 describe("idleMinutes", () => {
-  it("defaults to 30", () => expect(idleMinutes(undefined)).toBe(30));
-  it("reads DROVER_VITE_IDLE_MINUTES, fractions included", () => expect(idleMinutes("0.5")).toBe(0.5));
-  it("0 turns it off", () => expect(idleMinutes("0")).toBe(0));
+  const m = (raw?: string) => idleMinutes({ DROVER_VITE_IDLE_MINUTES: raw });
+  it("defaults to 30", () => expect(idleMinutes({})).toBe(30));
+  it("reads DROVER_VITE_IDLE_MINUTES, fractions included", () => expect(m("0.5")).toBe(0.5));
+  it("0 turns it off", () => expect(m("0")).toBe(0));
   it("falls back to 30 on garbage or a negative", () => {
-    expect(idleMinutes("soon")).toBe(30);
-    expect(idleMinutes("-1")).toBe(30);
-    expect(idleMinutes("")).toBe(30);
+    expect(m("soon")).toBe(30);
+    expect(m("-1")).toBe(30);
+    expect(m("")).toBe(30);
   });
+  // tauri dev starts vite, then builds Rust for minutes before its webview connects, and stops
+  // vite when it exits: an idle exit there leaves the app on a dead dev URL (2026-10-12).
+  it("is off under tauri dev", () =>
+    expect(idleMinutes({ TAURI_ENV_PLATFORM: "darwin", DROVER_VITE_IDLE_MINUTES: "0.5" })).toBe(0));
+  it("is off under vitest, whose watch mode sits idle on purpose", () => expect(idleMinutes({ VITEST: "true" })).toBe(0));
 });
