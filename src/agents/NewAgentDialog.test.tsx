@@ -7,6 +7,7 @@ import { useLensSettings } from "../settings/lens";
 import { useApp } from "../store/app";
 import { getFolder, setFolder } from "../workspaces/folder";
 import { NewAgentDialog } from "./NewAgentDialog";
+import { EMPTY_LAYOUT, projectKey, setKept, useLayout } from "../sidebar/groups";
 import type { WorkspaceView } from "../lib/types";
 
 const ws: WorkspaceView = { workspace_id: "w1", label: "api", number: 1, status: "idle", tabs: [
@@ -43,6 +44,7 @@ const open = (onError = vi.fn()) => {
 describe("NewAgentDialog", () => {
   beforeEach(() => {
     localStorage.clear();
+    useLayout.setState({ layout: EMPTY_LAYOUT });
     vi.clearAllMocks();
     useApp.setState({ selected: null, lensOverride: {}, starting: {} });
     useLensSettings.setState({ newAgentLens: "terminal" });
@@ -124,6 +126,17 @@ describe("NewAgentDialog", () => {
     expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "w1:p7" });
   });
 
+  it("updates a kept workspace's folder on the first folder choice", async () => {
+    const key = projectKey("local", "default", "api");
+    useLayout.setState({ layout: setKept(EMPTY_LAYOUT, key, "/old") });
+    respond();
+    open();
+    fireEvent.change(screen.getByLabelText("Folder"), { target: { value: "/chosen " } });
+    fireEvent.click(screen.getByRole("button", { name: "shell" }));
+    await waitFor(() => expect(useApp.getState().selected?.pane_id).toBe("w1:p7"));
+    expect(useLayout.getState().layout.kept?.[key]).toEqual({ folder: "/chosen" });
+    expect(getFolder(ref)).toBe("/chosen");
+  });
   it("uses the remembered folder without asking", async () => {
     setFolder(ref, "/home/me/api");
     respond();

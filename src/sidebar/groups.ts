@@ -257,19 +257,31 @@ export function forgetKept(layout: Layout, key: ProjectKey): Layout {
 /** Move a kept Workspace and its Bookmark when its label changes, keeping the Bookmark's place. */
 export function renameProjectKey(layout: Layout, from: ProjectKey, to: ProjectKey): Layout {
   if (from === to) return layout;
-  const bookmarks = layout.bookmarks.includes(from)
-    ? layout.bookmarks.map((k) => (k === from ? to : k))
-    : layout.bookmarks;
+  const seen = new Set<ProjectKey>();
+  const bookmarks: ProjectKey[] = [];
+  for (const k of layout.bookmarks) {
+    const mapped = k === from ? to : k;
+    if (seen.has(mapped)) continue;
+    seen.add(mapped);
+    bookmarks.push(mapped);
+  }
+  const bookmarksUnchanged =
+    bookmarks.length === layout.bookmarks.length && bookmarks.every((k, i) => k === layout.bookmarks[i]);
   const current = layout.kept;
   let kept = current;
   if (current && from in current) {
     const next: Record<ProjectKey, KeptEntry> = {};
-    for (const [k, v] of Object.entries(current)) next[k === from ? to : k] = v;
+    for (const [k, v] of Object.entries(current)) {
+      if (k === from) {
+        if (to in current) continue;
+        next[to] = v;
+      } else next[k] = v;
+    }
     kept = next;
   }
-  return bookmarks === layout.bookmarks && kept === layout.kept
+  return bookmarksUnchanged && kept === layout.kept
     ? layout
-    : { ...layout, bookmarks, ...(kept ? { kept } : {}) };
+    : { ...layout, bookmarks: bookmarksUnchanged ? layout.bookmarks : bookmarks, ...(kept ? { kept } : {}) };
 }
 
 /** Move a bookmark before `beforeKey`, or to the end when null. */
@@ -326,6 +338,7 @@ export function forgetSessions(layout: Layout, keys: SessionKey[]): Layout {
 
 /** The renamed Session keeps its place in the tree and its bookmark. */
 export function renameSessionKey(layout: Layout, from: SessionKey, to: SessionKey): Layout {
+  if (from === to) return layout;
   const walk = (nodes: LayoutNode[]): LayoutNode[] => {
     let changed = false;
     const out = nodes.map((n): LayoutNode => {
@@ -386,6 +399,13 @@ function parseKept(v: unknown): Record<ProjectKey, KeptEntry> | undefined {
   const out: Record<ProjectKey, KeptEntry> = {};
   for (const [k, entry] of Object.entries(v as Record<string, unknown>)) {
     if (!isProjectKey(k)) continue;
+    const parts = k.split("/");
+    try {
+      decodeURIComponent(parts[1]);
+      decodeURIComponent(parts[2]);
+    } catch {
+      continue;
+    }
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const { folder } = entry as { folder?: unknown };
     if (typeof folder !== "string" && folder !== null) continue;

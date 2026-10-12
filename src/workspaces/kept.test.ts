@@ -32,6 +32,12 @@ describe("closedKept", () => {
     const s = session("ct", true);
     expect(closedKept(layout, machine("probing", s), s)).toEqual([]);
   });
+  it("handles a malformed label defensively even without parsing", () => {
+    const s = session("ct", true);
+    expect(closedKept({ ...EMPTY_LAYOUT, kept: { "local/ct/%": { folder: "/a" } } }, machine("connected", s), s)).toEqual([
+      { key: "local/ct/%", label: "%", folder: "/a" },
+    ]);
+  });
   it("lists nothing without kept workspaces", () => {
     const s = session("ct", true);
     expect(closedKept(EMPTY_LAYOUT, machine("connected", s), s)).toEqual([]);
@@ -44,6 +50,16 @@ describe("backfillKept", () => {
     const layout = { ...EMPTY_LAYOUT, bookmarks: [k("infra"), k("gone")] };
     const m = machine("connected", session("ct", true, ws("w1", "infra")));
     expect(backfillKept(layout, m, folderOf).kept).toEqual({ [k("infra")]: { folder: "/c/infra" } });
+  });
+  it("backfills the first duplicate label's folder, not the second's", () => {
+    const first = ws("w1", "infra");
+    const second = ws("w2", "infra");
+    first.tabs[0].panes[0].cwd = "/first";
+    second.tabs[0].panes[0].cwd = "/second";
+    const layout = { ...EMPTY_LAYOUT, bookmarks: [k("infra")] };
+    expect(backfillKept(layout, machine("connected", session("ct", true, first, second)), (_s, w) => w.tabs[0].panes[0].cwd).kept).toEqual({
+      [k("infra")]: { folder: "/first" },
+    });
   });
   it("changes nothing when every live bookmark is kept, or the snapshot is not authoritative", () => {
     const kept = setBookmarked(EMPTY_LAYOUT, k("infra"), true, "/old");

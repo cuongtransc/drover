@@ -113,6 +113,10 @@ describe("layout file", () => {
       expect.objectContaining({ future: { v: 2 }, kept: expect.objectContaining({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } }) }),
     );
   });
+  it("drops kept keys with undecodable session or label components on load", async () => {
+    await initLayout(io({ ...l, kept: { "local/ct/%": { folder: "/a" }, "local/%/ok": { folder: "/b" } } }));
+    expect(useLayout.getState().layout.kept).toEqual({});
+  });
   it("reads a file with no kept field as an empty kept object", async () => {
     const f = io({ tree: l.tree, bookmarks: l.bookmarks });
     await initLayout(f);

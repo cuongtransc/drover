@@ -13,7 +13,14 @@ export interface ClosedKept {
 }
 
 /** The Workspace label a ProjectKey was built from. */
-const labelOf = (key: ProjectKey): string => decodeURIComponent(key.slice(key.lastIndexOf("/") + 1));
+const labelOf = (key: ProjectKey): string => {
+  const raw = key.slice(key.lastIndexOf("/") + 1);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+};
 
 /**
  * The kept Workspaces of `session` no live Workspace carries, by label. Empty unless

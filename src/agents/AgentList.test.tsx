@@ -14,6 +14,10 @@ import { itemKey, NO_ITEMS } from "../store/openItems";
 import { EMPTY_LAYOUT, projectKey, setBookmarked, setKept, useLayout } from "../sidebar/groups";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
+import { ClosedSection } from "./ClosedSection";
+import { Sidebar } from "../sidebar/Sidebar";
+import { ActionsProvider, useActions, type Actions } from "../sidebar/actions";
+import type { MenuItem } from "../sidebar/ContextMenu";
 import { useProtect } from "./protect";
 import { useActiveWindow, usePaneFilter } from "./paneFilter";
 import type { MachineView, PaneView } from "../lib/types";
@@ -621,6 +625,7 @@ describe("AgentList", () => {
     fireEvent.click(toggle);
     expect(useApp.getState().expanded["closed:local/default"]).toBe(true);
     expect([...closed().querySelectorAll(".closed-label")].map((b) => b.textContent)).toEqual(["agent", "smarthomes"]);
+    expect([...closed().querySelectorAll(".ws-folder")].map((b) => b.textContent)).toEqual(["agent", "smarthomes"]);
     act(() => usePaneFilter.setState({ filter: "all" }));
     expect(within(closed()).getByText("agent", { selector: ".closed-label" })).toBeTruthy();
   });
@@ -653,9 +658,15 @@ describe("AgentList", () => {
     let done!: (v: unknown) => void;
     vi.mocked(herdrCall).mockImplementation(() => new Promise((r) => (done = r)));
     useApp.setState({ expanded: { "closed:local/default": true } });
-    render(<AgentList />);
-    fireEvent.click(screen.getByRole("button", { name: "Reopen agent" }));
+    let actions!: Actions;
+    function CaptureActions() { actions = useActions()!; return null; }
+    render(<ActionsProvider><CaptureActions /><ClosedSection machineId="local" session={m.sessions[0]} /></ActionsProvider>);
+    const menu = vi.spyOn(actions, "menu");
     const row = within(closed()).getByText("agent", { selector: ".closed-label" }).closest(".closed-row")!;
+    fireEvent.contextMenu(row);
+    const capturedReopen = (menu.mock.calls[0][1].find((i) => i !== "sep" && i.label === "Reopen") as MenuItem).onSelect;
+    fireEvent.click(screen.getByRole("button", { name: "Reopen agent" }));
+    act(() => capturedReopen());
     fireEvent.contextMenu(row);
     const item = screen.getByRole("menuitem", { name: "Reopen" });
     expect((item as HTMLButtonElement).disabled).toBe(true);
@@ -666,6 +677,39 @@ describe("AgentList", () => {
     await act(async () => done({ workspace: { workspace_id: "w4" }, root_pane: { pane_id: "p40" } }));
   });
 
+  it.each(["closed", "bookmark"])("shares reopen protection across Closed and Bookmark, starting from %s", async (start) => {
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, keyOf("agent"), true, "/c/agent") });
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    let done!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockReturnValue(new Promise((r) => (done = r)));
+    render(<><AgentList /><Sidebar /></>);
+    const closedButton = screen.getByRole("button", { name: "Reopen agent" });
+    const bookmark = screen.getByRole("button", { name: "agent, default, closed" });
+    fireEvent.click(start === "closed" ? closedButton : bookmark);
+    expect(bookmark.getAttribute("aria-disabled")).toBe("true");
+    expect((closedButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(start === "closed" ? bookmark : closedButton);
+    expect(vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "workspace.create")).toHaveLength(1);
+    await act(async () => done({ workspace: { workspace_id: "w4" }, root_pane: { pane_id: "p40" } }));
+  });
+  it("renders a malformed kept label without throwing", () => {
+    useLayout.setState({ layout: { ...EMPTY_LAYOUT, kept: { "local/default/%": { folder: "/a" } } } });
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    render(<AgentList />);
+    expect(within(closed()).getByText("%", { selector: ".closed-label" })).toBeTruthy();
+  });
+  it("keeping the second duplicate stores the first workspace's folder", () => {
+    const duplicate = structuredClone(m);
+    const second = structuredClone(duplicate.sessions[0].workspaces[1]);
+    second.workspace_id = "w4";
+    second.tabs[0].panes[0].cwd = "/second";
+    duplicate.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { local: duplicate } });
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getAllByRole("group", { name: "web" })[1].querySelector(".ws-head")!);
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Keep when closed" }));
+    expect(useLayout.getState().layout.kept).toEqual({ "local/default/web": { folder: "/x" } });
+  });
   it("forgets a closed workspace from its menu, unbookmarking it", () => {
     useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, keyOf("agent"), true, "/c/agent") });
     useApp.setState({ expanded: { "closed:local/default": true } });

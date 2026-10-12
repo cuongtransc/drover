@@ -86,6 +86,17 @@ export function workspaceFolder(machineId: string, session: string, ws: Workspac
   return getFolder(ref) ?? (suggestFolder(ws) || null);
 }
 
+/** The first live Workspace with this label, and the folder a label-keyed kept entry should store. */
+export function firstWorkspaceFolder(
+  machineId: string,
+  session: string,
+  workspaces: readonly WorkspaceView[],
+  label: string,
+): string | null {
+  const ws = workspaces.find((w) => w.label === label);
+  return ws ? workspaceFolder(machineId, session, ws) : null;
+}
+
 export function suggestFolder(ws: WorkspaceView): string {
   for (const tab of ws.tabs) {
     for (const pane of tab.panes) {

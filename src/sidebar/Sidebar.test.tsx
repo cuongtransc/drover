@@ -1,10 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined), herdrCall: vi.fn() }));
-import { herdrCall, sessionStart, sessionStop } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined), sessionRename: vi.fn(), herdrCall: vi.fn() }));
+import { herdrCall, sessionRename, sessionStart, sessionStop } from "../lib/ipc";
 import { useProtect } from "../agents/protect";
 import { useApp } from "../store/app";
-import { EMPTY_LAYOUT, projectKey, sessionKey, setKept, useLayout } from "./groups";
+import { EMPTY_LAYOUT, projectKey, sessionKey, setBookmarked, setKept, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
 import type { MachineView } from "../lib/types";
@@ -25,6 +25,7 @@ const work = { kind: "group" as const, id: "g1", label: "Work", children: [{ kin
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     useApp.setState({ machines: { box: m }, order: ["box"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: EMPTY_LAYOUT });
     useSessionFilter.setState({ filter: "all" });
@@ -173,6 +174,48 @@ describe("Sidebar", () => {
     expect(herdrCall).not.toHaveBeenCalled();
     expect(useApp.getState().selected).toBeNull();
   });
+  it("keeps renamed Session entries when its snapshot arrives before the rename resolves", async () => {
+    const oldKey = projectKey("box", "ai-radar", "app");
+    const newKey = projectKey("box", "radar", "app");
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, oldKey, true, "/app") });
+    let resolve!: () => void;
+    vi.mocked(sessionRename).mockReturnValue(new Promise<void>((r) => (resolve = r)));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    act(() => useApp.getState().upsertMachine({ ...m, sessions: m.sessions.map((s) => s.name === "ai-radar" ? { ...s, name: "radar" } : s) }));
+    await act(async () => resolve());
+    expect(useLayout.getState().layout.kept).toEqual({ [newKey]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([newKey]);
+  });
+  it("rolls layout keys back if a Session rename fails", async () => {
+    const key = projectKey("box", "ai-radar", "app");
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, key, true, "/app") });
+    vi.mocked(sessionRename).mockRejectedValue(new Error("rename failed"));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(screen.getByText("rename failed")).toBeTruthy());
+    expect(useLayout.getState().layout.kept).toEqual({ [key]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([key]);
+  });
+  it("bookmarking the second duplicate stores the first workspace's folder", () => {
+    const duplicate = structuredClone(m);
+    const first = duplicate.sessions[0].workspaces[0];
+    const second = structuredClone(first);
+    second.workspace_id = "w2";
+    second.tabs[0].panes[0].cwd = "/second";
+    duplicate.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { box: duplicate } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByRole("button", { name: "drover" })[1]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ "box/default/drover": { folder: "/x" } });
+  });
   it("bookmarking a project keeps its workspace with its folder", () => {
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByRole("button", { name: "drover" }));
@@ -203,10 +246,14 @@ describe("Sidebar", () => {
     fireEvent.click(closed);
     fireEvent.click(closed);
     expect(herdrCall).toHaveBeenCalledTimes(1);
-    expect(closed.disabled).toBe(true);
+    expect(closed.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.contextMenu(closed);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Unbookmark" }));
+    expect(useLayout.getState().layout.bookmarks).toEqual([]);
+    expect(useLayout.getState().layout.kept?.[key]).toEqual({ folder: "/c/old" });
     release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
     await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
-    await waitFor(() => expect(closed.disabled).toBe(false));
+    expect(herdrCall).toHaveBeenCalledTimes(1);
   });
   it("views a running session on click", () => {
     render(<Sidebar />);

@@ -11,7 +11,7 @@ import type { MenuEntry, MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
 import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ArchiveIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
-import { folderName, suggestFolder, useFolder, workspaceFolder } from "../workspaces/folder";
+import { firstWorkspaceFolder, folderName, suggestFolder, useFolder } from "../workspaces/folder";
 import { saveWorkspaceFolder } from "../workspaces/keptActions";
 import { forgetKept, projectKey, renameProjectKey, setKept, useLayout } from "../sidebar/groups";
 import { ClosedSection } from "./ClosedSection";
@@ -372,7 +372,18 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           note: bookmarked ? "Bookmarked" : undefined,
           onSelect: () =>
             useLayout.getState().update((l) =>
-              kept ? forgetKept(l, keptKey) : setKept(l, keptKey, workspaceFolder(machineId, session, ws)),
+              kept
+                ? forgetKept(l, keptKey)
+                : setKept(
+                    l,
+                    keptKey,
+                    firstWorkspaceFolder(
+                      machineId,
+                      session,
+                      useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)?.workspaces ?? [],
+                      ws.label,
+                    ),
+                  ),
             ),
         },
         {

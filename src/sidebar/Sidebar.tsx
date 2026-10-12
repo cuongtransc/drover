@@ -96,14 +96,23 @@ export function SessionRow({ node }: { node: RSession }) {
               icon: PencilIcon,
               // herdr has no rename: the backend moves the stopped session's directory.
               onSelect: () =>
-                a.rename("Rename session", session.name, (to) =>
-                  sessionRename(machineId, session.name, to).then(() => {
-                    moveSessionFolders(machineId, session.name, to);
-                    useLayout.getState().update((l) => renameSessionKey(l, key, sessionKey(machineId, to)));
-                    const v = useApp.getState().viewed;
-                    if (v?.machine_id === machineId && v.session === session.name) view({ machine_id: machineId, session: to });
-                  }),
-                ),
+                a.rename("Rename session", session.name, (to) => {
+                  const toKey = sessionKey(machineId, to);
+                  // The backend publishes the renamed snapshot before its promise resolves.
+                  // Move now so upsertMachine cannot forget the old Session's entries.
+                  useLayout.getState().update((l) => renameSessionKey(l, key, toKey));
+                  return sessionRename(machineId, session.name, to).then(
+                    () => {
+                      moveSessionFolders(machineId, session.name, to);
+                      const v = useApp.getState().viewed;
+                      if (v?.machine_id === machineId && v.session === session.name) view({ machine_id: machineId, session: to });
+                    },
+                    (err) => {
+                      useLayout.getState().update((l) => renameSessionKey(l, toKey, key));
+                      throw err;
+                    },
+                  );
+                }),
             }]),
             {
               label: "Delete session…",

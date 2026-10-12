@@ -208,6 +208,18 @@ describe("kept workspaces", () => {
     expect(a.kept).toEqual({ [to]: { folder: "/x" }, [other]: { folder: null } });
     expect(renameProjectKey(EMPTY_LAYOUT, k, to)).toBe(EMPTY_LAYOUT);
   });
+  it.each([false, true])("destination wins a project rename collision, reversed insertion: %s", (reverse) => {
+    const to = projectKey("local", "ai", "destination");
+    const entries = reverse ? { [to]: { folder: "/dest" }, [k]: { folder: "/source" } } : { [k]: { folder: "/source" }, [to]: { folder: "/dest" } };
+    const result = renameProjectKey({ ...EMPTY_LAYOUT, kept: entries, bookmarks: [k, other, to] }, k, to);
+    expect(result.kept).toEqual({ [to]: { folder: "/dest" } });
+    expect(result.bookmarks).toEqual([to, other]);
+  });
+  it("self-renaming a Session preserves layout identity", () => {
+    const key = sessionKey("local", "ai");
+    const layout = { ...setBookmarked(EMPTY_LAYOUT, k, true, "/x"), tree: [{ kind: "session" as const, key }] };
+    expect(renameSessionKey(layout, key, key)).toBe(layout);
+  });
   it("a renamed Session carries its kept entries; a forgotten Session or Machine drops them", () => {
     const base = setKept(setKept(EMPTY_LAYOUT, k, "/x"), other, null);
     expect(Object.keys(renameSessionKey(base, sessionKey("local", "ai"), sessionKey("local", "ai2")).kept!)).toEqual([

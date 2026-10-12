@@ -1,12 +1,10 @@
-import { useState } from "react";
 import type { SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { useActions } from "../sidebar/actions";
 import { forgetKept, setKept, useLayout } from "../sidebar/groups";
-import type { ProjectKey } from "../sidebar/groups";
 import { closedKept } from "../workspaces/kept";
 import type { ClosedKept } from "../workspaces/kept";
-import { reopenKept } from "../workspaces/keptActions";
+import { isReopenPending, reopenKept, useReopenPending } from "../workspaces/keptActions";
 import { folderName } from "../workspaces/folder";
 import { ChevronIcon, FolderOpenIcon, TerminalIcon, TrashIcon } from "../ui/icons";
 import type { MenuItem } from "../sidebar/ContextMenu";
@@ -23,27 +21,17 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
   const foldKey = `closed:${machineId}/${session.name}`;
   const open = useApp((s) => s.expanded[foldKey] ?? false);
   const toggle = useApp((s) => s.toggle);
-  const [pending, setPending] = useState<ReadonlySet<ProjectKey>>(new Set());
   if (!machine) return null;
   const closed = closedKept(layout, machine, session);
   if (closed.length === 0) return null;
-  const setPendingKey = (key: ProjectKey, on: boolean) =>
-    setPending((p) => {
-      const next = new Set(p);
-      if (on) next.add(key);
-      else next.delete(key);
-      return next;
-    });
   const reopen = (c: ClosedKept) => {
-    // The pending contract covers every reopen route, not just the row's buttons.
-    if (pending.has(c.key)) return;
-    setPendingKey(c.key, true);
-    a?.guard(() => reopenKept(machineId, session.name, c).finally(() => setPendingKey(c.key, false)));
+    if (isReopenPending(c.key)) return;
+    a?.guard(() => reopenKept(machineId, session.name, c));
   };
   const menuFor = (c: ClosedKept): MenuItem[] =>
     a
       ? [
-          { label: "Reopen", icon: TerminalIcon, disabled: pending.has(c.key), onSelect: () => reopen(c) },
+          { label: "Reopen", icon: TerminalIcon, disabled: isReopenPending(c.key), onSelect: () => reopen(c) },
           {
             label: "Change folder…",
             icon: FolderOpenIcon,
@@ -59,19 +47,32 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
         Closed
         <span className="project-meta">{closed.length}</span>
       </button>
-      {open &&
-        closed.map((c) => (
-          <div key={c.key} className="ws-head closed-row" onContextMenu={(e) => a?.menu(e, menuFor(c))}>
-            <span className="closed-dot" aria-hidden="true" />
-            <button className="ws-label closed-label" title={c.folder ?? undefined} disabled={pending.has(c.key)} onClick={() => reopen(c)}>
-              {c.label}
-            </button>
-            <span className="ws-folder">{c.folder ? folderName(c.folder) : ""}</span>
-            <button className="ws-add" aria-label={`Reopen ${c.label}`} disabled={pending.has(c.key)} onClick={() => reopen(c)}>
-              <TerminalIcon />
-            </button>
-          </div>
-        ))}
+      {open && closed.map((c) => <ClosedRow key={c.key} c={c} reopen={reopen} menuFor={menuFor} />)}
     </section>
+  );
+}
+
+function ClosedRow({
+  c,
+  reopen,
+  menuFor,
+}: {
+  c: ClosedKept;
+  reopen: (c: ClosedKept) => void;
+  menuFor: (c: ClosedKept) => MenuItem[];
+}) {
+  const a = useActions();
+  const pending = useReopenPending(c.key);
+  return (
+    <div className="ws-head closed-row" onContextMenu={(e) => a?.menu(e, menuFor(c))}>
+      <span className="closed-dot" aria-hidden="true" />
+      <button className="ws-label closed-label" title={c.folder ?? undefined} disabled={pending} onClick={() => reopen(c)}>
+        {c.label}
+      </button>
+      <span className="ws-folder">{c.folder ? folderName(c.folder) : ""}</span>
+      <button className="ws-add" aria-label={`Reopen ${c.label}`} disabled={pending} onClick={() => reopen(c)}>
+        <TerminalIcon />
+      </button>
+    </div>
   );
 }
