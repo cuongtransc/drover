@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BackgroundTasks } from "./BackgroundTasks";
 
-const ci = { call_id: "t1", kind: "bash" as const, description: "Run full dotfiles CI in background", started: "2026-10-10T17:08:00.000Z" };
+const ci = { call_id: "t1", kind: "bash" as const, description: "Run full dotfiles CI", started: "2026-10-10T17:08:00.000Z" };
+const lint = { call_id: "t2", kind: "bash" as const, description: "Lint", started: "2026-10-10T17:09:00.000Z" };
 const review = { call_id: "a1", kind: "agent" as const, description: "Whole-branch review", started: "2026-10-10T17:10:30.000Z" };
 
 beforeEach(() => {
@@ -11,20 +12,44 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-it("lists each running task with its kind and time running", () => {
+const summary = () => screen.getByRole("button", { name: /in background/ });
+
+it("folds the tasks into one line by default: counts by kind and the longest run", () => {
+  render(<BackgroundTasks tasks={[ci, lint, review]} onJump={() => {}} />);
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(summary().getAttribute("aria-expanded")).toBe("false");
+  expect(summary().textContent).toBe("2 shells · 1 agent in background›3m 12s");
+  expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
+});
+
+it("names only the kinds running, in the singular for one", () => {
+  render(<BackgroundTasks tasks={[review]} onJump={() => {}} />);
+  expect(summary().textContent).toBe("1 agent in background›42s");
+});
+
+it("counts from the oldest known start when some starts are unknown", () => {
+  render(<BackgroundTasks tasks={[{ ...ci, started: null }, review]} onJump={() => {}} />);
+  expect(summary().textContent).toBe("1 shell · 1 agent in background›42s");
+});
+
+it("opens to list each task with its kind and time running, and folds again", () => {
   render(<BackgroundTasks tasks={[ci, review]} onJump={() => {}} />);
-  const rows = screen.getAllByRole("button");
-  expect(rows.map((r) => r.textContent)).toEqual([
-    "ShellRun full dotfiles CI in background3m 12s",
+  fireEvent.click(summary());
+  expect(summary().getAttribute("aria-expanded")).toBe("true");
+  const list = screen.getByRole("list", { name: "Background tasks" });
+  expect([...list.querySelectorAll("button")].map((r) => r.textContent)).toEqual([
+    "ShellRun full dotfiles CI3m 12s",
     "AgentWhole-branch review42s",
   ]);
-  expect(screen.getByRole("list", { name: "Background tasks" })).toBeTruthy();
+  fireEvent.click(summary());
+  expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
 });
 
 it("jumps to the task's tool card", () => {
   const onJump = vi.fn();
   render(<BackgroundTasks tasks={[ci]} onJump={onJump} />);
-  fireEvent.click(screen.getByRole("button"));
+  fireEvent.click(summary());
+  fireEvent.click(screen.getByRole("button", { name: /Run full dotfiles CI/ }));
   expect(onJump).toHaveBeenCalledWith("t1");
 });
 

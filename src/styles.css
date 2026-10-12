@@ -1212,12 +1212,20 @@ kbd {
 .chat-queued .chat-bubble { background: transparent; border-style: dashed; color: var(--fg-2); }
 .chat-queued-label { flex: none; color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
 /* Running background shells and Agents above the Composer; text uses only the contrast-tested tokens, no fill. */
-.chat-background { flex: none; margin: 0 auto; padding: 0 28px; list-style: none; width: 100%; max-width: var(--chat-max); box-sizing: border-box; max-height: 20vh; overflow-y: auto; }
+.chat-background { flex: none; margin: 0 auto; padding: 0 28px; width: 100%; max-width: var(--chat-max); box-sizing: border-box; }
+.chat-background > ul { margin: 0; padding: 0; list-style: none; max-height: 20vh; overflow-y: auto; }
 /* Same 28px inset and 8px gap as .chat-working, so the spinners share one x; the kind label gets a column that fits "Agent". */
-.chat-background-row {
-  display: grid; grid-template-columns: 12px 40px minmax(0, 1fr) auto; align-items: center; column-gap: 8px; width: 100%; margin: 0; padding: 2px 0;
+.chat-background-summary, .chat-background-row {
+  display: grid; align-items: center; column-gap: 8px; width: 100%; margin: 0; padding: 2px 0;
   border: 0; background: transparent; font: inherit; font-size: 12px; text-align: left; cursor: pointer; color: var(--fg-2);
 }
+.chat-background-summary { grid-template-columns: 12px minmax(0, 1fr) auto; }
+.chat-background-row { grid-template-columns: 12px 40px minmax(0, 1fr) auto; }
+.chat-background-count { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-background-summary:hover .chat-background-count { text-decoration: underline; }
+/* Larger than the text so it reads, with no line height of its own so the row stays one line high. */
+.chat-background-chev { display: inline-block; margin-left: 6px; font-size: 15px; line-height: 0; transition: transform var(--t) var(--ease); }
+.chat-background-summary[aria-expanded="true"] .chat-background-chev { transform: rotate(90deg); }
 .chat-background-kind, .chat-background-time { color: var(--fg-3); white-space: nowrap; }
 .chat-background-time { text-align: right; }
 .chat-background-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }

@@ -81,6 +81,12 @@ beforeEach(() => {
     });
 });
 
+/** Opens the folded background strip and returns its list. */
+function openStrip() {
+  fireEvent.click(screen.getByRole("button", { name: /in background/ }));
+  return screen.getByRole("list", { name: "Background tasks" });
+}
+
 describe("ChatLens", () => {
   it("lets a new Claude be chatted with before its transcript exists", async () => {
     opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: true });
@@ -209,9 +215,9 @@ describe("ChatLens", () => {
         background: [{ call_id: "t1", kind: "bash", description: "Run CI", started: "2026-10-10T17:08:00.000Z" }],
       }),
     );
-    expect(screen.getByRole("list", { name: "Background tasks" }).textContent).toContain("Run CI");
+    expect(screen.getByRole("button", { name: /1 shell in background/ })).toBeTruthy();
     rerender(<ChatLens pane={pane} view={{ ...view, agent: null }} />);
-    expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /in background/ })).toBeNull();
   });
 
   it("says a forked pane is a fork, of what and since when, and goes back to the original", () => {
@@ -374,7 +380,7 @@ describe("ChatLens", () => {
       );
       const head = screen.getByRole("button", { name: /^Worked/ });
       expect(head.getAttribute("aria-expanded")).toBe("false");
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Run CI/ }));
       expect(screen.getByRole("button", { name: /^Worked/ }).getAttribute("aria-expanded")).toBe("true");
     });
 
@@ -385,7 +391,7 @@ describe("ChatLens", () => {
       try {
         await load();
         bgMeta();
-        fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Run CI/ }));
+        fireEvent.click(within(openStrip()).getByRole("button", { name: /Run CI/ }));
         const cards = () => (scroll.mock.contexts as HTMLElement[]).map((el) => el.dataset.call);
         await waitFor(() => expect(cards()).toContain("bg1"));
       } finally {
@@ -435,7 +441,7 @@ describe("ChatLens", () => {
           background: [{ call_id: "bg9", kind: "bash", description: "Old job", started: null }],
         }),
       );
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Old job/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Old job/ }));
       await waitFor(() => expect(screen.getAllByRole("button", { name: /^Worked/ })[0].getAttribute("aria-expanded")).toBe("true"));
       expect(vi.mocked(chatPage).mock.calls.map((c) => c[1])).toEqual([4, 2]);
     });
@@ -454,7 +460,7 @@ describe("ChatLens", () => {
           background: [{ call_id: "gone", kind: "bash", description: "Lost job", started: null }],
         }),
       );
-      fireEvent.click(within(screen.getByRole("list", { name: "Background tasks" })).getByRole("button", { name: /Lost job/ }));
+      fireEvent.click(within(openStrip()).getByRole("button", { name: /Lost job/ }));
       expect(await screen.findByText(/Task call not found in the transcript/)).toBeTruthy();
     });
 
