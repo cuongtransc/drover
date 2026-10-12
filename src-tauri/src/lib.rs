@@ -41,6 +41,17 @@ pub fn run() {
                 }
             }
         })
+        .on_window_event(|window, event| {
+            // Sessions made outside the app (a terminal, another client) show on return.
+            if let tauri::WindowEvent::Focused(true) = event {
+                if let Some(mgr) = window.try_state::<Arc<MachineManager>>() {
+                    let mgr = mgr.inner().clone();
+                    tauri::async_runtime::spawn(async move {
+                        mgr.poll_all(machines::FOCUS_POLL_GAP).await
+                    });
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::machines_list,
             commands::machine_connect,

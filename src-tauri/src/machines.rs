@@ -57,8 +57,10 @@ pub const ALLOWED_METHODS: &[&str] = &[
 const EMIT_THROTTLE: Duration = Duration::from_millis(100);
 const START_WAIT: Duration = Duration::from_secs(10);
 const START_POLL: Duration = Duration::from_millis(200);
-/// How often a connected ssh Machine's master is checked.
+/// How often a connected ssh Machine's master is checked and a connected Machine's Sessions polled.
 const HEALTH_EVERY: Duration = Duration::from_secs(15);
+/// Focusing the window polls each Machine's Sessions at most this often.
+pub const FOCUS_POLL_GAP: Duration = Duration::from_secs(3);
 pub const LOCAL: &str = "local";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -241,8 +243,17 @@ struct Machine {
     gate: Arc<tokio::sync::Mutex<()>>,
     /// Bumped by disconnect/remove; a connect that started under an older epoch is abandoned.
     epoch: u64,
-    /// Periodic master check while an ssh Machine is connected.
+    /// Periodic master check (ssh only) and Session poll while connected.
     health: Option<JoinHandle<()>>,
+    /// A `poll_sessions` is running.
+    polling: bool,
+    /// When the last `poll_sessions` started.
+    polled: Option<Instant>,
+    /// In-app changes to the Sessions (start, stop, delete, rename, connect) in flight.
+    changing: u32,
+    /// Bumped as each such change begins and ends; a poll whose list was taken under an
+    /// older value is dropped.
+    changes: u64,
     /// Being removed: its views are no longer emitted.
     removing: bool,
 }
@@ -262,6 +273,10 @@ impl Machine {
             gate: Arc::default(),
             epoch: 0,
             health: None,
+            polling: false,
+            polled: None,
+            changing: 0,
+            changes: 0,
             removing: false,
         }
     }
@@ -306,6 +321,43 @@ impl Machine {
                 h.abort();
             }
         }
+    }
+}
+
+/// An in-app change to a Machine's Sessions, from creation to drop (see `Machine::changes`).
+struct Change<'a> {
+    mgr: &'a MachineManager,
+    id: String,
+}
+impl<'a> Change<'a> {
+    fn begin(mgr: &'a MachineManager, id: &str) -> Self {
+        let _ = mgr.with_machine(id, |m| {
+            m.changing += 1;
+            m.changes += 1;
+        });
+        Change {
+            mgr,
+            id: id.to_string(),
+        }
+    }
+}
+impl Drop for Change<'_> {
+    fn drop(&mut self) {
+        let _ = self.mgr.with_machine(&self.id, |m| {
+            m.changing = m.changing.saturating_sub(1);
+            m.changes += 1;
+        });
+    }
+}
+
+/// Clears `Machine::polling` when the poll ends or is aborted.
+struct Polling<'a> {
+    mgr: &'a MachineManager,
+    id: &'a str,
+}
+impl Drop for Polling<'_> {
+    fn drop(&mut self) {
+        let _ = self.mgr.with_machine(self.id, |m| m.polling = false);
     }
 }
 
@@ -710,6 +762,7 @@ impl MachineManager {
     /// removed meanwhile (`epoch` moved on), any master this attempt started is ended,
     /// the Machine's state is left alone and the result is `Ok`.
     async fn connect_core(&self, cfg: &MachineConfig, epoch: u64) -> AppResult<()> {
+        let _change = Change::begin(self, &cfg.id);
         let id = cfg.id.as_str();
         let ssh = if id != LOCAL && self.factory.lock().unwrap().is_none() {
             Some(self.ssh_for(cfg)?)
@@ -816,11 +869,9 @@ impl MachineManager {
     }
 
     /// Watch a connected ssh Machine's master so a dead one is noticed even with no
-    /// running Session (whose watcher would otherwise notice).
+    /// running Session (whose watcher would otherwise notice), and poll every connected
+    /// Machine's Sessions.
     fn start_health(&self, id: &str) {
-        if id == LOCAL {
-            return;
-        }
         let Some(me) = self.me.upgrade() else { return };
         let h = tokio::spawn(me.health_loop(id.to_string()));
         let _ = self.with_machine(id, |m| {
@@ -834,12 +885,13 @@ impl MachineManager {
         loop {
             let every = *self.health_every.lock().unwrap();
             tokio::time::sleep(every).await;
-            if !self.health_ok(&id).await {
+            if id != LOCAL && !self.health_ok(&id).await {
                 // Spawned: on_master_lost's teardown aborts this task.
                 let me = self.clone();
                 tokio::spawn(async move { me.on_master_lost(&id).await });
                 return;
             }
+            self.poll_sessions(&id, Duration::ZERO).await;
         }
     }
 
@@ -1138,10 +1190,27 @@ impl MachineManager {
 
     /// Reconcile the Machine's sessions with `list`; start watchers for newly running ones.
     fn apply_list(&self, id: &str, list: Vec<SessionEntry>) -> AppResult<()> {
-        self.with_machine(id, |m| {
+        self.apply_list_if(id, list, None)
+    }
+
+    /// `apply_list`, unless `changes` is given and an in-app change began or ended since.
+    fn apply_list_if(
+        &self,
+        id: &str,
+        list: Vec<SessionEntry>,
+        changes: Option<u64>,
+    ) -> AppResult<()> {
+        let applied = self.with_machine(id, |m| {
+            if changes.is_some_and(|c| c != m.changes || m.changing > 0) {
+                return false;
+            }
             let Some(transport) = m.transport.clone() else {
-                return;
+                return true;
             };
+            if changes.is_some() && !m.sessions.iter().map(|s| &s.entry).eq(list.iter()) {
+                let names: Vec<&str> = list.iter().map(|e| e.name.as_str()).collect();
+                tracing::info!("poll {id}: sessions changed outside the app: {names:?}");
+            }
             let mut old: Vec<Sess> = std::mem::take(&mut m.sessions);
             let mut next = Vec::new();
             for entry in list {
@@ -1185,9 +1254,56 @@ impl MachineManager {
                 }
             }
             m.sessions = next;
+            true
         })?;
-        self.notify(id);
+        if applied {
+            self.notify(id);
+        }
         Ok(())
+    }
+
+    /// Pick up Sessions created, stopped or removed outside the app. Skipped unless the
+    /// Machine is connected, while a poll is running and within `min_gap` of the last one.
+    pub async fn poll_sessions(&self, id: &str, min_gap: Duration) {
+        let go = self.with_machine(id, |m| {
+            let recent = m.polled.is_some_and(|t| t.elapsed() < min_gap);
+            if m.state != MachineState::Connected || m.polling || m.changing > 0 || recent {
+                return None;
+            }
+            m.polling = true;
+            m.polled = Some(Instant::now());
+            Some(m.changes)
+        });
+        let Ok(Some(changes)) = go else { return };
+        // Cleared on drop: the health task may be aborted mid-poll.
+        let _polling = Polling { mgr: self, id };
+        let list = self.list_sessions(id).await;
+        match list {
+            Ok(list) => {
+                if let Err(e) = self.apply_list_if(id, list, Some(changes)) {
+                    tracing::debug!("poll {id}: {e}");
+                }
+            }
+            Err(e) => tracing::debug!("poll {id}: {e}"),
+        }
+    }
+
+    /// `poll_sessions` on every Machine at once (the window got focus).
+    pub async fn poll_all(&self, min_gap: Duration) {
+        let Some(me) = self.me.upgrade() else { return };
+        let ids: Vec<String> = self
+            .machines
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|m| m.cfg.id.clone())
+            .collect();
+        let mut set = tokio::task::JoinSet::new();
+        for id in ids {
+            let me = me.clone();
+            set.spawn(async move { me.poll_sessions(&id, min_gap).await });
+        }
+        while set.join_next().await.is_some() {}
     }
 
     pub async fn refresh_sessions(&self, id: &str) -> AppResult<()> {
@@ -1204,6 +1320,7 @@ impl MachineManager {
     }
 
     pub async fn start_session(&self, id: &str, name: &str) -> AppResult<()> {
+        let _change = Change::begin(self, id);
         if !Self::valid_session_name(name) {
             return Err(AppError::new(
                 "invalid",
@@ -1275,6 +1392,7 @@ impl MachineManager {
     }
 
     pub async fn stop_session(&self, id: &str, name: &str) -> AppResult<()> {
+        let _change = Change::begin(self, id);
         let entry = self.session(id, name)?;
         let t = self.transport(id)?;
         let socket = t.local_socket(&entry).await?;
@@ -1297,6 +1415,7 @@ impl MachineManager {
 
     /// Delete a stopped Session with `herdr session delete`; herdr refuses running ones, so do we.
     pub async fn delete_session(&self, id: &str, name: &str) -> AppResult<()> {
+        let _change = Change::begin(self, id);
         let entry = self.session(id, name)?;
         if entry.running {
             return Err(AppError::new(
@@ -1321,6 +1440,7 @@ impl MachineManager {
 
     /// Rename a stopped Session by moving its directory beside itself (see `RENAME_SCRIPT`).
     pub async fn rename_session(&self, id: &str, name: &str, to: &str) -> AppResult<()> {
+        let _change = Change::begin(self, id);
         let invalid = |msg: String| Err(AppError::new("invalid", msg));
         if !Self::valid_session_name(to) || to == "default" {
             return invalid(format!("invalid session name {to:?}"));
@@ -2371,10 +2491,147 @@ mod tests {
         let n = calls.load(std::sync::atomic::Ordering::SeqCst);
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), n);
-        // The local Machine gets no health task.
+        // The local Machine gets no master check.
         mgr.connect("local").await.unwrap();
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), n);
+    }
+
+    /// Stopped Sessions held in `names`, changed by the test or by `session delete`; counts
+    /// execs, and delays the next `session list` by 300 ms (keeping the list it was asked at)
+    /// while `delay` is set.
+    #[derive(Clone, Default)]
+    struct ListT {
+        names: Arc<Mutex<Vec<String>>>,
+        delay: Arc<std::sync::atomic::AtomicBool>,
+        execs: Arc<std::sync::atomic::AtomicU32>,
+    }
+    impl ListT {
+        fn list(&self) -> String {
+            let mut out = "name status directory socket\n".to_string();
+            for n in self.names.lock().unwrap().iter() {
+                out.push_str(&format!("{n} stopped /s/{n} /s/{n}/herdr.sock\n"));
+            }
+            out
+        }
+    }
+    #[async_trait::async_trait]
+    impl Transport for ListT {
+        fn wrap(&self, argv: &[String], _tty: bool) -> Vec<String> {
+            use std::sync::atomic::Ordering::SeqCst;
+            self.execs.fetch_add(1, SeqCst);
+            let joined = argv.join(" ");
+            let out = if joined.contains("HERDR=") {
+                probe_reply(&self.list())
+            } else if joined.contains("session delete") {
+                let gone = argv.last().cloned().unwrap_or_default();
+                self.names.lock().unwrap().retain(|n| *n != gone);
+                String::new()
+            } else if joined.contains("session list") {
+                let out = self.list();
+                if self.delay.swap(false, SeqCst) {
+                    let script = "sleep 0.3; printf %s \"$1\"".to_string();
+                    return vec!["sh".into(), "-c".into(), script, "sh".into(), out];
+                }
+                out
+            } else {
+                String::new()
+            };
+            vec!["printf".into(), "%s".into(), out]
+        }
+        async fn local_socket(&self, s: &SessionEntry) -> AppResult<PathBuf> {
+            Ok(s.socket.clone().into())
+        }
+        async fn release_socket(&self, _: &SessionEntry) -> AppResult<()> {
+            Ok(())
+        }
+    }
+
+    fn list_mgr(names: &[&str]) -> (Arc<MachineManager>, ListT, tempfile::TempDir) {
+        let d = tempfile::tempdir().unwrap();
+        let mgr = MachineManager::new(d.path().join("m.json"), Arc::new(|_| {}));
+        let t = ListT::default();
+        *t.names.lock().unwrap() = names.iter().map(|n| n.to_string()).collect();
+        let t2 = t.clone();
+        mgr.with_transport_factory(Arc::new(move |_| {
+            Arc::new(t2.clone()) as Arc<dyn Transport>
+        }));
+        (mgr, t, d)
+    }
+
+    fn session_names(mgr: &MachineManager, id: &str) -> Vec<String> {
+        let v = mgr.views().into_iter().find(|v| v.id == id).unwrap();
+        v.sessions.into_iter().map(|s| s.name).collect()
+    }
+
+    #[tokio::test]
+    async fn poll_picks_up_sessions_changed_outside_the_app() {
+        let (mgr, t, _d) = list_mgr(&["old"]);
+        let calls: Arc<std::sync::atomic::AtomicU32> = Arc::default();
+        mgr.with_health_check(
+            std::time::Duration::from_millis(50),
+            alive_seam(true, calls),
+        );
+        mgr.connect("local").await.unwrap();
+        t.names.lock().unwrap().push("hp-ct".into());
+        let m = mgr.clone();
+        assert!(wait_for(move || session_names(&m, "local") == ["old", "hp-ct"]).await);
+        t.names.lock().unwrap().retain(|n| n != "old");
+        let m = mgr.clone();
+        assert!(wait_for(move || session_names(&m, "local") == ["hp-ct"]).await);
+    }
+
+    #[tokio::test]
+    async fn poll_drops_a_list_taken_before_an_in_app_change() {
+        let (mgr, t, _d) = list_mgr(&["old", "gone"]);
+        mgr.connect("local").await.unwrap();
+        t.delay.store(true, std::sync::atomic::Ordering::SeqCst);
+        let m = mgr.clone();
+        let poll =
+            tokio::spawn(async move { m.poll_sessions("local", std::time::Duration::ZERO).await });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        mgr.delete_session("local", "gone").await.unwrap();
+        assert_eq!(session_names(&mgr, "local"), ["old"]);
+        poll.await.unwrap();
+        assert_eq!(session_names(&mgr, "local"), ["old"]);
+    }
+
+    #[tokio::test]
+    async fn a_poll_cut_off_by_a_disconnect_does_not_block_later_polls() {
+        let (mgr, t, _d) = list_mgr(&["old"]);
+        mgr.connect("local").await.unwrap();
+        t.delay.store(true, std::sync::atomic::Ordering::SeqCst);
+        let m = mgr.clone();
+        let poll =
+            tokio::spawn(async move { m.poll_sessions("local", std::time::Duration::ZERO).await });
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        poll.abort();
+        mgr.disconnect("local").await;
+        mgr.connect("local").await.unwrap();
+        t.names.lock().unwrap().push("hp-ct".into());
+        mgr.poll_sessions("local", std::time::Duration::ZERO).await;
+        assert_eq!(session_names(&mgr, "local"), ["old", "hp-ct"]);
+    }
+
+    #[tokio::test]
+    async fn focus_polls_a_machine_once_within_the_gap() {
+        let (mgr, t, _d) = list_mgr(&["old"]);
+        mgr.connect("local").await.unwrap();
+        let before = t.execs.load(std::sync::atomic::Ordering::SeqCst);
+        mgr.poll_all(std::time::Duration::from_secs(60)).await;
+        mgr.poll_all(std::time::Duration::from_secs(60)).await;
+        // One `session list` and its client-only check.
+        assert_eq!(
+            t.execs.load(std::sync::atomic::Ordering::SeqCst) - before,
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn poll_skips_a_disconnected_machine() {
+        let (mgr, t, _d) = list_mgr(&["old"]);
+        mgr.poll_all(std::time::Duration::ZERO).await;
+        assert_eq!(t.execs.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
