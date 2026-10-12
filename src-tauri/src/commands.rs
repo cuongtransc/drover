@@ -666,7 +666,13 @@ pub async fn chat_open(
         chats.insert(
             pane_ref.clone(),
             located.path.clone(),
-            transcript::spawn_tail(transport, located.path.clone(), parser, sink),
+            transcript::spawn_tail_with(
+                transport,
+                located.path.clone(),
+                transcript::Fetch::for_machine(&machine_id, &located.path),
+                parser,
+                sink,
+            ),
         );
     }
     chats.set_located(&pane_ref, &located);

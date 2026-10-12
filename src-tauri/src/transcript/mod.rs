@@ -1,5 +1,6 @@
 //! Transcript discovery and streaming: find an agent's JSONL transcript on a Machine and
 //! tail it into chat items.
+pub mod cache;
 pub mod claude;
 pub mod images;
 pub mod locate;
@@ -18,7 +19,7 @@ use std::sync::Mutex;
 
 pub use locate::{locate, Located};
 pub use pi_alias::ModelAlias;
-pub use tail::{spawn_tail, Sink, TailHandle};
+pub use tail::{spawn_tail, spawn_tail_with, Fetch, Sink, TailHandle};
 
 /// An image attached to a chat item; its bytes are fetched by `reference`.
 #[derive(Clone, Debug, PartialEq, Serialize)]
