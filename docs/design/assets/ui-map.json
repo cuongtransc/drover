@@ -632,7 +632,7 @@
     19,
     0
    ],
-   "what": "Quick replies above the message box.",
+   "what": "Claude's suggestion (a click puts it in the box, like Tab) and quick replies above the message box.",
    "code": ".composer-quick in Composer",
    "rect": {
     "x": 589,
@@ -657,16 +657,16 @@
     -16,
     0
    ],
-   "what": "Esc, Ctrl+C, ⇧Tab sent to the agent as keys.",
+   "what": "/btw, and Esc sent to the agent as a key.",
    "code": ".composer-keys in Composer",
    "rect": {
-    "x": 1183.359375,
+    "x": 1300.96875,
     "y": 761,
-    "w": 205.640625,
+    "w": 88.03125,
     "h": 24
    },
    "badge": {
-    "x": 1167.359375,
+    "x": 1284.96875,
     "y": 773
    }
   },

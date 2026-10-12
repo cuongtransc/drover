@@ -21,12 +21,9 @@ import { useComposerFill, useRewind } from "./rewind";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
 // Key names verified against herdr's key parser (pane.send_keys accepts esc, ctrl+c,
-// shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`).
-const KEYS: { label: string; key: string }[] = [
-  { label: "Esc", key: "esc" },
-  { label: "Ctrl+C", key: "ctrl+c" },
-  { label: "⇧Tab", key: "shift+tab" },
-];
+// shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`). Only Esc: Ctrl+C does
+// nothing Esc does not, and twice in a row exits Claude; ⇧Tab's mode change went almost unused.
+const KEYS: { label: string; key: string }[] = [{ label: "Esc", key: "esc" }];
 
 // Agents whose TUI turns a bracketed-pasted image path into an image attachment (as when
 // pasting a screenshot in a terminal); `agent.prompt` frames text and path as one paste,
@@ -197,6 +194,13 @@ export function Composer({
   // not while a send is on its way: Claude's box would still show the old suggestion.
   const { suggestion, clear: clearSuggestion } = useClaudeSuggestion(pane, agent, status, text === "" && !sending);
   const offered = text === "" ? suggestion : null;
+  /** Puts the suggestion in the box, caret at the end, as Tab does in Claude's own input. */
+  const takeSuggestion = (s: string) => {
+    setText(s);
+    setCaret(s.length);
+    box.current?.focus();
+    requestAnimationFrame(() => box.current?.setSelectionRange(s.length, s.length));
+  };
   // Past half the window the share replaces the raw count; from 75% it warns (modelLabel.ts).
   const meter = contextMeter(meta);
   const full = meter && meter.level !== "low" ? meter : null;
@@ -390,8 +394,13 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer-top">
-        {((showQuick && quickReplies.length > 0) || compact) && (
+        {((showQuick && quickReplies.length > 0) || compact || offered) && (
           <div className="composer-quick" role="group" aria-label="Quick replies">
+            {offered && (
+              <button className="composer-quick-reply suggestion" title="Take Claude's suggestion (Tab)" onClick={() => takeSuggestion(offered)}>
+                {offered}
+              </button>
+            )}
             {compact && (
               <button
                 className={`composer-quick-reply compact ctx-${compact}`}
@@ -530,10 +539,7 @@ export function Composer({
             // After the completion list: Tab takes the suggestion into the empty box, as in Claude's own input.
             if (offered && e.key === "Tab" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              setText(offered);
-              setCaret(offered.length);
-              requestAnimationFrame(() => box.current?.setSelectionRange(offered.length, offered.length));
-              return;
+              return takeSuggestion(offered);
             }
             // Backspace in an empty box takes back the last pasted image, as in the agents' own TUIs.
             if (e.key === "Backspace" && e.currentTarget.value === "" && images.length > 0 && !e.nativeEvent.isComposing) {

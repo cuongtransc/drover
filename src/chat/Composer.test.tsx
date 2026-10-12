@@ -203,6 +203,11 @@ describe("Composer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Esc" }));
     expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.send_keys", { target: "w1:p1", keys: ["esc"] });
   });
+  it("offers Esc as its only key: no Ctrl+C, which exits Claude when pressed twice, and no ⇧Tab", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    expect(screen.queryByRole("button", { name: "Ctrl+C" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "⇧Tab" })).toBeNull();
+  });
 
   it("enables Stop only while the agent works, and Stop sends Esc", () => {
     const stop = () => screen.getByRole("button", { name: "Stop" }) as HTMLButtonElement;
@@ -427,6 +432,26 @@ describe("Composer suggestion", () => {
     expect(reads()).toHaveLength(before);
     expect(box.placeholder).not.toContain("run the tests again");
     await act(async () => finish());
+  });
+
+  it("shows the suggestion as a chip that puts it in the box without sending", async () => {
+    render(<Composer pane={pane} agent="claude" status="done" />);
+    const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+    const chip = await screen.findByRole("button", { name: "run the tests again" });
+    expect(chip.title).toBe("Take Claude's suggestion (Tab)");
+    fireEvent.click(chip);
+    expect(box.value).toBe("run the tests again");
+    expect(document.activeElement).toBe(box);
+    expect(vi.mocked(herdrCall).mock.calls.map((c) => c[2])).not.toContain("agent.prompt");
+    expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
+  });
+
+  it("hides the suggestion chip while something is typed", async () => {
+    render(<Composer pane={pane} agent="claude" status="idle" />);
+    const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await screen.findByRole("button", { name: "run the tests again" });
+    fireEvent.change(box, { target: { value: "my own" } });
+    expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
   });
 
   it("leaves Tab alone while something is typed", async () => {
