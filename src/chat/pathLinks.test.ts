@@ -21,6 +21,14 @@ describe("parsePathRef", () => {
       expect(parsePathRef(text)).toBeNull();
     },
   );
+
+  // A glob names many files or none: opening it as one file only fails with "does not exist".
+  it.each(["/private/tmp/s/chip-{light,dark}-{262,900}.png", "~/.claude/projects/*/memory/*.md", "/var/log/app-?.log", "../_shared/*", ".batch/*.spec.ts"])(
+    "leaves the glob %s as code",
+    (text) => {
+      expect(parsePathRef(text)).toBeNull();
+    },
+  );
 });
 
 describe("pathTarget", () => {
