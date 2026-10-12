@@ -766,7 +766,7 @@ describe("Composer prompt history", () => {
 
   it("recalls Claude's own history for the folder, then what was sent since, as Claude's terminal does", async () => {
     vi.mocked(claudePromptHistory).mockResolvedValue(["from the terminal", "from yesterday"]);
-    recordPrompt("devtuf/default/w1:p1", "only in Herdr");
+    recordPrompt("devtuf/default/w1:p1", "only in Drover");
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     await waitFor(() => expect(claudePromptHistory).toHaveBeenCalledWith(pane));
@@ -795,24 +795,24 @@ describe("Composer prompt history", () => {
     expect(box.value).toBe("another session's");
   });
 
-  it("gives a pi pane its session's prompts before Herdr's for the folder", async () => {
-    recordPrompt("devtuf/default/w1:p1", "sent from Herdr");
+  it("gives a pi pane its session's prompts before Drover's for the folder", async () => {
+    recordPrompt("devtuf/default/w1:p1", "sent from Drover");
     render(<Composer pane={pane} agent="pi" sessionPrompts={["typed in pi"]} />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     up(box);
     expect(box.value).toBe("typed in pi");
     up(box);
-    expect(box.value).toBe("sent from Herdr");
+    expect(box.value).toBe("sent from Drover");
   });
 
-  it("falls back to Herdr's own history when Claude's cannot be read", async () => {
+  it("falls back to Drover's own history when Claude's cannot be read", async () => {
     vi.mocked(claudePromptHistory).mockRejectedValue({ code: "io", message: "no ssh" });
-    recordPrompt("devtuf/default/w1:p1", "only in Herdr");
+    recordPrompt("devtuf/default/w1:p1", "only in Drover");
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     await act(async () => {});
     up(box);
-    expect(box.value).toBe("only in Herdr");
+    expect(box.value).toBe("only in Drover");
   });
 
   it("does not ask a pi pane for Claude's history", async () => {

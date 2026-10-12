@@ -100,7 +100,7 @@ pub fn run() {
         ])
         .setup(|app| {
             init_logging(app.path().app_log_dir()?)?;
-            tracing::info!("herdr-app starting");
+            tracing::info!("drover starting");
             transport::use_runtime_dir_for(&app.config().identifier);
             notify::init(app.handle());
             let dir = app.path().app_data_dir()?;
@@ -189,7 +189,7 @@ fn init_logging(dir: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error
     std::fs::create_dir_all(&dir)?;
     let appender = Builder::new()
         .rotation(Rotation::DAILY)
-        .filename_prefix("herdr-app")
+        .filename_prefix("drover")
         .filename_suffix("log")
         .max_log_files(5)
         .build(&dir)?;

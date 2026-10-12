@@ -1,6 +1,6 @@
-# Herdr UI/UX guidelines
+# Drover UI/UX guidelines
 
-How Herdr's interface decides what to show, how it looks, and how it is driven. Every UI change is
+How Drover's interface decides what to show, how it looks, and how it is driven. Every UI change is
 checked against this page; a change that breaks a rule either fixes the rule here in the same PR
 or does not ship.
 
@@ -10,7 +10,7 @@ design, macOS platform & accessibility) of the app as it stood after the triage 
 call and why. Terms follow `CONTEXT.md` (Machine › Session › Workspace › Tab › Pane).
 
 The same tokens, rules and components as a browsable page, with live previews in both themes:
-the [Herdr Design System](https://claude.ai/artifact/4xbvNjCSxGdWRzrVxgGNUq), built from
+the [Drover Design System](https://claude.ai/artifact/4xbvNjCSxGdWRzrVxgGNUq), built from
 `src/styles.css` and this page (private to its owner until shared).
 
 ## 1. Who it is for, and the loop it serves

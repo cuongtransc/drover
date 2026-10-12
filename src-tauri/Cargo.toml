@@ -1,13 +1,13 @@
 [package]
-name = "herdr-app"
+name = "drover"
 version = "0.1.1"
-description = "Herdr desktop app"
+description = "Drover desktop app"
 authors = ["Cuong Nguyen"]
 edition = "2021"
 
 [lib]
 # The `_lib` suffix is necessary to keep the lib name unique from the bin name.
-name = "herdr_app_lib"
+name = "drover_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

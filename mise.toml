@@ -1,4 +1,4 @@
-# Herdr — Tauri 2 (pnpm + cargo). `mise tasks` lists them, `mise run <task>` runs one.
+# Drover — Tauri 2 (pnpm + cargo). `mise tasks` lists them, `mise run <task>` runs one.
 min_version = "2026.9.0"
 
 [settings]
@@ -13,8 +13,8 @@ pnpm = "11"
 rust = "stable"
 
 [env]
-APP = "src-tauri/target/release/bundle/macos/Herdr.app"
-LOCAL_APP = "src-tauri/target/local/bundle/macos/Herdr.app"
+APP = "src-tauri/target/release/bundle/macos/Drover.app"
+LOCAL_APP = "src-tauri/target/local/bundle/macos/Drover.app"
 
 # Frontend dependencies install before any `mise run` when the lockfile changed.
 # By hand: `mise deps`.
@@ -42,19 +42,19 @@ echo 'next: mise run dev'
 """
 
 # Its own identifier (tauri.dev.conf.json): a separate data dir and ssh control sockets, so it
-# runs beside the installed Herdr.app without sharing machines or ending its ssh masters.
+# runs beside the installed Drover.app without sharing machines or ending its ssh masters.
 [tasks.dev]
 description = "Run the app with hot reload, apart from the installed app"
 run = "pnpm tauri dev --config src-tauri/tauri.dev.conf.json"
 
 [tasks.build]
-description = "Build the release bundle (Herdr.app)"
+description = "Build the release bundle (Drover.app)"
 run = "pnpm tauri build --bundles app"
 
 # The release build minus LTO (src-tauri/Cargo.toml [profile.local]): same behaviour, about 3x
 # faster to rebuild. For the bundle a release ships, use `build`.
 [tasks."build:local"]
-description = "Build the bundle without LTO (Herdr.app under target/local)"
+description = "Build the bundle without LTO (Drover.app under target/local)"
 run = "pnpm tauri build --bundles app -- --profile local"
 
 [tasks.start]
@@ -67,16 +67,22 @@ run = "open $APP"
 [tasks."app:install"]
 description = "Build without LTO (profile.local) and install it into /Applications"
 depends = ["build:local"]
-run = ["rm -rf /Applications/Herdr.app", "ditto $LOCAL_APP /Applications/Herdr.app", "scripts/sign-app.sh /Applications/Herdr.app"]
+run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $LOCAL_APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 [tasks."app:install:release"]
 description = "Build the release bundle, as shipped, and install it into /Applications"
 depends = ["build"]
-run = ["rm -rf /Applications/Herdr.app", "ditto $APP /Applications/Herdr.app", "scripts/sign-app.sh /Applications/Herdr.app"]
+run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
 # Ad-hoc signed builds get a new identity each time, so macOS asks again for every permission.
+# Before the first Drover install: Drover's identifier starts with empty folders. app:install
+# runs it while Drover has no state yet, so a reinstall never does.
+[tasks."app:migrate-id"]
+description = "One-time: copy the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders"
+run = "scripts/migrate-id.sh"
+
 [tasks."sign:setup"]
-description = "One-time: create the local signing identity app:install signs Herdr.app with"
+description = "One-time: create the local signing identity app:install signs Drover.app with"
 run = "scripts/sign-setup.sh"
 
 # Call it `mise run fmt`: bare `mise fmt` is mise's own mise.toml formatter.
@@ -125,12 +131,17 @@ run = "cargo test"
 description = "Tests for the local signing scripts (macOS)"
 run = "scripts/sign.test.sh"
 
+# A throwaway HOME; never the real ~/Library.
+[tasks."test:migrate"]
+description = "Tests for the state migration script"
+run = "sh scripts/migrate-id.test.sh"
+
 [tasks.test]
 description = "Frontend, backend and signing script tests"
-depends = ["test:frontend", "test:backend", "test:sign"]
+depends = ["test:frontend", "test:backend", "test:sign", "test:migrate"]
 
-# Starts isolated `herdrapp-test-*` sessions on the local herdr and always
-# stops and deletes them. The SSH test only runs when HERDR_APP_SSH_TEST is set.
+# Starts isolated `drover-test-*` sessions on the local herdr and always
+# stops and deletes them. The SSH test only runs when DROVER_SSH_TEST is set.
 [tasks."test:integration"]
 description = "Integration tests against a real local herdr"
 dir = "src-tauri"
@@ -140,10 +151,10 @@ run = "cargo test -- --ignored --test-threads=1"
 # Warns, never fails: words the glossaries list under _Avoid_ in living docs and UI strings
 # (specs/plans under docs/superpowers and the ADRs are history and left out).
 [tasks."lint:terms"]
-description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator)"
+description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator, Herdr)"
 run = """
-hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' | grep -v -F '.test.' \\
-  | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project' || true)
+hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' -e '^CONTEXT.md$' | grep -v -F '.test.' \\
+  | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project|\\bHerdr\\b' | grep -v 'named Herdr' || true)
 if [ -n "$hits" ]; then echo "lint:terms (warning) — see CONTEXT.md:"; echo "$hits"; else echo "lint:terms: clean"; fi
 """
 

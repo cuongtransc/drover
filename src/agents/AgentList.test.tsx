@@ -505,7 +505,7 @@ describe("AgentList", () => {
       render(<AgentList />);
       fireEvent.contextMenu(screen.getByText("Idempotent payments"));
       fireEvent.click(screen.getByRole("menuitem", { name: "Fork session" }));
-      expect(await screen.findByText("Herdr has not reported this pane's session yet")).toBeTruthy();
+      expect(await screen.findByText("herdr has not reported this pane's session yet")).toBeTruthy();
       expect(herdrCall).not.toHaveBeenCalledWith("local", "default", "tab.create", expect.anything());
     });
   });

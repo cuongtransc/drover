@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Herdr",
+  "productName": "Drover",
   "version": "0.1.1",
-  "identifier": "dev.cuongnb.herdrapp",
+  "identifier": "dev.cuongtransc.drover",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Herdr",
+        "title": "Drover",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

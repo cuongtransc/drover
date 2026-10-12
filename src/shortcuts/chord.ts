@@ -75,7 +75,7 @@ export function formatChord(c: Chord): string {
 
 const chord = (code: string, m: Partial<Chord> = {}): Chord => ({ code, shift: false, alt: false, ctrl: false, ...m });
 
-/** Chords macOS or Herdr's fixed keys own, with why they cannot be a Shortcut. */
+/** Chords macOS or Drover's fixed keys own, with why they cannot be a Shortcut. */
 const RESERVED: [Chord, string][] = [
   ...[chord("KeyQ"), chord("KeyQ", { shift: true }), chord("KeyF", { ctrl: true }), chord("Space", { ctrl: true }), chord("KeyH"), chord("KeyH", { alt: true }), chord("KeyM"), chord("Tab"), chord("Space"), chord("Backquote")].map(
     (c): [Chord, string] => [c, "Reserved by macOS"],
@@ -83,11 +83,11 @@ const RESERVED: [Chord, string][] = [
   ...[chord("KeyC"), chord("KeyV"), chord("KeyX"), chord("KeyA"), chord("KeyZ"), chord("KeyZ", { shift: true })].map(
     (c): [Chord, string] => [c, "Reserved by macOS"],
   ),
-  [chord("Comma"), "Reserved by Herdr: Settings"],
-  [chord("KeyF"), "Reserved by Herdr: Find"],
-  [chord("KeyG"), "Reserved by Herdr: Find next"],
-  [chord("KeyG", { shift: true }), "Reserved by Herdr: Find previous"],
-  [chord("KeyR"), "Reserved by Herdr: Reload"],
+  [chord("Comma"), "Reserved by Drover: Settings"],
+  [chord("KeyF"), "Reserved by Drover: Find"],
+  [chord("KeyG"), "Reserved by Drover: Find next"],
+  [chord("KeyG", { shift: true }), "Reserved by Drover: Find previous"],
+  [chord("KeyR"), "Reserved by Drover: Reload"],
 ];
 
 export function reservedReason(c: Chord): string | null {

@@ -6,16 +6,16 @@ set -u
 
 here=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d)
-export HERDR_SIGN_KEYCHAIN="$tmp/test.keychain-db"
-export HERDR_SIGN_KEYCHAIN_PASSWORD=test
-export HERDR_SIGN_IDENTITY="Herdr Sign Test $$"
+export DROVER_SIGN_KEYCHAIN="$tmp/test.keychain-db"
+export DROVER_SIGN_KEYCHAIN_PASSWORD=test
+export DROVER_SIGN_IDENTITY="Drover Sign Test $$"
 cleanup() {
-  security delete-keychain "$HERDR_SIGN_KEYCHAIN" >/dev/null 2>&1
+  security delete-keychain "$DROVER_SIGN_KEYCHAIN" >/dev/null 2>&1
   rm -rf "$tmp"
 }
 trap cleanup EXIT
-security create-keychain -p test "$HERDR_SIGN_KEYCHAIN" || exit 1
-security unlock-keychain -p test "$HERDR_SIGN_KEYCHAIN" || exit 1
+security create-keychain -p test "$DROVER_SIGN_KEYCHAIN" || exit 1
+security unlock-keychain -p test "$DROVER_SIGN_KEYCHAIN" || exit 1
 
 fails=0
 check() { # check <name> <command...>
@@ -31,7 +31,7 @@ bundle() { # bundle [binary]: a minimal app bundle with a real Mach-O to sign
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>dev.cuongnb.herdrapp.signtest</string>
+<key>CFBundleIdentifier</key><string>dev.cuongtransc.drover.signtest</string>
 <key>CFBundleExecutable</key><string>test</string>
 </dict></plist>
 EOF
@@ -51,10 +51,10 @@ check "no identity: stays ad-hoc" has "$(requirement)" cdhash
 # Setup creates the identity once; a second run leaves it alone.
 "$here/sign-setup.sh" >"$tmp/setup1.log" 2>&1; rc=$?
 check "setup: exit 0" [ "$rc" -eq 0 ]
-check "setup: identity in keychain" sh -c 'security find-identity -p codesigning "$HERDR_SIGN_KEYCHAIN" | grep -q "\"$HERDR_SIGN_IDENTITY\""'
+check "setup: identity in keychain" sh -c 'security find-identity -p codesigning "$DROVER_SIGN_KEYCHAIN" | grep -q "\"$DROVER_SIGN_IDENTITY\""'
 "$here/sign-setup.sh" >"$tmp/setup2.log" 2>&1; rc=$?
 check "setup again: exit 0" [ "$rc" -eq 0 ]
-check "setup again: still one identity" [ "$(security find-identity -p codesigning "$HERDR_SIGN_KEYCHAIN" | grep -c "\"$HERDR_SIGN_IDENTITY\"")" -eq 1 ]
+check "setup again: still one identity" [ "$(security find-identity -p codesigning "$DROVER_SIGN_KEYCHAIN" | grep -c "\"$DROVER_SIGN_IDENTITY\"")" -eq 1 ]
 
 # With the identity: the requirement names the certificate, not the build's hash, and two
 # builds with different content get the same requirement (what TCC grants are keyed on).

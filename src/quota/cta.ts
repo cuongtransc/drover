@@ -10,7 +10,7 @@ export interface CtaCard {
   /** The account's number among its Provider's, when it has several. */
   account: string | null;
   accountId: string;
-  /** The command that signs in again; null for a Provider Herdr does not know. */
+  /** The command that signs in again; null for a Provider Drover does not know. */
   cli: string | null;
   entry: QuotaEntry;
   polledAt: number | null;

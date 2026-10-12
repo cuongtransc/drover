@@ -1,13 +1,13 @@
 //! Needs a real herdr on PATH. Run with
 //! `cargo test --test session_rename_herdr -- --ignored --test-threads=1`.
-use herdr_app_lib::machines::MachineManager;
-use herdr_app_lib::transport::parse_session_list;
+use drover_lib::machines::MachineManager;
+use drover_lib::transport::parse_session_list;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Duration;
 
-const FROM: &str = "herdrapp-test-rename-a";
-const TO: &str = "herdrapp-test-rename-b";
+const FROM: &str = "drover-test-rename-a";
+const TO: &str = "drover-test-rename-b";
 
 fn herdr(args: &[&str]) -> String {
     let out = Command::new("herdr")

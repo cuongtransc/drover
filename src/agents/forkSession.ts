@@ -17,7 +17,7 @@ const FORK_START_MS = 15000;
  */
 export function forkBlocked(pane: PaneView): string | null {
   if (pane.agent !== "claude") return "Only Claude sessions can be forked";
-  if (pane.untracked) return "Herdr does not track this Claude session";
+  if (pane.untracked) return "herdr does not track this Claude session";
   if (pane.status === "working") return "Busy: a fork now would run its unfinished command again. Fork once it finishes.";
   if (pane.status === "blocked") return "Waiting for an answer: a fork now would run its unfinished command again. Answer it first.";
   return null;
@@ -107,10 +107,10 @@ export async function forkSession(
   if (blocked) throw new Error(blocked);
   const got = (await call("agent.get", { target: ref.pane_id })) as { agent?: { agent_session?: { kind?: string; value?: string } | null } };
   const session = got?.agent?.agent_session;
-  if (session?.kind !== "id" || !session.value) throw new Error("Herdr has not reported this pane's session yet");
+  if (session?.kind !== "id" || !session.value) throw new Error("herdr has not reported this pane's session yet");
   const where = await locate(ref);
   if (where.pending) throw new Error("Nothing to fork yet: send it a first message");
-  if (where.ambiguous) throw new Error("Herdr is not sure which session this pane runs, so it cannot fork it");
+  if (where.ambiguous) throw new Error("Drover is not sure which session this pane runs, so it cannot fork it");
   // The menu's pane may be stale by now: a turn that started meanwhile must not be forked.
   const live = findPane(useApp.getState().machines, ref);
   const stillBlocked = live && forkBlocked(live);

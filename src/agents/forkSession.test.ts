@@ -32,7 +32,7 @@ describe("forkBlocked", () => {
     expect(forkBlocked(claude("working"))).toBe("Busy: a fork now would run its unfinished command again. Fork once it finishes.");
     expect(forkBlocked(claude("blocked"))).toBe("Waiting for an answer: a fork now would run its unfinished command again. Answer it first.");
     expect(forkBlocked(claude("idle", { agent: "pi" }))).toBe("Only Claude sessions can be forked");
-    expect(forkBlocked(claude("idle", { untracked: true }))).toBe("Herdr does not track this Claude session");
+    expect(forkBlocked(claude("idle", { untracked: true }))).toBe("herdr does not track this Claude session");
   });
 });
 
@@ -88,8 +88,8 @@ describe("forkSession", () => {
   it("refuses before opening anything when the session has no transcript yet, is a guess, or herdr reports no id", async () => {
     for (const [over, msg] of [
       [{ located: located({ pending: true }) }, "Nothing to fork yet: send it a first message"],
-      [{ located: located({ ambiguous: true }) }, "Herdr is not sure which session this pane runs, so it cannot fork it"],
-      [{ session: null }, "Herdr has not reported this pane's session yet"],
+      [{ located: located({ ambiguous: true }) }, "Drover is not sure which session this pane runs, so it cannot fork it"],
+      [{ session: null }, "herdr has not reported this pane's session yet"],
     ] as const) {
       const d = deps(over);
       await expect(forkSession(orig, ws, claude("idle"), { worktree: false }, d)).rejects.toThrow(msg);
