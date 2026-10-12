@@ -26,14 +26,16 @@ import {
 
 // A renamed snapshot can arrive before the rename request resolves. Keep the
 // source layout intact until the caller can migrate it after backend acceptance.
-const pendingSessionRenames = new Set<SessionKey>();
+const pendingSessionRenames = new Map<SessionKey, number>();
 
 export function beginSessionRename(key: SessionKey): void {
-  pendingSessionRenames.add(key);
+  pendingSessionRenames.set(key, (pendingSessionRenames.get(key) ?? 0) + 1);
 }
 
 export function endSessionRename(key: SessionKey): void {
-  pendingSessionRenames.delete(key);
+  const remaining = (pendingSessionRenames.get(key) ?? 0) - 1;
+  if (remaining > 0) pendingSessionRenames.set(key, remaining);
+  else pendingSessionRenames.delete(key);
 }
 
 export interface SessionRef {

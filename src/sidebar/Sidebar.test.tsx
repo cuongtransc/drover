@@ -192,6 +192,32 @@ describe("Sidebar", () => {
     expect(useLayout.getState().layout.kept).toEqual({ [newKey]: { folder: "/app" } });
     expect(useLayout.getState().layout.bookmarks).toEqual([newKey]);
   });
+  it("keeps the source protected when an overlapping Session rename rejects before the first resolves", async () => {
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, "box/ai-radar/app", true, "/app") });
+    let resolve!: () => void;
+    vi.mocked(sessionRename)
+      .mockReturnValueOnce(new Promise<void>((r) => (resolve = r)))
+      .mockRejectedValueOnce(new Error("second rename failed"));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    try {
+      fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: "other-radar" } });
+      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+      await waitFor(() => expect(screen.getByText("second rename failed")).toBeTruthy());
+      act(() => useApp.getState().upsertMachine({ ...m, sessions: m.sessions.map((s) => s.name === "ai-radar" ? { ...s, name: "radar" } : s) }));
+      expect(useLayout.getState().layout.kept).toEqual({ "box/ai-radar/app": { folder: "/app" } });
+      expect(useLayout.getState().layout.bookmarks).toEqual(["box/ai-radar/app"]);
+    } finally {
+      await act(async () => resolve());
+    }
+    expect(useLayout.getState().layout.kept).toEqual({ "box/radar/app": { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/radar/app"]);
+  });
   it("leaves layout keys unchanged if a Session rename fails", async () => {
     const key = projectKey("box", "ai-radar", "app");
     useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, key, true, "/app") });
