@@ -106,6 +106,44 @@ fn tag<'a>(text: &'a str, name: &str) -> Option<&'a str> {
     Some(text[start..start + len].trim())
 }
 
+/// The user's words with the CLI's paste wrappers taken off: a multi-line paste is stored
+/// `<pasted_content id="…">…</pasted_content id="…">` (the closing tag repeats the id)
+/// between blank lines. Each becomes its own text; runs of blank lines collapse to one.
+/// A wrapper with no closing tag is left as it is.
+fn unwrap_pastes(text: &str) -> String {
+    const OPEN: &str = "<pasted_content id=\"";
+    if !text.contains(OPEN) {
+        return text.to_string();
+    }
+    let mut pieces: Vec<&str> = vec![];
+    let mut rest = text;
+    while let Some(at) = rest.find(OPEN) {
+        let after_open = &rest[at + OPEN.len()..];
+        let Some(id_end) = after_open.find('"') else {
+            break;
+        };
+        let id = &after_open[..id_end];
+        let Some(tag_end) = after_open[id_end..].find('>') else {
+            break;
+        };
+        let body = &after_open[id_end + tag_end + 1..];
+        let close = format!("</pasted_content id=\"{id}\">");
+        let Some(close_at) = body.find(&close) else {
+            break;
+        };
+        pieces.push(&rest[..at]);
+        pieces.push(&body[..close_at]);
+        rest = &body[close_at + close.len()..];
+    }
+    pieces.push(rest);
+    pieces
+        .into_iter()
+        .map(|piece| piece.trim_matches('\n'))
+        .filter(|piece| !piece.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 /// The chat text for a user record: a slash command reads as the user typed
 /// it, and the CLI's own bookkeeping (command output, caveats) is dropped.
 fn user_text(text: &str) -> Option<String> {
@@ -119,7 +157,7 @@ fn user_text(text: &str) -> Option<String> {
     if text.starts_with("<local-command-") || text.starts_with("Caveat:") {
         return None;
     }
-    Some(text.to_string())
+    Some(unwrap_pastes(text))
 }
 
 /// The chat item for a user record's text: a `!` shell command and its
@@ -328,8 +366,14 @@ impl ClaudeParser {
         }
     }
 
+    /// `text` is a queue entry as recorded, or the user's words as shown.
     fn leave_queue(&mut self, text: &str) {
-        if let Some(i) = self.queue.iter().position(|q| q.as_deref() == Some(text)) {
+        let is_it = |q: &str| q == text || unwrap_pastes(q) == text;
+        if let Some(i) = self
+            .queue
+            .iter()
+            .position(|q| q.as_deref().is_some_and(is_it))
+        {
             self.queue.remove(i);
         }
     }
@@ -650,7 +694,7 @@ impl Parser for ClaudeParser {
                 .iter()
                 .flatten()
                 .filter(|text| !text.starts_with('<') || text.starts_with("<pasted_content"))
-                .cloned()
+                .map(|text| unwrap_pastes(text))
                 .collect(),
             background: self.background.clone(),
             ..self.meta.clone()
@@ -1174,13 +1218,45 @@ mod tests {
         );
     }
     #[test]
+    fn a_paste_reads_without_the_cli_s_wrapper() {
+        // The CLI wraps a multi-line paste `<pasted_content id="…">…</pasted_content id="…">`
+        // (the closing tag repeats the id) and pads it with blank lines.
+        assert_eq!(
+            unwrap_pastes("<pasted_content id=\"b625\">\n➜ ssh ct-prox\nVolid  Format\n</pasted_content id=\"b625\">"),
+            "➜ ssh ct-prox\nVolid  Format"
+        );
+        // Typed words around the paste, and more than one paste, keep their order.
+        assert_eq!(
+            unwrap_pastes("fix this\n\n\n\n<pasted_content id=\"1\">\na\n</pasted_content id=\"1\">\n\n\n<pasted_content id=\"2\">\nb\n</pasted_content id=\"2\">\n\n\nthanks"),
+            "fix this\n\na\n\nb\n\nthanks"
+        );
+        // An unterminated or foreign tag is left as it is.
+        assert_eq!(
+            unwrap_pastes("<pasted_content id=\"1\">\nhalf"),
+            "<pasted_content id=\"1\">\nhalf"
+        );
+        assert_eq!(unwrap_pastes("a <b> c"), "a <b> c");
+    }
+    #[test]
+    fn a_paste_shows_unwrapped_queued_and_once_read() {
+        let paste = "<pasted_content id=\"b625\">\n➜ ssh ct-prox\n</pasted_content id=\"b625\">";
+        let sent = queue_op("enqueue", Some(paste));
+        let (items, _, p) = run_with(&sent);
+        assert_eq!(items, vec![]);
+        assert_eq!(p.meta().queued, vec!["➜ ssh ct-prox".to_string()]);
+        // Read mid-turn without a `remove` record: the shown words still clear the queue.
+        let (items, _, p) = run_with(&[sent, queued(paste.into(), "human")].join("\n"));
+        assert_eq!(p.meta().queued, Vec::<String>::new());
+        assert!(matches!(&items[..], [User { text, .. }] if text == "➜ ssh ct-prox"));
+    }
+    #[test]
     fn a_pasted_message_waits_in_the_queue_like_any_other() {
         // A long paste into the CLI is wrapped `<pasted_content id="…">…</pasted_content id="…">`:
         // the user's words all the same, not one of the CLI's own entries.
         let paste = "<pasted_content id=\"b625\">\n➜ ssh ct-prox 'pvesm list local'\nVolid  Format\n</pasted_content id=\"b625\">";
         assert_eq!(
             queued_now(&[queue_op("enqueue", Some(paste))]),
-            vec![paste.to_string()]
+            vec!["➜ ssh ct-prox 'pvesm list local'\nVolid  Format".to_string()]
         );
         // One from another session is not.
         let peer =
@@ -1640,6 +1716,40 @@ mod tests {
             for t in p.meta().background {
                 let task = p.task_ids.get(&t.call_id).cloned().unwrap_or_default();
                 println!("LEFT\t{file}\t{}\t{task}\t{}", t.call_id, t.description);
+            }
+        }
+    }
+
+    /// Runs the parser over real transcripts and prints every user message or queued
+    /// entry still carrying a paste wrapper, to find a wrapper shape `unwrap_pastes`
+    /// misses. `LIST` as for `audit_background_tasks_left_running`, e.g.
+    /// `grep -l pasted_content ~/.claude/projects/*/*.jsonl > /tmp/list`, then
+    /// `LIST=/tmp/list cargo test --release --lib audit_pastes -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "reads local transcripts"]
+    fn audit_pastes_left_wrapped() {
+        let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
+            return;
+        };
+        let wrapped =
+            |text: &str| text.contains("<pasted_content") || text.contains("</pasted_content");
+        let head = |text: &str| text.chars().take(80).collect::<String>();
+        for file in list.unwrap_or_default().lines() {
+            let Ok(text) = std::fs::read_to_string(file) else {
+                continue;
+            };
+            let (items, _, p) = run_with(&text);
+            for item in items {
+                if let User { text, .. } = item {
+                    if wrapped(&text) {
+                        println!("SHOWN\t{file}\t{:?}", head(&text));
+                    }
+                }
+            }
+            for text in p.meta().queued {
+                if wrapped(&text) {
+                    println!("QUEUED\t{file}\t{:?}", head(&text));
+                }
             }
         }
     }
