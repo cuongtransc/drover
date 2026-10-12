@@ -35,13 +35,15 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
       return next;
     });
   const reopen = (c: ClosedKept) => {
+    // The pending contract covers every reopen route, not just the row's buttons.
+    if (pending.has(c.key)) return;
     setPendingKey(c.key, true);
     a?.guard(() => reopenKept(machineId, session.name, c).finally(() => setPendingKey(c.key, false)));
   };
   const menuFor = (c: ClosedKept): MenuItem[] =>
     a
       ? [
-          { label: "Reopen", icon: TerminalIcon, onSelect: () => reopen(c) },
+          { label: "Reopen", icon: TerminalIcon, disabled: pending.has(c.key), onSelect: () => reopen(c) },
           {
             label: "Change folder…",
             icon: FolderOpenIcon,
@@ -64,7 +66,7 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
             <button className="ws-label closed-label" title={c.folder ?? undefined} disabled={pending.has(c.key)} onClick={() => reopen(c)}>
               {c.label}
             </button>
-            <span className="ws-folder">{c.folder && folderName(c.folder) !== c.label ? folderName(c.folder) : ""}</span>
+            <span className="ws-folder">{c.folder ? folderName(c.folder) : ""}</span>
             <button className="ws-add" aria-label={`Reopen ${c.label}`} disabled={pending.has(c.key)} onClick={() => reopen(c)}>
               <TerminalIcon />
             </button>
