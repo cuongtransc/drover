@@ -17,7 +17,7 @@ import {
 const { fontFace } = vi.hoisted(() => ({ fontFace: vi.fn() }));
 vi.mock("../lib/ipc", () => ({ systemFonts: vi.fn(async () => []), fontFace }));
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 
 beforeEach(() => {
   localStorage.clear();

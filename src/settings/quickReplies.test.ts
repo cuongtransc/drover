@@ -12,7 +12,7 @@ import {
   useQuickReplies,
 } from "./quickReplies";
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 
 beforeEach(() => {
   localStorage.clear();

@@ -31,7 +31,7 @@ describe("promptHistory", () => {
   });
 
   it("reads a corrupt entry as empty", () => {
-    localStorage.setItem("herdr-app:history:s", "{not json");
+    localStorage.setItem("drover:history:s", "{not json");
     expect(readHistory("s")).toEqual([]);
   });
 });

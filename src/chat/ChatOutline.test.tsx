@@ -67,7 +67,7 @@ describe("ChatOutline", () => {
     expect(screen.queryByRole("button", { name: "fix the header" })).toBeNull();
     expect(screen.queryByRole("separator", { name: "Resize outline" })).toBeNull();
     expect(rail().className).toContain("collapsed");
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).outlineCollapsed).toBe(true);
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).outlineCollapsed).toBe(true);
     unmount();
     render(<ChatOutline entries={entries} current={0} onJump={() => {}} />);
     const show = screen.getByRole("button", { name: "Show outline" });

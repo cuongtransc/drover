@@ -299,10 +299,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_folder_has_no_branch() {
-        let s = git_status(&LocalTransport, "/nonexistent/herdr-app/")
+        let s = git_status(&LocalTransport, "/nonexistent/drover/")
             .await
             .unwrap();
-        assert_eq!(s.folder, "herdr-app");
+        assert_eq!(s.folder, "drover");
         assert_eq!(s.branch, None);
     }
 

@@ -19,14 +19,14 @@ describe("sessionProjects", () => {
     const asking = pane("blocked");
     const finished = pane("done");
     const s = session([
-      ws("herdr-app", [tab("orch-ux", orch), tab("lane-a", pane("working")), tab("lane-b", pane("done"))]),
+      ws("drover", [tab("orch-ux", orch), tab("lane-a", pane("working")), tab("lane-b", pane("done"))]),
       ws("ccpoke", [tab("1", asking)]),
       ws("history", [tab("main", finished)]),
       ws("journal", [tab("1", pane("idle"))]),
       ws("shells", [tab("1", pane("unknown", null))]),
     ]);
     expect(sessionProjects(machine, s, {}, false)).toEqual([
-      { id: "herdr-app", label: "herdr-app", state: "working", lanes: 2, target: ref(orch) },
+      { id: "drover", label: "drover", state: "working", lanes: 2, target: ref(orch) },
       { id: "ccpoke", label: "ccpoke", state: "blocked", lanes: 0, target: ref(asking) },
       { id: "history", label: "history", state: "review", lanes: 0, target: ref(finished) },
     ]);

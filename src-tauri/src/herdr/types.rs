@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(s.panes.len(), 4);
         assert_eq!(s.panes[3].agent_status, AgentStatus::Unknown);
         assert_eq!(s.agents[1].agent.as_deref(), Some("pi"));
-        assert_eq!(s.panes[0].cwd.as_deref(), Some("/Users/me/herdr app"));
+        assert_eq!(s.panes[0].cwd.as_deref(), Some("/Users/me/drover app"));
     }
     #[test]
     fn rollup_picks_most_urgent() {

@@ -14,7 +14,7 @@ const m: MachineView = {
   sessions: [{ name: "default", running: true, status: "working", error: null, workspaces: [
     { workspace_id: "w1", label: "remora", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [pane("p1", "Mermaid diagram", "idle")] } ] },
-    { workspace_id: "w2", label: "herdr-app", number: 2, status: "working", tabs: [
+    { workspace_id: "w2", label: "drover", number: 2, status: "working", tabs: [
       { tab_id: "w2:t1", label: "1", number: 1, status: "working", panes: [pane("p2", "Chat tabs", "working"), pane("p3", "Bug button", "blocked")] } ] },
   ] }, { name: "pegabot", running: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "bot", number: 1, status: "idle", tabs: [
@@ -116,7 +116,7 @@ describe("OpenStrip", () => {
     useApp.getState().select(ref("p1"));
     render(<OpenStrip />);
     const tab = screen.getByRole("tab", { name: "main.ts" });
-    expect(tab.closest(".files-tab-item")?.getAttribute("title")).toBe("local/default · herdr-app · src/main.ts");
+    expect(tab.closest(".files-tab-item")?.getAttribute("title")).toBe("local/default · drover · src/main.ts");
     fireEvent.click(tab);
     expect(useApp.getState().openItems.active).toBe("file:local/default/w2|/r|src/main.ts");
     expect(useApp.getState().selected).toEqual(ref("p1"));

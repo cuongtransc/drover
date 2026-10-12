@@ -25,7 +25,7 @@ How to use the Files panel, protected panes, Fork session and `/btw`: [docs/guid
 
 To update, download the new `.dmg`, replace the app in Applications and run the `xattr` command again.
 
-Drover was named Herdr until 0.1.1. To keep that app's settings, Groups, Bookmarks and Machines, quit it and run `mise run app:migrate-id` once before the first launch (`mise run app:install` does it for you): it copies the state from `dev.cuongnb.herdrapp` to `dev.cuongtransc.drover` and leaves the old folders in place.
+Drover was named Herdr before ADR 0007 (October 2026). To keep that app's settings, Groups, Bookmarks and Machines, quit it and run `mise run app:migrate-id` once before the first launch (`mise run app:install` does it for you): it copies the state from `dev.cuongnb.herdrapp` to `dev.cuongtransc.drover` and leaves the old folders in place.
 
 ## Requirements
 

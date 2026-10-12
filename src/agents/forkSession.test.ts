@@ -120,7 +120,7 @@ describe("forkSession", () => {
     });
     await expect(forkSession(orig, ws, claude("idle"), { worktree: false }, d)).rejects.toBeTruthy();
     expect(useForks.getState().forks).toEqual({});
-    expect(JSON.parse(localStorage.getItem("herdr-app:forks") ?? "{}")).toEqual({});
+    expect(JSON.parse(localStorage.getItem("drover:forks") ?? "{}")).toEqual({});
   });
 
   it("checks the pane again after asking herdr: one that started working meanwhile is not forked", async () => {

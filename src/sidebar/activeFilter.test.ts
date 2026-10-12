@@ -56,12 +56,12 @@ describe("filterResolved", () => {
 describe("useSessionFilter", () => {
   it("starts on Active unless the user chose All", async () => {
     vi.resetModules();
-    localStorage.removeItem("herdr-app:settings");
+    localStorage.removeItem("drover:settings");
     expect((await import("./activeFilter")).useSessionFilter.getState().filter).toBe("active");
     vi.resetModules();
-    localStorage.setItem("herdr-app:settings", JSON.stringify({ sessionFilter: "all" }));
+    localStorage.setItem("drover:settings", JSON.stringify({ sessionFilter: "all" }));
     expect((await import("./activeFilter")).useSessionFilter.getState().filter).toBe("all");
-    localStorage.removeItem("herdr-app:settings");
+    localStorage.removeItem("drover:settings");
   });
 });
 

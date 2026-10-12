@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadLayout, nextLayout, useLayout } from "./layout";
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 
 beforeEach(() => {
   localStorage.clear();

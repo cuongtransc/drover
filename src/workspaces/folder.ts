@@ -7,7 +7,7 @@ export interface WorkspaceRef {
   workspace_id: string;
 }
 
-const PREFIX = "herdr-app:ws-folder:";
+const PREFIX = "drover:ws-folder:";
 
 const listeners = new Set<() => void>();
 function notify() {

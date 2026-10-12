@@ -295,7 +295,7 @@ mod tests {
                 .iter()
                 .map(|w| w.label.as_str())
                 .collect::<Vec<_>>(),
-            ["herdr-app", "api"]
+            ["drover", "api"]
         );
         let w1 = &v.workspaces[0];
         assert_eq!(w1.status, AgentStatus::Blocked);

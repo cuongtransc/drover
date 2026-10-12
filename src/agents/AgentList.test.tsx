@@ -84,7 +84,7 @@ describe("AgentList", () => {
     expect(rowsOf("web")).toEqual(["Guard export, codex, blocked", "Tag v1.4.0, shell", "Ship flag, pi, idle"]);
     expect(screen.getByRole("button", { name: "Ship flag, pi, idle" }).className).toContain("quiet");
     expect(screen.getByRole("button", { name: "Guard export, codex, blocked" }).className).not.toContain("quiet");
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).paneFilter).toBe("all");
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).paneFilter).toBe("all");
   });
 
   it("keeps an agent idle under the Active window (1h by default), with its idle time", () => {
@@ -546,7 +546,7 @@ describe("AgentList", () => {
       render(<AgentList />);
       fireEvent.click(within(menuOf("Tag v1.4.0")).getByRole("menuitemcheckbox", { name: "Protect" }));
       expect(screen.getByLabelText("Protected: Tag v1.4.0")).toBeTruthy();
-      expect(JSON.parse(localStorage.getItem("herdr-app:protected")!)).toEqual({ "local/default/p3": true });
+      expect(JSON.parse(localStorage.getItem("drover:protected")!)).toEqual({ "local/default/p3": true });
     });
 
     it("refuses to close a tab holding a protected pane until the user unprotects it in the dialog", () => {

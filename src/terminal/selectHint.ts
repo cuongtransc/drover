@@ -1,4 +1,4 @@
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /** A drag this far, in pixels, is a selection attempt rather than a shaky click. */
 export const DRAG_HINT_PX = 8;

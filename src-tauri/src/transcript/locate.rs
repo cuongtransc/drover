@@ -271,8 +271,8 @@ mod tests {
     #[test]
     fn claude_dir_encoding() {
         assert_eq!(
-            claude_project_dir("/Users/me/herdr app"),
-            "-Users-me-herdr-app"
+            claude_project_dir("/Users/me/drover app"),
+            "-Users-me-drover-app"
         );
         assert_eq!(
             claude_project_dir("/srv/example.com/my_project"),

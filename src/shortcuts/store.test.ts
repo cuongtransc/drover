@@ -4,7 +4,7 @@ import { ACTIONS } from "./actions";
 import type { Chord } from "./chord";
 import { checkChord, DEFAULT_BINDINGS, loadBindings, useShortcutLabel, useShortcuts } from "./store";
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 const c = (code: string, m: Partial<Chord> = {}): Chord => ({ code, shift: false, alt: false, ctrl: false, ...m });
 const s = () => useShortcuts.getState();
 

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Shared with store.ts, theme.ts and notify.ts: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /**
  * The short replies people send an agent most, by count; each person edits theirs in Settings.

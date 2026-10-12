@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const KEY = "herdr-app:files-panel";
+const KEY = "drover:files-panel";
 const fresh = async () => {
   vi.resetModules();
   return (await import("./panelStore")).useFilesPanel;

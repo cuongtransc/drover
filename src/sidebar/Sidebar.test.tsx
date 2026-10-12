@@ -13,7 +13,7 @@ const m: MachineView = {
   id: "box", label: "devtuf", kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "working",
   sessions: [
     { name: "default", running: true, status: "working", error: null, workspaces: [
-      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [
+      { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [
         { tab_id: "w1:t1", label: "1", number: 1, status: "working", panes: [
           { pane_id: "w1:p1", terminal_id: "t", title: "Rewrite", cwd: "/x", agent: "claude", status: "working" } ] } ] } ] },
     { name: "ai-radar", running: false, status: "unknown", error: null, workspaces: [] },
@@ -38,10 +38,10 @@ describe("Sidebar", () => {
     const blocked = structuredClone(m);
     blocked.sessions[0].workspaces[0].tabs[0].panes[0].status = "blocked";
     useApp.setState({ machines: { box: blocked }, doneSeen: {} });
-    useLayout.setState({ layout: { tree: [], bookmarks: [projectKey("box", "default", "herdr-app")] } });
+    useLayout.setState({ layout: { tree: [], bookmarks: [projectKey("box", "default", "drover")] } });
     render(<Sidebar />);
-    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "herdr-app, default, blocked" });
-    expect(bm.textContent).toBe("herdr-appdefaultBlocked");
+    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "drover, default, blocked" });
+    expect(bm.textContent).toBe("droverdefaultBlocked");
     expect(bm.className).toContain("blocked");
     // The Session row carries no count: its project rows say what needs the user.
     expect(within(screen.getByRole("region", { name: "Sessions" })).getByText("default").closest("button")!.querySelector(".need")).toBeNull();
@@ -52,9 +52,9 @@ describe("Sidebar", () => {
     useApp.setState({ machines: { box: idle }, doneSeen: {}, statusSince: { "box/default/w1:p1": Date.now() - 12 * 60_000 } });
     useSessionFilter.setState({ filter: "active" });
     render(<Sidebar />);
-    const project = screen.getByRole("button", { name: "herdr-app, idle 12m" });
+    const project = screen.getByRole("button", { name: "drover, idle 12m" });
     expect(project.className).toContain("recent");
-    expect(project.textContent).toBe("herdr-app12m");
+    expect(project.textContent).toBe("drover12m");
     useApp.setState({ statusSince: {} });
   });
   it("lists a session's projects under it: Blocked, Review, the lanes of one in progress", () => {
@@ -62,7 +62,7 @@ describe("Sidebar", () => {
     const p = (pane_id: string, status: "working" | "blocked" | "done" | "idle") => ({ pane_id, terminal_id: "t" + pane_id, title: pane_id, cwd: "/x", agent: "claude", status });
     const t = (label: string, pane: ReturnType<typeof p>) => ({ tab_id: label, label, number: 1, status: pane.status, panes: [pane] });
     s.sessions[0].workspaces = [
-      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [t("orch-ux", p("o", "idle")), t("lane-a", p("a", "working")), t("lane-b", p("b", "working"))] },
+      { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [t("orch-ux", p("o", "idle")), t("lane-a", p("a", "working")), t("lane-b", p("b", "working"))] },
       { workspace_id: "w2", label: "ccpoke", number: 2, status: "blocked", tabs: [t("1", p("c", "blocked"))] },
       { workspace_id: "w3", label: "history", number: 3, status: "done", tabs: [t("1", p("h", "done"))] },
       { workspace_id: "w4", label: "journal", number: 4, status: "idle", tabs: [t("1", p("j", "idle"))] },
@@ -71,8 +71,8 @@ describe("Sidebar", () => {
     useSessionFilter.setState({ filter: "active" });
     render(<Sidebar />);
     const tree = screen.getByRole("region", { name: "Sessions" });
-    const rows = within(tree).getAllByRole("button", { name: /^(herdr-app|ccpoke|history|journal)/ });
-    expect(rows.map((b) => b.textContent)).toEqual(["herdr-app2 lanes", "ccpokeBlocked", "historyReview"]);
+    const rows = within(tree).getAllByRole("button", { name: /^(drover|ccpoke|history|journal)/ });
+    expect(rows.map((b) => b.textContent)).toEqual(["drover2 lanes", "ccpokeBlocked", "historyReview"]);
     fireEvent.click(rows[1]);
     expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "c" });
     expect(rows[1].getAttribute("aria-current")).toBe("true");
@@ -84,12 +84,12 @@ describe("Sidebar", () => {
     expect(within(tree).getByRole("button", { name: "journal" }).className).toContain("quiet");
   });
   it("puts Bookmarks first; a click opens the project's pane and lights only that row", () => {
-    useLayout.setState({ layout: { tree: [work], bookmarks: [projectKey("box", "default", "herdr-app")] } });
+    useLayout.setState({ layout: { tree: [work], bookmarks: [projectKey("box", "default", "drover")] } });
     render(<Sidebar />);
     const sections = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
     expect(sections.indexOf("Bookmarks")).toBeLessThan(sections.indexOf("Sessions"));
-    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: /^herdr-app/ });
-    const inTree = within(screen.getByRole("region", { name: "Sessions" })).getByRole("button", { name: "herdr-app" });
+    const bm = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: /^drover/ });
+    const inTree = within(screen.getByRole("region", { name: "Sessions" })).getByRole("button", { name: "drover" });
     // In the tree the bookmarked project carries the star.
     expect(inTree.querySelector("[aria-label='bookmarked']")).toBeTruthy();
     fireEvent.click(bm);
@@ -119,7 +119,7 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Active 1" }));
     expect(screen.queryByText("ai-radar")).toBeNull();
     expect(row("default")).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).sessionFilter).toBe("active");
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).sessionFilter).toBe("active");
     expect(screen.getByText("1 hidden · idle or stopped")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show" }));
     expect(row("ai-radar")).toBeTruthy();
@@ -138,7 +138,7 @@ describe("Sidebar", () => {
     const machines = screen.getByRole("region", { name: "Machines" });
     expect(within(machines).getByText("devtuf")).toBeTruthy();
     expect(within(machines).queryByText("default")).toBeNull();
-    expect(within(machines).queryByText("herdr-app")).toBeNull();
+    expect(within(machines).queryByText("drover")).toBeNull();
     expect(screen.queryByRole("region", { name: "Bookmarks" })).toBeNull();
   });
   it("renders sessions inside their group and collapses it", () => {
@@ -151,7 +151,7 @@ describe("Sidebar", () => {
     expect(screen.getByText("ai-radar")).toBeTruthy();
   });
   it("keeps a bookmarked project while Active hides its Session, and one whose Workspace is gone, closed", () => {
-    useLayout.setState({ layout: { tree: [], bookmarks: [projectKey("box", "ai-radar", "old"), projectKey("box", "default", "herdr-app")] } });
+    useLayout.setState({ layout: { tree: [], bookmarks: [projectKey("box", "ai-radar", "old"), projectKey("box", "default", "drover")] } });
     useSessionFilter.setState({ filter: "active" });
     render(<Sidebar />);
     expect(within(screen.getByRole("region", { name: "Sessions" })).queryByText("ai-radar")).toBeNull();
@@ -166,8 +166,8 @@ describe("Sidebar", () => {
     render(<Sidebar />);
     fireEvent.click(screen.getByText("default"));
     expect(useApp.getState().viewed).toEqual({ machine_id: "box", session: "default" });
-    // The pane it opened is in herdr-app: that project's row is the one lit.
-    expect(screen.getByRole("button", { name: "herdr-app" }).className).toContain("active");
+    // The pane it opened is in drover: that project's row is the one lit.
+    expect(screen.getByRole("button", { name: "drover" }).className).toContain("active");
   });
   it("selecting a pane views its session", () => {
     useApp.getState().select({ machine_id: "box", session: "default", pane_id: "w1:p1" });
@@ -218,7 +218,7 @@ describe("Sidebar tree", () => {
   const projects = () => {
     const s = structuredClone(m);
     s.sessions[0].workspaces = [
-      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [t("1", p("o", "working"))] },
+      { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [t("1", p("o", "working"))] },
       { workspace_id: "w2", label: "ccpoke", number: 2, status: "blocked", tabs: [t("1", p("c", "blocked"))] },
       { workspace_id: "w3", label: "journal", number: 3, status: "idle", tabs: [t("1", p("j", "idle"))] },
     ];
@@ -241,7 +241,7 @@ describe("Sidebar tree", () => {
     expect(projectNames()).toEqual(["ccpokeBlocked", "2 more"]);
     expect(within(tree()).getByRole("button", { name: "Unfold default" }).getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(within(tree()).getByRole("button", { name: "2 more" }));
-    expect(projectNames()).toEqual(["herdr-app", "ccpokeBlocked", "journal"]);
+    expect(projectNames()).toEqual(["drover", "ccpokeBlocked", "journal"]);
   });
 
   it("folded, still shows the project holding the selected pane", () => {
@@ -266,7 +266,7 @@ describe("Sidebar tree", () => {
     fireEvent.click(session);
     expect(useApp.getState().viewed).toMatchObject({ machine_id: "box", session: "default" });
     // Folded, it keeps the project now on screen and the one that asks.
-    expect(projectNames()).toEqual(["herdr-app", "ccpokeBlocked", "1 more"]);
+    expect(projectNames()).toEqual(["drover", "ccpokeBlocked", "1 more"]);
     fireEvent.click(session);
     expect(projectNames()).toHaveLength(3);
   });

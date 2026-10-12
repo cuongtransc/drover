@@ -67,8 +67,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let cwd = tmp.path().to_string_lossy().into_owned();
         for (cwd, dir) in [
-            (cwd.as_str(), "../nonexistent-herdr-app/"),
-            ("/nonexistent/herdr-app", "../"),
+            (cwd.as_str(), "../nonexistent-drover/"),
+            ("/nonexistent/drover", "../"),
         ] {
             let got = list_entries(&LocalTransport, cwd, dir).await.unwrap();
             assert!(got.is_empty(), "{cwd} {dir}: {got:?}");

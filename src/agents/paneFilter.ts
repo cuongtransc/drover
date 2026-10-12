@@ -3,7 +3,7 @@ import { create } from "zustand";
 import { paneKey, type PaneView, type WorkspaceView } from "../lib/types";
 
 /** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /** The Agents column's twin of the sidebar's session filter (docs/design/ui-ux-guidelines.md §7.1). */
 export type PaneFilter = "all" | "active";

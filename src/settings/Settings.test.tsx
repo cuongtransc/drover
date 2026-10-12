@@ -50,7 +50,7 @@ describe("Settings dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Light" }));
     expect(useTheme.getState()).toMatchObject({ pref: "light", theme: "light" });
     expect(screen.getByRole("button", { name: "Light" }).getAttribute("aria-pressed")).toBe("true");
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).theme).toBe("light");
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).theme).toBe("light");
   });
 
   it("sets how long Active keeps an idle agent, 1h by default, and remembers it", () => {
@@ -60,7 +60,7 @@ describe("Settings dialog", () => {
     expect(screen.getByRole("button", { name: "1h" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "15m" }));
     expect(useActiveWindow.getState().minutes).toBe(15);
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).activeMinutes).toBe(15);
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).activeMinutes).toBe(15);
   });
 
   it("opens as a dialog on the General section and switches sections", () => {
@@ -126,7 +126,7 @@ describe("Settings quick replies", () => {
   });
 
   it("reads an unknown chat width as comfortable", () => {
-    localStorage.setItem("herdr-app:settings", JSON.stringify({ chatWidth: "huge" }));
+    localStorage.setItem("drover:settings", JSON.stringify({ chatWidth: "huge" }));
     expect(loadLensSettings().chatWidth).toBe("comfortable");
   });
 

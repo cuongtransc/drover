@@ -243,7 +243,7 @@ mod tests {
         let got = list_files(
             &LocalTransport,
             "/nonexistent-home",
-            "/nonexistent/herdr-app",
+            "/nonexistent/drover",
             &HiddenFolders::default(),
         )
         .await

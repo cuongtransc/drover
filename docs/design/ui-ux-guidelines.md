@@ -209,7 +209,7 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
 - Every row has an explicit `aria-label`: "Fix login flow, claude, needs input" (not the concatenated
   text of its children).
 - The selected row has `aria-current="true"`; collapsible headers are buttons with `aria-expanded`
-  and an accessible name that includes their roll-up ("herdr-app, 1 needs you").
+  and an accessible name that includes their roll-up ("drover, 1 needs you").
 - Status: shape or word plus the name; never colour alone (deuteranopia: amber vs green).
 - Text ≥ 4.5:1 against its real background (§3.5). Pointer targets ≥ 24px tall, contiguous along a
   list.
