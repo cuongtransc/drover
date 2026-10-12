@@ -642,13 +642,14 @@ impl Parser for ClaudeParser {
 
     fn meta(&self) -> ChatMeta {
         ChatMeta {
-            // The CLI's own entries (a task finishing, a subagent's hand-back) are tagged
-            // `<…>`; they are not the user's words.
+            // The CLI's own entries (a task finishing, a subagent's hand-back, another
+            // session's message) are tagged `<…>`; they are not the user's words. A long
+            // paste is the user's, wrapped `<pasted_content id="…">` by the CLI.
             queued: self
                 .queue
                 .iter()
                 .flatten()
-                .filter(|text| !text.starts_with('<'))
+                .filter(|text| !text.starts_with('<') || text.starts_with("<pasted_content"))
                 .cloned()
                 .collect(),
             background: self.background.clone(),
@@ -1169,6 +1170,23 @@ mod tests {
         // The CLI's own entries are not the user's words.
         assert_eq!(
             queued_now(&[queue_op("enqueue", Some(task))]),
+            Vec::<String>::new()
+        );
+    }
+    #[test]
+    fn a_pasted_message_waits_in_the_queue_like_any_other() {
+        // A long paste into the CLI is wrapped `<pasted_content id="…">…</pasted_content id="…">`:
+        // the user's words all the same, not one of the CLI's own entries.
+        let paste = "<pasted_content id=\"b625\">\n➜ ssh ct-prox 'pvesm list local'\nVolid  Format\n</pasted_content id=\"b625\">";
+        assert_eq!(
+            queued_now(&[queue_op("enqueue", Some(paste))]),
+            vec![paste.to_string()]
+        );
+        // One from another session is not.
+        let peer =
+            "<cross-session-message from=\"uds:/tmp/cc-socks/1.sock\">hi</cross-session-message>";
+        assert_eq!(
+            queued_now(&[queue_op("enqueue", Some(peer))]),
             Vec::<String>::new()
         );
     }
