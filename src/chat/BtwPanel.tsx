@@ -3,7 +3,7 @@ import { herdrCall } from "../lib/ipc";
 import { paneKey, type PaneRef } from "../lib/types";
 import { useApp } from "../store/app";
 import { CloseIcon, SendIcon } from "../ui/icons";
-import { closeBtw, useBtw, type Aside } from "./btw";
+import { BTW_TOO_LONG, btwPrompt, closeBtw, useBtw, type Aside } from "./btw";
 import { asPaneCall } from "./Composer";
 import { CopyButton } from "./CopyButton";
 import { BTW_DEFAULT, BTW_MAX, BTW_MIN, clampBtwWidth, loadBtwWidth, saveBtwWidth } from "./outlineWidth";
@@ -53,11 +53,13 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
   // Claude's own /btw panel takes the pane's keys until the answer is read and the panel closed.
   const asking = aside?.phase === "asking";
   const question = text.trim();
-  const canAsk = question !== "" && !asking;
+  const prompt = question === "" ? null : btwPrompt(question);
+  const tooLong = question !== "" && prompt === null;
+  const canAsk = prompt !== null && !asking;
   const ask = () => {
     if (!canAsk) return;
     setText("");
-    call("agent.prompt", { target: pane.pane_id, text: `/btw ${question}` }).then(
+    call("agent.prompt", { target: pane.pane_id, text: prompt }).then(
       () => void useBtw.getState().ask(pane, question, call),
       () => {
         if (!useBtw.getState().drafts[key]) setText(question);
@@ -131,10 +133,11 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
             }
           }}
         />
-        <button className="send" aria-label="Ask" title={asking ? "Wait for the /btw answer" : undefined} disabled={!canAsk} onClick={ask}>
+        <button className="send" aria-label="Ask" title={asking ? "Wait for the /btw answer" : tooLong ? BTW_TOO_LONG : undefined} disabled={!canAsk} onClick={ask}>
           <SendIcon />
         </button>
       </div>
+      {tooLong && <p className="btw-limit">{BTW_TOO_LONG}.</p>}
     </section>
   );
 }

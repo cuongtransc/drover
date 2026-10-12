@@ -15,6 +15,23 @@ export function btwQuestion(text: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * The longest `/btw` prompt Claude still takes as one. It turns a paste of 800 characters or more,
+ * or of four lines or more, into "[Pasted text]" and sends it to the main conversation as a plain
+ * message; typed text arrives too fast to escape that. Measured 2026-10-12 (claude, isolated herdr):
+ * 790 characters opened the panel, 810 did not; 3 lines did, 4 did not.
+ */
+export const BTW_MAX_CHARS = 790;
+
+/** Why a question past BTW_MAX_CHARS is held back. */
+export const BTW_TOO_LONG = `Too long for /btw (over ${BTW_MAX_CHARS} characters): Claude would send it to the main conversation`;
+
+/** The `/btw` prompt for `question`, on one line as Claude shows it, or null when it is too long for /btw. */
+export function btwPrompt(question: string): string | null {
+  const text = `/btw ${question.replace(/\s+/g, " ").trim()}`;
+  return text.length <= BTW_MAX_CHARS ? text : null;
+}
+
 function lastIndex(lines: string[], test: (l: string) => boolean): number {
   for (let i = lines.length - 1; i >= 0; i--) if (test(lines[i])) return i;
   return -1;

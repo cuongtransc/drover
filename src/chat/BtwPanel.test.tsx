@@ -113,6 +113,24 @@ describe("BtwPanel", () => {
       expect(box().value).toBe("");
     });
 
+    it("asks a question of several lines on one line, which Claude still takes as /btw", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why that file?\n1. lock it?\n2. keep it?\n3. and the test?" } });
+      fireEvent.keyDown(box(), { key: "Enter" });
+      expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "/btw why that file? 1. lock it? 2. keep it? 3. and the test?" });
+    });
+
+    it("holds Ask for a question too long for /btw, and says why", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why ".repeat(300) } });
+      expect(send().disabled).toBe(true);
+      expect(screen.getByText(/Too long for \/btw/)).toBeTruthy();
+      fireEvent.keyDown(box(), { key: "Enter" });
+      expect(herdrCall).not.toHaveBeenCalled();
+    });
+
     it("keeps a newline on Shift+Enter", () => {
       act(() => useBtw.getState().openBtw(pane));
       render(<BtwPanel pane={pane} />);
