@@ -28,6 +28,7 @@ export const SURFACES: Surface[] = [
   { group: "Agents column", name: "Panes filter", selector: ".panes-head .active-toggle", at: [0, 0.5], d: [-17, 0], what: "All | Active on the PANES header.", code: "usePaneFilter, PanesHeader" },
   { group: "Agents column", name: "Workspace header", selector: ".ws-head", at: [0, 0.5], d: [91, 0], what: "A Workspace's name over its Pane rows; + starts an agent in it.", code: ".ws-head in AgentList" },
   { group: "Agents column", name: "Pane row", selector: ".agent-card", at: [0, 0.5], d: [159, 0], what: "A Pane: agent mark, title, lock, status.", code: "AgentCard" },
+  { group: "Agents column", name: "Closed section", selector: ".closed-ws", at: [0, 0.5], d: [96, 0], what: "CLOSED and its count: the Session's kept workspaces herdr removed; a click opens one again.", code: "src/agents/ClosedSection.tsx" },
   { group: "Agents column", name: "Lane toggle", selector: ".lane-toggle", at: [0.5, 0], d: [3, -11], what: "“N lanes ›” on an orchestrator's Pane row.", code: ".lane-toggle in AgentList" },
   { group: "Agents column", name: "Files panel", selector: ".files-panel", at: [0, 0], d: [157, 17], what: "Under the Pane rows; ⌘E shows and hides it.", code: "src/files/FilesPanel.tsx" },
   { group: "Agents column", name: "Go to file", selector: ".files-goto", at: [0, 0.5], d: [223, 0], what: "⌘P: find a file by name in the panel's root.", code: "src/files/GoToFile.tsx" },

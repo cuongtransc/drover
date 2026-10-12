@@ -115,7 +115,7 @@ vi.mock("../chat/chatSession", async (orig) => ({
 }));
 const { default: App } = await import("../App");
 const { useApp } = await import("../store/app");
-const { useLayout, projectKey } = await import("../sidebar/groups");
+const { useLayout, projectKey, setKept } = await import("../sidebar/groups");
 const { useFilesPanel } = await import("../files/panelStore");
 
 const settle = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
@@ -135,7 +135,8 @@ it("captures the UI map", async () => {
     useApp.getState().pinAgent(at("p2"));
     useApp.getState().pinAgent(at("p1"));
     useApp.setState((s) => ({ expanded: { ...s.expanded, machines: true } }));
-    useLayout.setState((s) => ({ layout: { ...s.layout, bookmarks: [projectKey("local", "ca", "ca-trader")] } }));
+    // a closed workspace for Session ct, so the Closed section is on screen
+    useLayout.setState((s) => ({ layout: setKept({ ...s.layout, bookmarks: [projectKey("local", "ca", "ca-trader")] }, projectKey("local", "ct", "ct-cli-old"), "/Users/me/ct-cli-old") }));
     // the Files panel starts collapsed: open it, for Go to file and the tree
     useFilesPanel.getState().setCollapsed(false);
   });
