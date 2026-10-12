@@ -8,6 +8,7 @@ import { asPaneCall } from "./Composer";
 import { CopyButton } from "./CopyButton";
 import { BTW_DEFAULT, BTW_MAX, BTW_MIN, clampBtwWidth, loadBtwWidth, saveBtwWidth } from "./outlineWidth";
 import { ResizeEdge } from "./ResizeEdge";
+import { useFitHeight } from "./useFitHeight";
 
 /**
  * The pane's `/btw` thread, in a column beside the chat with its own box: the Composer below the
@@ -22,7 +23,8 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
   const earlier = useBtw((s) => s.history[key]) ?? NONE;
   const open = useBtw((s) => !!s.open[key]);
   const focus = useBtw((s) => s.focus[key]);
-  const [text, setText] = useState("");
+  const text = useBtw((s) => s.drafts[key]) ?? "";
+  const setText = (t: string) => useBtw.getState().setDraft(pane, t);
   const [width, setWidth] = useState(loadBtwWidth);
   const resize = (px: number) => {
     const w = clampBtwWidth(px);
@@ -31,6 +33,7 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
   };
   const body = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
+  useFitHeight(box, text);
   // A new question or its answer is what to read: bring it into view below the thread.
   useLayoutEffect(() => {
     const el = body.current;
@@ -56,7 +59,9 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
     setText("");
     call("agent.prompt", { target: pane.pane_id, text: `/btw ${question}` }).then(
       () => void useBtw.getState().ask(pane, question, call),
-      () => setText((cur) => (cur === "" ? question : cur)),
+      () => {
+        if (!useBtw.getState().drafts[key]) setText(question);
+      },
     );
   };
 
@@ -110,7 +115,7 @@ export function BtwPanel({ pane, untracked = false }: { pane: PaneRef; untracked
       <div className="btw-compose">
         <textarea
           ref={box}
-          rows={1}
+          rows={2}
           autoFocus
           aria-label="Side question"
           placeholder="Ask on the side…"

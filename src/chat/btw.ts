@@ -182,6 +182,9 @@ interface BtwState {
   open: Record<string, boolean>;
   /** Bumped each time the column is asked for, so its box takes the focus again. */
   focus: Record<string, number>;
+  /** The pane's unsent question: the column unmounts on a pane or lens switch, the draft stays until it closes. */
+  drafts: Record<string, string>;
+  setDraft: (pane: PaneRef, text: string) => void;
   /** Opens the pane's /btw column, its box focused. */
   openBtw: (pane: PaneRef) => void;
   /** Follows the `/btw` just sent to `pane` until its answer is read or fails. */
@@ -193,6 +196,8 @@ export const useBtw = create<BtwState>((set, get) => ({
   history: {},
   open: {},
   focus: {},
+  drafts: {},
+  setDraft: (pane, text) => set((s) => ({ drafts: { ...s.drafts, [paneKey(pane)]: text } })),
   openBtw: (pane) => {
     const key = paneKey(pane);
     set((s) => ({ open: { ...s.open, [key]: true }, focus: { ...s.focus, [key]: (s.focus[key] ?? 0) + 1 } }));
@@ -227,7 +232,8 @@ export async function closeBtw(pane: PaneRef, call: Call): Promise<void> {
     const { [key]: _, ...asides } = s.asides;
     const { [key]: _h, ...history } = s.history;
     const { [key]: _o, ...open } = s.open;
-    return { asides, history, open };
+    const { [key]: _d, ...drafts } = s.drafts;
+    return { asides, history, open, drafts };
   });
   if (!aside) return;
   if (aside.phase !== "asking") return;
