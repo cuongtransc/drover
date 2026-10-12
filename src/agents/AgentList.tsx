@@ -12,6 +12,7 @@ import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
 import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
 import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
+import { saveWorkspaceFolder } from "../workspaces/keptActions";
 import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
@@ -355,7 +356,7 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           onSelect: () => a.guard(() => openAgentTab(machineId, session, ws.workspace_id, agent, folder ?? suggestFolder(ws))),
         })),
         { label: "Browse files", icon: FolderOpenIcon, onSelect: browse },
-        { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(ref, folder ?? suggestFolder(ws)) },
+        { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(machineId, folder ?? suggestFolder(ws), (path) => saveWorkspaceFolder(ref, ws.label, path)) },
         { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })()) },
         {
           label: "Close workspace",
