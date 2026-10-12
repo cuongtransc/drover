@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  EMPTY_LAYOUT, addGroup, canMove, deleteGroup, forgetMachine, forgetSessions, groupPaths, moveBookmark, moveNode,
-  projectKey, renameGroup, renameSessionKey, sessionKey, setBookmarked,
+  EMPTY_LAYOUT, addGroup, canMove, deleteGroup, forgetKept, forgetMachine, forgetSessions, groupPaths, moveBookmark,
+  moveNode, projectKey, renameGroup, renameProjectKey, renameSessionKey, sessionKey, setBookmarked, setKept,
 } from "./groups";
 import type { GroupNode, Layout, LayoutNode, SessionNode } from "./groups";
 
@@ -171,5 +171,58 @@ describe("renameSessionKey", () => {
   it("returns the same layout when the session is not in it", () => {
     const l: Layout = { tree: [g("w", s("a"))], bookmarks: ["a/app"] };
     expect(renameSessionKey(l, "x", "y")).toBe(l);
+  });
+});
+
+describe("kept workspaces", () => {
+  const k = projectKey("local", "ai", "drover");
+  const other = projectKey("local", "other", "w");
+  it("keeps a workspace with its folder and forgets it", () => {
+    const a = setKept(EMPTY_LAYOUT, k, "/x/drover");
+    expect(a.kept).toEqual({ [k]: { folder: "/x/drover" } });
+    expect(setKept(a, k, "/x/drover")).toBe(a);
+    expect(setKept(a, k, "/y").kept).toEqual({ [k]: { folder: "/y" } });
+    expect(forgetKept(a, k).kept).toEqual({});
+    expect(forgetKept(EMPTY_LAYOUT, k)).toBe(EMPTY_LAYOUT);
+  });
+  it("bookmarking keeps the workspace; unbookmarking leaves it kept", () => {
+    const a = setBookmarked(EMPTY_LAYOUT, k, true, "/x/drover");
+    expect(a.kept).toEqual({ [k]: { folder: "/x/drover" } });
+    const b = setBookmarked(a, k, false);
+    expect(b.bookmarks).toEqual([]);
+    expect(b.kept).toEqual(a.kept);
+  });
+  it("bookmarking leaves an existing kept folder alone", () => {
+    expect(setBookmarked(setKept(EMPTY_LAYOUT, k, "/old"), k, true, "/new").kept?.[k]).toEqual({ folder: "/old" });
+  });
+  it("forgetting a bookmarked workspace unbookmarks it", () => {
+    const a = forgetKept(setBookmarked(EMPTY_LAYOUT, k, true, null), k);
+    expect(a.bookmarks).toEqual([]);
+    expect(a.kept).toEqual({});
+  });
+  it("a renamed workspace carries its kept entry and its bookmark, in place", () => {
+    const to = projectKey("local", "ai", "drover-2");
+    const base = setBookmarked(setBookmarked(EMPTY_LAYOUT, k, true, "/x"), other, true, null);
+    const a = renameProjectKey(base, k, to);
+    expect(a.bookmarks).toEqual([to, other]);
+    expect(a.kept).toEqual({ [to]: { folder: "/x" }, [other]: { folder: null } });
+    expect(renameProjectKey(EMPTY_LAYOUT, k, to)).toBe(EMPTY_LAYOUT);
+  });
+  it("a renamed Session carries its kept entries; a forgotten Session or Machine drops them", () => {
+    const base = setKept(setKept(EMPTY_LAYOUT, k, "/x"), other, null);
+    expect(Object.keys(renameSessionKey(base, sessionKey("local", "ai"), sessionKey("local", "ai2")).kept!)).toEqual([
+      projectKey("local", "ai2", "drover"), other,
+    ]);
+    expect(Object.keys(forgetSessions(base, [sessionKey("local", "ai")]).kept!)).toEqual([other]);
+    expect(forgetMachine(base, "local").kept).toEqual({});
+  });
+  it("keeps fields it does not know through every change", () => {
+    const x = setKept({ ...EMPTY_LAYOUT, future: 1 } as Layout, k, null);
+    const future = (l: Layout) => (l as unknown as { future?: number }).future;
+    expect(future(x)).toBe(1);
+    expect(future(forgetSessions(x, [sessionKey("local", "ai")]))).toBe(1);
+    expect(future(renameSessionKey(x, sessionKey("local", "ai"), sessionKey("local", "b")))).toBe(1);
+    expect(future(forgetMachine(x, "local"))).toBe(1);
+    expect(future(renameProjectKey(x, k, projectKey("local", "ai", "z")))).toBe(1);
   });
 });

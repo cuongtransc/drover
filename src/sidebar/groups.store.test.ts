@@ -103,6 +103,14 @@ describe("layout file", () => {
     await flush();
     expect(f.save).not.toHaveBeenCalled();
   });
+  it("reads kept workspaces, drops malformed entries, and saves unknown fields back", async () => {
+    const f = io({ ...l, kept: { "local/x/app": { folder: "/a" }, "local/x/b": { folder: null }, "local/x/c": { folder: 3 }, bad: "no" }, future: { v: 2 } });
+    await initLayout(f);
+    expect(useLayout.getState().layout.kept).toEqual({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } });
+    useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ future: { v: 2 } }));
+  });
 });
 
 describe("resolve", () => {

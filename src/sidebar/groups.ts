@@ -25,9 +25,17 @@ export type GroupNode = { kind: "group"; id: string; label: string; children: La
 export type SessionNode = { kind: "session"; key: SessionKey };
 export type LayoutNode = GroupNode | SessionNode;
 
+/** A Workspace the user keeps: the folder it was opened in, null when it had none. */
+export interface KeptEntry {
+  folder: string | null;
+}
+
 export interface Layout {
   tree: LayoutNode[];
   bookmarks: ProjectKey[];
+  /** Workspaces to remember once they close, by ProjectKey. A build that does not know a field here
+   *  still saves it back (ADR 0008). */
+  kept?: Record<ProjectKey, KeptEntry>;
 }
 
 export const EMPTY_LAYOUT: Layout = { tree: [], bookmarks: [] };
@@ -216,10 +224,51 @@ export function deleteGroup(layout: Layout, id: string): Layout {
   return tree === layout.tree ? layout : { ...layout, tree };
 }
 
-export function setBookmarked(layout: Layout, key: SessionKey, on: boolean): Layout {
+export function setBookmarked(layout: Layout, key: SessionKey, on: boolean, folder: string | null = null): Layout {
   const has = layout.bookmarks.includes(key);
   if (on === has) return layout;
-  return { ...layout, bookmarks: on ? [...layout.bookmarks, key] : layout.bookmarks.filter((k) => k !== key) };
+  if (!on) return { ...layout, bookmarks: layout.bookmarks.filter((k) => k !== key) };
+  const kept = layout.kept ?? {};
+  // Bookmarking a Workspace keeps it too, with the folder it was opened in.
+  return { ...layout, bookmarks: [...layout.bookmarks, key], kept: key in kept ? kept : { ...kept, [key]: { folder } } };
+}
+
+/** Keep a Workspace under its ProjectKey, with the folder it was opened in. */
+export function setKept(layout: Layout, key: ProjectKey, folder: string | null): Layout {
+  const kept = layout.kept ?? {};
+  const current = kept[key];
+  if (current && current.folder === folder) return layout;
+  return { ...layout, kept: { ...kept, [key]: { folder } } };
+}
+
+/** Stop keeping a Workspace; its Bookmark goes with it. */
+export function forgetKept(layout: Layout, key: ProjectKey): Layout {
+  const current = layout.kept;
+  const marked = layout.bookmarks.includes(key);
+  if (!(current && key in current) && !marked) return layout;
+  const bookmarks = marked ? layout.bookmarks.filter((k) => k !== key) : layout.bookmarks;
+  if (!current || !(key in current)) return { ...layout, bookmarks };
+  const kept: Record<ProjectKey, KeptEntry> = {};
+  for (const [k, v] of Object.entries(current)) if (k !== key) kept[k] = v;
+  return { ...layout, bookmarks, kept };
+}
+
+/** Move a kept Workspace and its Bookmark when its label changes, keeping the Bookmark's place. */
+export function renameProjectKey(layout: Layout, from: ProjectKey, to: ProjectKey): Layout {
+  if (from === to) return layout;
+  const bookmarks = layout.bookmarks.includes(from)
+    ? layout.bookmarks.map((k) => (k === from ? to : k))
+    : layout.bookmarks;
+  const current = layout.kept;
+  let kept = current;
+  if (current && from in current) {
+    const next: Record<ProjectKey, KeptEntry> = {};
+    for (const [k, v] of Object.entries(current)) next[k === from ? to : k] = v;
+    kept = next;
+  }
+  return bookmarks === layout.bookmarks && kept === layout.kept
+    ? layout
+    : { ...layout, bookmarks, ...(kept ? { kept } : {}) };
 }
 
 /** Move a bookmark before `beforeKey`, or to the end when null. */
@@ -254,9 +303,18 @@ function forgetWhere(layout: Layout, drop: (key: SessionKey) => boolean): Layout
     return changed ? out : nodes;
   };
   const tree = prune(layout.tree);
-  const kept = layout.bookmarks.filter((k) => !drop(sessionOf(k)));
-  const bookmarks = kept.length === layout.bookmarks.length ? layout.bookmarks : kept;
-  return tree === layout.tree && bookmarks === layout.bookmarks ? layout : { tree, bookmarks };
+  const keptBookmarks = layout.bookmarks.filter((k) => !drop(sessionOf(k)));
+  const bookmarks = keptBookmarks.length === layout.bookmarks.length ? layout.bookmarks : keptBookmarks;
+  const current = layout.kept;
+  let kept = current;
+  if (current && Object.keys(current).some((k) => drop(sessionOf(k)))) {
+    const next: Record<ProjectKey, KeptEntry> = {};
+    for (const [k, v] of Object.entries(current)) if (!drop(sessionOf(k))) next[k] = v;
+    kept = next;
+  }
+  return tree === layout.tree && bookmarks === layout.bookmarks && kept === layout.kept
+    ? layout
+    : { ...layout, tree, bookmarks, ...(kept ? { kept } : {}) };
 }
 
 export function forgetSessions(layout: Layout, keys: SessionKey[]): Layout {
@@ -286,7 +344,16 @@ export function renameSessionKey(layout: Layout, from: SessionKey, to: SessionKe
   const bookmarks = layout.bookmarks.some((k) => sessionOf(k) === from)
     ? layout.bookmarks.map((k) => (sessionOf(k) === from ? to + k.slice(from.length) : k))
     : layout.bookmarks;
-  return tree === layout.tree && bookmarks === layout.bookmarks ? layout : { tree, bookmarks };
+  const current = layout.kept;
+  let kept = current;
+  if (current && Object.keys(current).some((k) => sessionOf(k) === from)) {
+    const next: Record<ProjectKey, KeptEntry> = {};
+    for (const [k, v] of Object.entries(current)) next[sessionOf(k) === from ? to + k.slice(from.length) : k] = v;
+    kept = next;
+  }
+  return tree === layout.tree && bookmarks === layout.bookmarks && kept === layout.kept
+    ? layout
+    : { ...layout, tree, bookmarks, ...(kept ? { kept } : {}) };
 }
 
 export function forgetMachine(layout: Layout, machineId: string): Layout {
@@ -312,9 +379,32 @@ export function groupPaths(layout: Layout): { id: string; path: string }[] {
 export const LAYOUT_KEY = "drover:sidebar-layout";
 
 // Session bookmarks from before ADR 0006 are dropped on read; the next change saves the layout without them.
+// Kept entries naming something that is not a project, or with no folder, are dropped the same way.
+function parseKept(v: unknown): Record<ProjectKey, KeptEntry> | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out: Record<ProjectKey, KeptEntry> = {};
+  for (const [k, entry] of Object.entries(v as Record<string, unknown>)) {
+    if (!isProjectKey(k)) continue;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const { folder } = entry as { folder?: unknown };
+    if (typeof folder !== "string" && folder !== null) continue;
+    out[k] = { folder };
+  }
+  return out;
+}
+
 function parseLayout(v: unknown): Layout | null {
   const p = v as Partial<Layout> | null;
-  return p && Array.isArray(p.tree) && Array.isArray(p.bookmarks) ? { tree: p.tree, bookmarks: p.bookmarks.filter(isProjectKey) } : null;
+  if (!p || !Array.isArray(p.tree) || !Array.isArray(p.bookmarks)) return null;
+  // `rest` keeps fields this build does not know, so the next save writes them back.
+  const { kept: raw, ...rest } = p;
+  const kept = parseKept(raw);
+  return {
+    ...rest,
+    tree: p.tree,
+    bookmarks: p.bookmarks.filter(isProjectKey),
+    ...(kept && Object.keys(kept).length ? { kept } : {}),
+  };
 }
 
 /** The legacy localStorage layout; empty when missing, corrupt or unreadable. */
