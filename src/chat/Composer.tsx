@@ -24,6 +24,8 @@ import { IMAGE_EXTS } from "../terminal/imagePaste";
 // shift+tab, enter, up, down, 1; unknown names fail with `invalid_key`). Only Esc: Ctrl+C does
 // nothing Esc does not, and twice in a row exits Claude; ⇧Tab's mode change went almost unused.
 const KEYS: { label: string; key: string }[] = [{ label: "Esc", key: "esc" }];
+/** What the /btw key puts before the text, and takes off again. */
+const BTW_PREFIX = /^\s*\/btw\s/;
 
 // Agents whose TUI turns a bracketed-pasted image path into an image attachment (as when
 // pasting a screenshot in a terminal); `agent.prompt` frames text and path as one paste,
@@ -371,9 +373,11 @@ export function Composer({
     });
   }, [fill, key]);
 
-  /** Puts `/btw ` before what is typed (once) and returns to the box, caret at the end. */
-  const startBtw = () => {
-    setText((cur) => (/^\s*\/btw\s/.test(cur) ? cur : `/btw ${cur.replace(/^\s+/, "")}`));
+  // On while the box holds a /btw, however it got there; sending empties the box and turns it off.
+  const btwOn = BTW_PREFIX.test(text);
+  /** Puts `/btw ` before what is typed, or takes it off again, and returns to the box, caret at the end. */
+  const toggleBtw = () => {
+    setText((cur) => (BTW_PREFIX.test(cur) ? cur.replace(BTW_PREFIX, "") : `/btw ${cur.replace(/^\s+/, "")}`));
     box.current?.focus();
     requestAnimationFrame(() => {
       const el = box.current;
@@ -418,7 +422,8 @@ export function Composer({
             <button
               className="keycap"
               title="Ask on the side: Claude answers from the conversation without stopping or steering its turn, and the answer stays out of the transcript"
-              onClick={startBtw}
+              aria-pressed={btwOn}
+              onClick={toggleBtw}
             >
               /btw
             </button>
@@ -426,8 +431,8 @@ export function Composer({
           {/* The suggestion already shows in the empty box; this only takes it, as Tab does. Mounted
               for Claude whether or not one is offered, so the row doesn't shift. */}
           {agent === "claude" && (
-            <button className="keycap" title="Take Claude's suggestion" disabled={!offered} onClick={() => offered && takeSuggestion(offered)}>
-              Tab
+            <button className="keycap" title="Put Claude's suggestion in the box (Tab)" disabled={!offered} onClick={() => offered && takeSuggestion(offered)}>
+              Use suggestion
             </button>
           )}
           {KEYS.map((k) => (

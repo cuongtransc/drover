@@ -74,11 +74,34 @@ describe("Composer", () => {
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
     fireEvent.change(box, { target: { value: "why that file?" } });
-    fireEvent.click(screen.getByRole("button", { name: "/btw" }));
+    const btw = screen.getByRole("button", { name: "/btw" });
+    expect(btw.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btw);
     expect(box.value).toBe("/btw why that file?");
     expect(document.activeElement).toBe(box);
-    fireEvent.click(screen.getByRole("button", { name: "/btw" }));
-    expect(box.value).toBe("/btw why that file?");
+    expect(btw.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("takes /btw off again from its key, keeping the question", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    const btw = screen.getByRole("button", { name: "/btw" });
+    fireEvent.change(box, { target: { value: "why that file?" } });
+    fireEvent.click(btw);
+    fireEvent.click(btw);
+    expect(box.value).toBe("why that file?");
+    expect(btw.getAttribute("aria-pressed")).toBe("false");
+    expect(document.activeElement).toBe(box);
+  });
+
+  it("shows /btw pressed when it is typed by hand, and not once it is deleted", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox");
+    const btw = screen.getByRole("button", { name: "/btw" });
+    fireEvent.change(box, { target: { value: "/btw why?" } });
+    expect(btw.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.change(box, { target: { value: "why?" } });
+    expect(btw.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("has no /btw key for other agents", () => {
@@ -434,12 +457,12 @@ describe("Composer suggestion", () => {
     await act(async () => finish());
   });
 
-  it("has a Tab key that puts the suggestion in the box without sending, and no copy of its text", async () => {
+  it("has a Use suggestion key that puts the suggestion in the box without sending, and no copy of its text", async () => {
     render(<Composer pane={pane} agent="claude" status="done" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    const tab = screen.getByRole("button", { name: "Tab" }) as HTMLButtonElement;
+    const tab = screen.getByRole("button", { name: "Use suggestion" }) as HTMLButtonElement;
     await waitFor(() => expect(tab.disabled).toBe(false));
-    expect(tab.title).toBe("Take Claude's suggestion");
+    expect(tab.title).toBe("Put Claude's suggestion in the box (Tab)");
     expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
     fireEvent.click(tab);
     expect(box.value).toBe("run the tests again");
@@ -448,15 +471,15 @@ describe("Composer suggestion", () => {
     expect(tab.disabled).toBe(true);
   });
 
-  it("disables the Tab key while something is typed, and has none for other agents", async () => {
+  it("disables the Use suggestion key while something is typed, and has none for other agents", async () => {
     const { rerender } = render(<Composer pane={pane} agent="claude" status="idle" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    const tab = screen.getByRole("button", { name: "Tab" }) as HTMLButtonElement;
+    const tab = screen.getByRole("button", { name: "Use suggestion" }) as HTMLButtonElement;
     await waitFor(() => expect(tab.disabled).toBe(false));
     fireEvent.change(box, { target: { value: "my own" } });
     expect(tab.disabled).toBe(true);
     rerender(<Composer pane={pane} agent="codex" status="idle" />);
-    expect(screen.queryByRole("button", { name: "Tab" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Use suggestion" })).toBeNull();
   });
 
   it("leaves Tab alone while something is typed", async () => {

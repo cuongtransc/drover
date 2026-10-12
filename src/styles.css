@@ -242,6 +242,7 @@ kbd {
 }
 .keycap:hover:not(:disabled) { background: var(--surface-3); color: var(--fg); }
 .keycap:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 1px; }
+.keycap[aria-pressed="true"] { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--fg); }
 .keycap:disabled { background: transparent; color: var(--fg-3); cursor: default; } /* quiet, still 4.5:1 */
 
 /* ---------- Shell ---------- */
