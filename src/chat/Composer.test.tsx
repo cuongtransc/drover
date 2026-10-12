@@ -254,6 +254,23 @@ describe("Composer", () => {
     expect(screen.getByRole("img", { name: "Pasted image 1" })).toBeTruthy();
   });
 
+  it("attaches an image dropped on the box, and keeps the drop from opening the file", async () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const box = screen.getByRole("textbox");
+    const dataTransfer = { files: [png()], types: ["Files"] };
+    expect(fireEvent.dragOver(box, { dataTransfer })).toBe(false);
+    expect(fireEvent.drop(box, { dataTransfer })).toBe(false);
+    await waitFor(() => expect(screen.getByRole("img", { name: "Pasted image 1" })).toBeTruthy());
+    expect(imageSaveTemp).toHaveBeenCalledWith("devtuf", expect.any(Uint8Array), "png");
+  });
+
+  it("leaves a drop of text to the textarea", () => {
+    render(<Composer pane={pane} agent="claude" />);
+    const dataTransfer = { files: [], types: ["text/plain"] };
+    expect(fireEvent.drop(screen.getByRole("textbox"), { dataTransfer })).toBe(true);
+    expect(imageSaveTemp).not.toHaveBeenCalled();
+  });
+
   it("removes a pasted image with its button, or with Backspace in an empty box", async () => {
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole("textbox");

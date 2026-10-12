@@ -461,7 +461,7 @@ export function Composer({
           placeholder={
             offered
               ? `${offered}  (Tab to use)`
-              : "Message the agent…  (Enter to send, Shift+Enter for newline, paste images)"
+              : "Message the agent…  (Enter to send, Shift+Enter for newline, paste or drop images)"
           }
           onChange={(e) => {
             setText(e.target.value);
@@ -477,6 +477,16 @@ export function Composer({
             // Text that came with the image still lands in the textarea.
             if (!e.clipboardData.getData("text/plain")) e.preventDefault();
             files.forEach((f) => void attach(f));
+          }}
+          // A file dropped here is attached like a pasted one; without preventDefault the webview
+          // would open it instead. Dropped text stays the textarea's.
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes("Files")) e.preventDefault();
+          }}
+          onDrop={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            Array.from(e.dataTransfer.files).forEach((f) => void attach(f));
           }}
           onKeyDown={(e) => {
             // Escape closes any open list, a loading or failed one included.
