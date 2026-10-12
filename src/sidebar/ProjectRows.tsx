@@ -3,6 +3,7 @@ import { idleLabel, useActiveKeptMs, useMinuteClock } from "../agents/paneFilter
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { CheckIcon, StarIcon, StarOffIcon } from "../ui/icons";
+import { workspaceFolder } from "../workspaces/folder";
 import { useActions } from "./actions";
 import { projectKey, setBookmarked, useLayout } from "./groups";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
@@ -47,6 +48,9 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
   onUnfold?: () => void;
 }) {
   const openProject = useApp((s) => s.openProject);
+  // The row's Workspace, to keep its folder when its project is bookmarked: the Session row
+  // owns the SessionView, this component only has its name.
+  const sessionView = useApp((s) => s.machines[machineId]?.sessions.find((x) => x.name === session) ?? null);
   const setOrigin = useViewOrigin((s) => s.set);
   const bookmarks = useLayout((s) => s.layout.bookmarks);
   const a = useActions();
@@ -69,10 +73,11 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
         // A project is what Bookmarks hold (ADR 0006): its row's menu bookmarks it, a star says it is.
         const key = projectKey(machineId, session, r.label);
         const marked = bookmarks.includes(key);
+        const ws = sessionView?.workspaces.find((w) => w.workspace_id === r.id);
         const bookmarkItem = {
           label: marked ? "Unbookmark" : "Bookmark",
           icon: marked ? StarOffIcon : StarIcon,
-          onSelect: () => useLayout.getState().update((l) => setBookmarked(l, key, !marked)),
+          onSelect: () => useLayout.getState().update((l) => setBookmarked(l, key, !marked, ws ? workspaceFolder(machineId, session, ws) : null)),
         };
         return (
           <li key={r.id}>

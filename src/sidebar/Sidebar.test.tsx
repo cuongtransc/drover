@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined) }));
-import { sessionStart, sessionStop } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined), herdrCall: vi.fn() }));
+import { herdrCall, sessionStart, sessionStop } from "../lib/ipc";
 import { useProtect } from "../agents/protect";
 import { useApp } from "../store/app";
-import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "./groups";
+import { EMPTY_LAYOUT, projectKey, sessionKey, setKept, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
 import type { MachineView } from "../lib/types";
@@ -161,6 +161,22 @@ describe("Sidebar", () => {
     expect(closed.className).toContain("closed");
     fireEvent.click(closed);
     expect(useApp.getState().selected).toBeNull();
+  });
+  it("bookmarking a project keeps its workspace with its folder", () => {
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "drover" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ [projectKey("box", "default", "drover")]: { folder: "/x" } });
+  });
+  it("reopens a closed bookmarked workspace that is kept", async () => {
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    vi.mocked(herdrCall).mockResolvedValue({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    render(<Sidebar />);
+    fireEvent.click(within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" }));
+    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+    expect(herdrCall).toHaveBeenCalledWith("box", "default", "workspace.create", { cwd: "/c/old", label: "old", focus: false });
+    expect(useViewOrigin.getState().from).toBe("bookmarks");
   });
   it("views a running session on click", () => {
     render(<Sidebar />);
