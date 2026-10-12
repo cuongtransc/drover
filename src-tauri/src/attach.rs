@@ -591,8 +591,9 @@ mod tests {
     fn sh(cmd: &str) -> Vec<String> {
         vec!["sh".into(), "-c".into(), cmd.into()]
     }
+    /// Polls `cond` for up to ~10 s: a 3 s budget timed out 3 times under concurrent cargo builds.
     async fn wait_for(cond: impl Fn() -> bool) {
-        for _ in 0..100 {
+        for _ in 0..334 {
             if cond() {
                 return;
             }
