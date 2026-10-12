@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { paneKey } from "../lib/types";
 import type { MachineView, PaneRef, PaneView, SessionView, TabView, WorkspaceView } from "../lib/types";
-import { pruneFolders, type WorkspaceRef } from "../workspaces/folder";
+import { pruneFolders, workspaceFolder, type WorkspaceRef } from "../workspaces/folder";
 import { shareEqual } from "./share";
 import { forgetMachine, forgetSessions, sessionKey, useLayout } from "../sidebar/groups";
+import { backfillKept } from "../workspaces/kept";
 import { newAgentOnTerminal } from "../settings/lens";
 import { useFiles, filesKey } from "../files/store";
 import {
@@ -146,6 +147,8 @@ export const useApp = create<AppState>((set, get) => ({
     // just-created Workspace survives until the snapshot lists it.
     const prev = get().machines[v.id]?.sessions;
     for (const s of v.sessions) pruneFolders(v.id, s, prev?.find((p) => p.name === s.name));
+    // A live Workspace that is Bookmarked is kept with the folder it is open in.
+    useLayout.getState().update((l) => backfillKept(l, v, (s, w) => workspaceFolder(v.id, s, w)));
     // Only a connected snapshot is authoritative about which Sessions exist.
     if (v.state === "connected" && prev) {
       const gone = prev.filter((p) => !v.sessions.some((s) => s.name === p.name)).map((p) => sessionKey(v.id, p.name));

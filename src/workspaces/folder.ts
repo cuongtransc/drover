@@ -80,6 +80,12 @@ export function moveSessionFolders(machineId: string, from: string, to: string):
   notify();
 }
 
+/** The folder a Workspace was opened in: its stored one, else the first pane cwd it suggests. */
+export function workspaceFolder(machineId: string, session: string, ws: WorkspaceView): string | null {
+  const ref: WorkspaceRef = { machine_id: machineId, session, workspace_id: ws.workspace_id };
+  return getFolder(ref) ?? (suggestFolder(ws) || null);
+}
+
 export function suggestFolder(ws: WorkspaceView): string {
   for (const tab of ws.tabs) {
     for (const pane of tab.panes) {
