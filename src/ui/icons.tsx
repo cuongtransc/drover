@@ -132,6 +132,13 @@ export const FilterIcon = (p: SVGProps<SVGSVGElement>) => <Icon {...p}><path d="
 export const FolderIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z" /></Icon>
 );
+export const ArchiveIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <rect x="3" y="4" width="18" height="4" rx="1" />
+    <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+    <path d="M10 12h4" />
+  </Icon>
+);
 export const GitBranchIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}>
     <line x1="6" y1="3" x2="6" y2="15" />

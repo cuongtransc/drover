@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 // No ctc by default: lanes fold by workspace, as before the lane store reported owners.
 vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue(undefined), chatLocate: vi.fn(), lanesList: vi.fn().mockRejectedValue(new Error("no ctc")) }));
@@ -10,6 +11,7 @@ import { useFilesPanel } from "../files/panelStore";
 import { panelWorkspace } from "../files/root";
 import { useApp } from "../store/app";
 import { itemKey, NO_ITEMS } from "../store/openItems";
+import { EMPTY_LAYOUT, projectKey, setBookmarked, setKept, useLayout } from "../sidebar/groups";
 import { setFolder } from "../workspaces/folder";
 import { AgentList, workspaceGroups } from "./AgentList";
 import { useProtect } from "./protect";
@@ -50,10 +52,12 @@ describe("workspaceGroups", () => {
 describe("AgentList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(herdrCall).mockResolvedValue(undefined);
     localStorage.clear();
     useProtect.setState({ marks: {} });
     useApp.setState({ machines: { local: m }, order: ["local"], selected: null, viewed: { machine_id: "local", session: "default" }, expanded: {}, doneSeen: {}, statusSince: {} });
     usePaneFilter.setState({ filter: "active" });
+    useLayout.setState({ layout: EMPTY_LAYOUT });
   });
 
   const ago = (ms: number) => Date.now() - ms;
@@ -599,6 +603,84 @@ describe("AgentList", () => {
     useApp.setState({ viewed: null });
     render(<AgentList />);
     expect(screen.getByText("Select a session")).toBeTruthy();
+  });
+
+  const keyOf = (label: string) => projectKey("local", "default", label);
+  const closed = () => screen.getByRole("region", { name: "Closed" });
+  const keep = (...labels: string[]) =>
+    useLayout.setState({ layout: labels.reduce((l, x) => setKept(l, keyOf(x), "/c/" + x), EMPTY_LAYOUT) });
+
+  it("lists closed kept workspaces under a folded Closed section, under Active and All, not counted", () => {
+    keep("agent", "web", "smarthomes");
+    render(<AgentList />);
+    const toggle = within(closed()).getByRole("button", { name: /Closed/ });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toBe("Closed2");
+    expect(within(closed()).queryByText("agent")).toBeNull();
+    expect(screen.getByRole("button", { name: "Active 3" })).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(useApp.getState().expanded["closed:local/default"]).toBe(true);
+    expect([...closed().querySelectorAll(".closed-label")].map((b) => b.textContent)).toEqual(["agent", "smarthomes"]);
+    act(() => usePaneFilter.setState({ filter: "all" }));
+    expect(within(closed()).getByText("agent")).toBeTruthy();
+  });
+
+  it("shows no Closed section without closed kept workspaces", () => {
+    keep("web");
+    render(<AgentList />);
+    expect(screen.queryByRole("region", { name: "Closed" })).toBeNull();
+  });
+
+  it("reopens a closed workspace once, however often it is clicked", async () => {
+    keep("agent");
+    let done!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockImplementation(() => new Promise((r) => (done = r)));
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    render(<AgentList />);
+    const reopen = screen.getByRole("button", { name: "Reopen agent" });
+    fireEvent.click(reopen);
+    fireEvent.click(reopen);
+    fireEvent.click(within(closed()).getByText("agent"));
+    expect(vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "workspace.create")).toEqual([
+      ["local", "default", "workspace.create", { cwd: "/c/agent", label: "agent", focus: false }],
+    ]);
+    await act(async () => done({ workspace: { workspace_id: "w4" }, root_pane: { pane_id: "p40" } }));
+    expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p40" });
+  });
+
+  it("forgets a closed workspace from its menu, unbookmarking it", () => {
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, keyOf("agent"), true, "/c/agent") });
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    render(<AgentList />);
+    fireEvent.contextMenu(within(closed()).getByText("agent"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Forget" }));
+    expect(useLayout.getState().layout.kept).toEqual({});
+    expect(useLayout.getState().layout.bookmarks).toEqual([]);
+  });
+
+  it("keeps a workspace from its header menu, and cannot unkeep a bookmarked one", () => {
+    render(<AgentList />);
+    const head = screen.getByRole("group", { name: "web" }).querySelector(".ws-head")!;
+    fireEvent.contextMenu(head);
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Keep when closed" }));
+    expect(useLayout.getState().layout.kept).toEqual({ [keyOf("web")]: { folder: "/x" } });
+    act(() => useLayout.setState({ layout: setBookmarked(useLayout.getState().layout, keyOf("web"), true) }));
+    fireEvent.contextMenu(head);
+    const item = screen.getByRole("menuitemcheckbox", { name: /Keep when closed/ });
+    expect(item.getAttribute("aria-checked")).toBe("true");
+    expect((item as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Bookmarked")).toBeTruthy();
+  });
+
+  it("carries a kept workspace to its new name on rename", async () => {
+    keep("web");
+    render(<AgentList />);
+    fireEvent.contextMenu(screen.getByRole("group", { name: "web" }).querySelector(".ws-head")!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename workspace…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "web-2" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Rename" })));
+    expect(herdrCall).toHaveBeenCalledWith("local", "default", "workspace.rename", { workspace_id: "w2", label: "web-2" });
+    expect(useLayout.getState().layout.kept).toEqual({ [keyOf("web-2")]: { folder: "/c/web" } });
   });
 });
 
