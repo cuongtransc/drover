@@ -38,13 +38,18 @@ describe("pathTarget", () => {
     expect(pathTarget({ path: "../other/x.ts", line: null }, { root, home, local: true })).toEqual({ kind: "file", abs: "/Users/me/other/x.ts" });
   });
 
-  it("hands a path outside the folder to this Mac, and to nothing on another machine", () => {
+  it("hands a path outside the folder to this Mac, or reads it from another machine", () => {
     expect(pathTarget({ path: "/private/tmp/a.png", line: null }, { root, home, local: true })).toEqual({ kind: "file", abs: "/private/tmp/a.png" });
-    expect(pathTarget({ path: "/private/tmp/a.png", line: null }, { root, home, local: false })).toBeNull();
+    expect(pathTarget({ path: "/tmp/a.md", line: 3 }, { root, home, local: false })).toEqual({ kind: "remote", abs: "/tmp/a.md", line: 3 });
+    expect(pathTarget({ path: "~/notes/a.md", line: null }, { root: null, home, local: false })).toEqual({ kind: "remote", abs: "/Users/me/notes/a.md", line: null });
   });
 
   it("does not take a sibling folder sharing the prefix for the workspace", () => {
-    expect(pathTarget({ path: "/Users/me/app-old/a.ts", line: null }, { root, home, local: false })).toBeNull();
+    expect(pathTarget({ path: "/Users/me/app-old/a.ts", line: null }, { root, home, local: false })).toEqual({ kind: "remote", abs: "/Users/me/app-old/a.ts", line: null });
+  });
+
+  it("reads nothing from another machine for a path that ends in a folder", () => {
+    expect(pathTarget({ path: "/", line: null }, { root, home, local: false })).toBeNull();
   });
 
   it("needs a root for a relative path, and a home for ~", () => {
