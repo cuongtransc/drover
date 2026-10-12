@@ -21,7 +21,7 @@ describe("sessionKey", () => {
 
 describe("projectKey", () => {
   it("names a project by its Session's key and its Workspace's label, encoded", () => {
-    expect(projectKey("local", "ai-tools", "herdr-app")).toBe("local/ai-tools/herdr-app");
+    expect(projectKey("local", "ai-tools", "drover")).toBe("local/ai-tools/drover");
     expect(projectKey("a/b", "x y", "w/1")).toBe("a%2Fb/x%20y/w%2F1");
   });
 });

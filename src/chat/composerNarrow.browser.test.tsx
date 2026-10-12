@@ -10,7 +10,7 @@ vi.mock("../lib/ipc", () => ({
   completeEntries: vi.fn(async () => []),
   claudePromptHistory: vi.fn(async () => []),
   chatGitStatus: vi.fn(async () => ({
-    folder: "herdr-app", path: "/Users/me/herdr-app", branch: "feat/compact-top-bar", dirty: true, upstream: null, ahead: 0, behind: 0,
+    folder: "drover", path: "/Users/me/drover", branch: "feat/compact-top-bar", dirty: true, upstream: null, ahead: 0, behind: 0,
     staged: 0, modified: 2, untracked: 0, changed: 2, changes: [],
   })),
 }));

@@ -11,7 +11,7 @@ const machine = (id: string, panes: PaneView[], over: Partial<MachineView> = {})
   id, label: id + "-label", kind: id === "local" ? "local" : "ssh", state: "connected", error: null, version: "0.9.3", status: "idle",
   sessions: [
     { name: "default", running: true, status: "idle", error: null, workspaces: [
-      { workspace_id: "w1", label: "herdr-app", number: 1, status: "idle", tabs: [
+      { workspace_id: "w1", label: "drover", number: 1, status: "idle", tabs: [
         { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes } ] } ] },
     { name: "old", running: false, status: "unknown", error: null, workspaces: [
       { workspace_id: "w9", label: "stale", number: 1, status: "idle", tabs: [
@@ -57,7 +57,7 @@ describe("dashboardCards", () => {
       ["local/default/c", "idle"],
     ]);
     expect(cards[0].ref).toEqual({ machine_id: "local", session: "default", pane_id: "a" });
-    expect(cards[0].workspace.label).toBe("herdr-app");
+    expect(cards[0].workspace.label).toBe("drover");
     expect(cards[0].machine.label).toBe("local-label");
   });
   it("leaves out panes with no agent", () => {
@@ -86,7 +86,7 @@ describe("dashboardCards", () => {
 describe("matchesQuery", () => {
   const [card] = dashboardCards({ local: machine("local", [pane("a", "idle", { title: "Rewrite parser", agent: "pi" })]) }, ["local"], {});
   it("matches title, agent, workspace, session and machine case-insensitively", () => {
-    for (const q of ["rewrite", "PI", "herdr-app", "default", "local-label", ""]) expect(matchesQuery(card, q)).toBe(true);
+    for (const q of ["rewrite", "PI", "drover", "default", "local-label", ""]) expect(matchesQuery(card, q)).toBe(true);
     expect(matchesQuery(card, "nope")).toBe(false);
   });
 });

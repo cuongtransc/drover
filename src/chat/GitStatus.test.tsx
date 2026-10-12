@@ -6,8 +6,8 @@ import { GitStatusLine } from "./GitStatus";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const status = (over = {}) => ({
-  folder: "herdr-app",
-  path: "/Users/me/herdr-app",
+  folder: "drover",
+  path: "/Users/me/drover",
   branch: "main",
   dirty: false,
   upstream: "origin/main",
@@ -28,10 +28,10 @@ beforeEach(() => {
 describe("GitStatusLine", () => {
   it("shows the folder and a clean branch", async () => {
     render(<GitStatusLine pane={pane} status="idle" />);
-    expect(await screen.findByText("herdr-app")).toBeTruthy();
+    expect(await screen.findByText("drover")).toBeTruthy();
     expect(screen.getByText("main")).toBeTruthy();
     expect(screen.getByLabelText("clean")).toBeTruthy();
-    expect(screen.getByTitle(/\/Users\/me\/herdr-app/)).toBeTruthy();
+    expect(screen.getByTitle(/\/Users\/me\/drover/)).toBeTruthy();
   });
 
   it("counts staged, modified and untracked files, and commits ahead and behind", async () => {
@@ -55,14 +55,14 @@ describe("GitStatusLine", () => {
     vi.mocked(chatGitStatus).mockResolvedValue(status({ dirty: true, modified: 1, untracked: 1, changed: 17, changes }));
     render(<GitStatusLine pane={pane} status="idle" />);
     expect(await screen.findByLabelText("1 untracked")).toBeTruthy();
-    const title = screen.getByTitle(/herdr-app/).getAttribute("title");
-    expect(title).toBe("/Users/me/herdr-app\nmain → origin/main\n\n M src/a.ts\n?? new.txt\n… 15 more");
+    const title = screen.getByTitle(/drover/).getAttribute("title");
+    expect(title).toBe("/Users/me/drover\nmain → origin/main\n\n M src/a.ts\n?? new.txt\n… 15 more");
   });
 
   it("shows only the folder outside a repository", async () => {
     vi.mocked(chatGitStatus).mockResolvedValue(status({ branch: null }));
     render(<GitStatusLine pane={pane} status="idle" />);
-    expect(await screen.findByText("herdr-app")).toBeTruthy();
+    expect(await screen.findByText("drover")).toBeTruthy();
     expect(screen.queryByText("main")).toBeNull();
   });
 

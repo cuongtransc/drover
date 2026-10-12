@@ -89,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_or_relative_folder_has_no_folders() {
-        for dir in ["/nonexistent/herdr-app", "relative/path"] {
+        for dir in ["/nonexistent/drover", "relative/path"] {
             let got = list_dirs(&LocalTransport, "/nonexistent-home", dir)
                 .await
                 .unwrap();

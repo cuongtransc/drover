@@ -15,7 +15,7 @@ const pane = (id: string, title: string, status: PaneView["status"], agent = "cl
 const machine = (id: string, label: string, panes: PaneView[]): MachineView => ({
   id, label, kind: id === "local" ? "local" : "ssh", state: "connected", error: null, version: "0.9.3", status: "idle",
   sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
-    { workspace_id: "w1", label: "herdr-app", number: 1, status: "idle", tabs: [
+    { workspace_id: "w1", label: "drover", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes } ] } ] }],
 });
 
@@ -67,7 +67,7 @@ describe("AgentDashboard", () => {
     const laneAndUser: MachineView = {
       id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
       sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
-        { workspace_id: "w1", label: "herdr-app", number: 1, status: "idle", tabs: [
+        { workspace_id: "w1", label: "drover", number: 1, status: "idle", tabs: [
           { tab_id: "w1:t1", label: "lane-caps", number: 1, status: "idle", panes: [pane("l", "Lane docs", "done")] },
           { tab_id: "w1:t2", label: "1", number: 2, status: "idle", panes: [pane("u", "User docs", "done")] },
         ] } ] }],

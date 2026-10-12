@@ -39,7 +39,7 @@ describe("workspace folder", () => {
   });
 
   it("names a folder by its last segment", () => {
-    expect(folderName("/Users/me/herdr-app")).toBe("herdr-app");
+    expect(folderName("/Users/me/drover")).toBe("drover");
     expect(folderName("/a/b/")).toBe("b");
     expect(folderName("~")).toBe("~");
     expect(folderName("/")).toBe("/");

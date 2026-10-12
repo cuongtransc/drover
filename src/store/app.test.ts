@@ -11,7 +11,7 @@ import { useLensSettings } from "../settings/lens";
 const machine: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "blocked",
   sessions: [{ name: "default", running: true, status: "blocked", error: null, workspaces: [
-    { workspace_id: "w1", label: "herdr-app", number: 1, status: "blocked", tabs: [
+    { workspace_id: "w1", label: "drover", number: 1, status: "blocked", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "blocked", panes: [
         { pane_id: "w1:p1", terminal_id: "term_a", title: "Rewrite", cwd: "/x", agent: "claude", status: "working" },
         { pane_id: "w1:p2", terminal_id: "term_b", title: "pi", cwd: "/x", agent: "pi", status: "blocked" },
@@ -79,7 +79,7 @@ describe("app store", () => {
     useApp.getState().upsertMachine(machine);
     useApp.getState().select({ machine_id: "local", session: "default", pane_id: "w1:p2" });
     const sel = selectedPane(useApp.getState());
-    expect(sel?.workspace.label).toBe("herdr-app");
+    expect(sel?.workspace.label).toBe("drover");
     expect(sel?.pane.title).toBe("pi");
   });
   it("an automatic lens override is not persisted and an explicit choice clears it", () => {

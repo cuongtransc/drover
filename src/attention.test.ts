@@ -27,7 +27,7 @@ describe("shouldAlert", () => {
 describe("roleOfLabel", () => {
   it("reads lane- as lane and everything else as other", () => {
     expect(roleOfLabel("lane-caps")).toBe("lane");
-    expect(roleOfLabel("orch-herdr-app")).toBe("other");
+    expect(roleOfLabel("orch-drover")).toBe("other");
     expect(roleOfLabel("brief-1005-x")).toBe("other");
     expect(roleOfLabel("3")).toBe("other");
     expect(roleOfLabel(undefined)).toBe("other");

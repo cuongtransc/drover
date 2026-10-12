@@ -6,7 +6,7 @@ const p = (agent: string | null): PaneView => ({ pane_id: "x", terminal_id: "t",
 
 describe("roles", () => {
   it("reads a tab's role from its label", () => {
-    expect([tabRole("orch-herdr-app"), tabRole("lane-caps"), tabRole("brief-pricing"), tabRole("1"), tabRole("main-orches")]).toEqual([
+    expect([tabRole("orch-drover"), tabRole("lane-caps"), tabRole("brief-pricing"), tabRole("1"), tabRole("main-orches")]).toEqual([
       "orch", "lane", "brief", null, null,
     ]);
   });

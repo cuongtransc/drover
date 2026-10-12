@@ -11,13 +11,13 @@ import type { ChatItem, MachineView, PaneView } from "../lib/types";
 import { SURFACES } from "./uiMap.surfaces";
 
 const W = 1440, H = 900;
-const pane = (id: string, title: string, agent: string | null, status: PaneView["status"], cwd = "/Users/me/herdr-app"): PaneView =>
+const pane = (id: string, title: string, agent: string | null, status: PaneView["status"], cwd = "/Users/me/drover"): PaneView =>
   ({ pane_id: id, terminal_id: "t" + id, title, cwd, agent, status });
 const local: MachineView = {
   id: "local", label: "MacBook Pro", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working",
   sessions: [
     { name: "ct", running: true, status: "working", error: null, workspaces: [
-      { workspace_id: "w1", label: "herdr-app", number: 1, status: "working", tabs: [
+      { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [
         { tab_id: "w1:t1", label: "orch-ui", number: 1, status: "working", panes: [pane("p1", "Compact tab bar", "claude", "working")] },
         { tab_id: "w1:t2", label: "lane-docs", number: 2, status: "blocked", panes: [pane("p2", "UI map doc", "pi", "blocked")] },
         { tab_id: "w1:t3", label: "dev", number: 3, status: "idle", panes: [pane("p3", "zsh", null, "idle")] } ] },
@@ -47,7 +47,7 @@ vi.mock("@tauri-apps/api/core", async (orig) => ({
     switch (cmd) {
       case "machines_list": return [local, ssh];
       case "chat_locate": return { agent: "claude", path: "/h/s.jsonl", ambiguous: false, candidates: ["/h/s.jsonl"], pending: false };
-      case "chat_git_status": return { folder: "herdr-app", path: "/Users/me/herdr-app", branch: "feat/compact-tabs", dirty: true, upstream: null, ahead: 0, behind: 0,
+      case "chat_git_status": return { folder: "drover", path: "/Users/me/drover", branch: "feat/compact-tabs", dirty: true, upstream: null, ahead: 0, behind: 0,
         staged: 0, modified: 2, untracked: 0, changed: 2, changes: [{ code: " M", path: "src/styles.css" }, { code: " M", path: "src/App.tsx" }] };
       // The lane store names the orchestrator that owns lane-docs, so its row shows the Lane toggle.
       case "lanes_list": return [{ lane_id: "docs", herdr_session: "ct", pane_id: "p2", owner: "ct/p1" }];
@@ -64,19 +64,19 @@ vi.mock("@tauri-apps/api/event", async (orig) => ({ ...(await orig<object>()), l
 // A shell's sample output in a real xterm with the app's terminal theme and font, for the README's
 // Terminal lens; the lens itself attaches to a live herdr terminal, which a capture has none of.
 const SHELL = [
-  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ git log --oneline -4",
+  "\x1b[1;32m~/drover\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ git log --oneline -4",
   "\x1b[33m6e6815c\x1b[0m Merge pull request #75 from cuongtransc/fix/composer-narrow",
   "\x1b[33m80ff029\x1b[0m fix(chat): the Composer fits the smallest window",
   "\x1b[33m5028def\x1b[0m fix(ui): Top bar tabs as 28px outlined pills, not 45px blocks",
   "\x1b[33mabfbef7\x1b[0m feat(ui): one Top bar over the main area, 33px more for the content",
-  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ mise run ci",
+  "\x1b[1;32m~/drover\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ mise run ci",
   "[typecheck] $ tsc --noEmit",
   "[test:frontend]  \x1b[32m✓\x1b[0m src/main/topBar.browser.test.tsx (4 tests) 412ms",
   "[test:frontend]  Test Files  \x1b[1;32m139 passed\x1b[0m (139)",
   "[test:frontend]       Tests  \x1b[1;32m1265 passed\x1b[0m (1265)",
   "[test:backend] test result: \x1b[32mok\x1b[0m. 416 passed; 0 failed",
   "[ci] Finished in 102.4s",
-  "\x1b[1;32m~/herdr-app\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ ",
+  "\x1b[1;32m~/drover\x1b[0m \x1b[2mfeat/compact-tabs\x1b[0m $ ",
 ].join("\r\n");
 vi.mock("../terminal/TerminalLens", async () => {
   const { useEffect, useRef } = await import("react");
