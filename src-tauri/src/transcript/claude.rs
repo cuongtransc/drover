@@ -157,6 +157,11 @@ fn user_text(text: &str) -> Option<String> {
     if text.starts_with("<local-command-") || text.starts_with("Caveat:") {
         return None;
     }
+    // Sent from the IDE extension: what the IDE knows (open file, selection, browser
+    // instructions) comes in a text block of its own before the user's words.
+    if text.starts_with("<ide_") || text.starts_with("<browser_instruction>") {
+        return None;
+    }
     Some(unwrap_pastes(text))
 }
 
@@ -1218,6 +1223,22 @@ mod tests {
         );
     }
     #[test]
+    fn ide_context_before_the_user_s_words_is_not_shown() {
+        // Sent from the IDE extension: the CLI puts what the IDE knows (open file, selection)
+        // in a text block of its own before the user's words. Not the user's words.
+        let line = serde_json::json!({"type":"user","promptSource":"sdk","origin":{"kind":"human"},"message":{"content":[
+            {"type":"text","text":"<ide_opened_file>The user opened the file /tmp/a.rs in the IDE. This may or may not be related to the current task.</ide_opened_file>"},
+            {"type":"text","text":"fix it"}]}}).to_string();
+        let (items, _, _) = run_with(&line);
+        assert!(
+            matches!(&items[..], [User { text, .. }] if text == "fix it"),
+            "{items:?}"
+        );
+        for tag in ["<ide_selection>", "<browser_instruction>"] {
+            assert_eq!(user_text(&format!("{tag}…")), None, "{tag}");
+        }
+    }
+    #[test]
     fn a_paste_reads_without_the_cli_s_wrapper() {
         // The CLI wraps a multi-line paste `<pasted_content id="…">…</pasted_content id="…">`
         // (the closing tag repeats the id) and pads it with blank lines.
@@ -1749,6 +1770,37 @@ mod tests {
             for text in p.meta().queued {
                 if wrapped(&text) {
                     println!("QUEUED\t{file}\t{:?}", head(&text));
+                }
+            }
+        }
+    }
+
+    /// Runs the parser over real transcripts and prints every user bubble that would show
+    /// a tag (`<…>`) as the user's words: a CLI wrapper or note the parser does not know yet.
+    /// `LIST` as above: `ls ~/.claude/projects/*/*.jsonl > /tmp/list`, then
+    /// `LIST=/tmp/list cargo test --release --lib audit_tags_shown -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "reads local transcripts"]
+    fn audit_tags_shown_as_the_user_s_words() {
+        let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
+            return;
+        };
+        let head = |text: &str| {
+            text.chars()
+                .take(100)
+                .collect::<String>()
+                .replace('\n', "⏎")
+        };
+        for file in list.unwrap_or_default().lines() {
+            let Ok(text) = std::fs::read_to_string(file) else {
+                continue;
+            };
+            let (items, _, _) = run_with(&text);
+            for item in items {
+                if let User { text, .. } = item {
+                    if text.trim_start().starts_with('<') {
+                        println!("SHOWN\t{file}\t{}", head(&text));
+                    }
                 }
             }
         }
