@@ -7,7 +7,7 @@ import { paneRoles, tabRole } from "./roles";
 /** By paneKey: true protects a pane, false unprotects one protected by default (an orchestrator). */
 export type Marks = Record<string, boolean>;
 
-const KEY = "herdr-app:protected";
+const KEY = "drover:protected";
 
 export function loadMarks(): Marks {
   try {

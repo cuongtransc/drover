@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Shared with store.ts, quickReplies.ts and notify.ts: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /** As `DEFAULT_HIDDEN` in src-tauri/src/complete/files.rs, which applies when the UI sends none. */
 export const DEFAULT_HIDDEN_FOLDERS = [".git", "node_modules", ".venv", "venv", "__pycache__", "target", "dist", "build", ".next", ".worktrees"];

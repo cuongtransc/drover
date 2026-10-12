@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** Shared with store.ts, theme.ts, lens.ts, newTab.ts, quickReplies.ts and notify.ts: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /** Which columns show: all three, the Agents column and the main area, or the main area alone. */
 export type Layout = "normal" | "sidebar-hidden" | "focus";

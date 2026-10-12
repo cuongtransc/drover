@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const STORAGE_KEY = "herdr-app:files-panel";
+const STORAGE_KEY = "drover:files-panel";
 
 /** Open or collapsed and the dragged height, kept across launches; collapsed the first time. */
 function load(): { collapsed: boolean; height: number | null } {

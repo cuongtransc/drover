@@ -1,7 +1,7 @@
 // Prompts sent from the Composer, recalled with Up and Down as in the agents' own TUIs. Kept per
 // folder (Claude Code keeps its history per working directory), so every agent working there
 // shares it and it outlives the pane.
-const historyKey = (scope: string) => `herdr-app:history:${scope}`;
+const historyKey = (scope: string) => `drover:history:${scope}`;
 
 /** How many prompts a scope keeps; the oldest go first. */
 export const HISTORY_MAX = 100;

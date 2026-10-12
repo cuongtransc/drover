@@ -119,7 +119,7 @@ describe("Sidebar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Active 1" }));
     expect(screen.queryByText("ai-radar")).toBeNull();
     expect(row("default")).toBeTruthy();
-    expect(JSON.parse(localStorage.getItem("herdr-app:settings")!).sessionFilter).toBe("active");
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).sessionFilter).toBe("active");
     expect(screen.getByText("1 hidden · idle or stopped")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show" }));
     expect(row("ai-radar")).toBeTruthy();
@@ -166,7 +166,7 @@ describe("Sidebar", () => {
     render(<Sidebar />);
     fireEvent.click(screen.getByText("default"));
     expect(useApp.getState().viewed).toEqual({ machine_id: "box", session: "default" });
-    // The pane it opened is in herdr-app: that project's row is the one lit.
+    // The pane it opened is in drover: that project's row is the one lit.
     expect(screen.getByRole("button", { name: "herdr-app" }).className).toContain("active");
   });
   it("selecting a pane views its session", () => {

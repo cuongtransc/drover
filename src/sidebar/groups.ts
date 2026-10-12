@@ -309,7 +309,7 @@ export function groupPaths(layout: Layout): { id: string; path: string }[] {
 }
 
 /** Where the layout lived before it moved to a file; read once to migrate, removed once the file holds it. */
-export const LAYOUT_KEY = "herdr-app:sidebar-layout";
+export const LAYOUT_KEY = "drover:sidebar-layout";
 
 // Session bookmarks from before ADR 0006 are dropped on read; the next change saves the layout without them.
 function parseLayout(v: unknown): Layout | null {

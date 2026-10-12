@@ -1,3 +1,5 @@
+// First: moves the localStorage keys Herdr wrote before any store reads them (ADR 0007).
+import "./lib/storageMigrate.run";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";

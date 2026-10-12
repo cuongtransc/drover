@@ -3,7 +3,7 @@ import { ACTIONS, type ActionId } from "./actions";
 import { type Chord, formatChord, isChord, reservedReason, sameChord } from "./chord";
 
 /** Shared with the other settings stores: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 /** Each action's chord, or null for None. */
 export type Bindings = Record<ActionId, Chord | null>;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyDragHint, applyOptionCursor, createHintBudget, DRAG_HINT_PX, DRAG_HINT_RUNS } from "./selectHint";
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 
 afterEach(() => localStorage.clear());
 

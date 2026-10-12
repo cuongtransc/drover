@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_HIDDEN_FOLDERS, folderNameError, loadHiddenFolders, normalizeHiddenFolders, useHiddenFolders } from "./hiddenFolders";
 
-const KEY = "herdr-app:settings";
+const KEY = "drover:settings";
 
 beforeEach(() => {
   localStorage.clear();

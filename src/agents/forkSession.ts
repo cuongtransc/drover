@@ -36,7 +36,7 @@ export interface ForkOrigin {
   path?: string;
 }
 
-const KEY = "herdr-app:forks";
+const KEY = "drover:forks";
 
 function load(): Record<string, ForkOrigin> {
   try {

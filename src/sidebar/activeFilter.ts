@@ -9,7 +9,7 @@ import { resolve, sessionKey, useLayout } from "./groups";
 import type { RBookmark, RNode, RSession } from "./groups";
 
 /** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
-const SETTINGS_KEY = "herdr-app:settings";
+const SETTINGS_KEY = "drover:settings";
 
 export type SessionFilter = "all" | "active";
 

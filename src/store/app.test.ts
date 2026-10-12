@@ -86,7 +86,7 @@ describe("app store", () => {
     useApp.setState({ lens: {}, lensOverride: {} });
     useApp.getState().setLensOverride("k", "terminal");
     expect(chosenLens(useApp.getState(), "k")).toBe("terminal");
-    expect(localStorage.getItem("herdr-app:ui") ?? "").not.toContain('"k"');
+    expect(localStorage.getItem("drover:ui") ?? "").not.toContain('"k"');
     useApp.getState().setLens("k", "chat");
     expect(useApp.getState().lensOverride).toEqual({});
     expect(chosenLens(useApp.getState(), "k")).toBe("chat");

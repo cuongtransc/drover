@@ -35,9 +35,9 @@ describe("useProtect", () => {
   });
 
   it("reads a broken store as no marks", () => {
-    localStorage.setItem("herdr-app:protected", "{not json");
+    localStorage.setItem("drover:protected", "{not json");
     expect(loadMarks()).toEqual({});
-    localStorage.setItem("herdr-app:protected", JSON.stringify({ "m/s/p1": "yes", "m/s/p2": true }));
+    localStorage.setItem("drover:protected", JSON.stringify({ "m/s/p1": "yes", "m/s/p2": true }));
     expect(loadMarks()).toEqual({ "m/s/p2": true });
   });
 });
