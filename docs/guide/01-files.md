@@ -9,6 +9,7 @@ whichever Machine it lives.
 | Find a file by name | ⌘P (**Go to file**) |
 | See what changed | The **CHANGED** group above the tree lists git's changes under the root |
 | Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Copy contents, an Outline for Markdown, and find |
+| Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it |
 | Copy a file to the Mac | Right-click → **Download**. It lands in `~/Downloads`; a name already there gets `name (1).ext` |
 | Copy files to the Workspace | Right-click a folder → **Upload Files…** or **Upload Folder…** (the macOS open panel; drag and drop is off) |
 | Show the hidden folders | **Show hidden folders** (the eye) on the panel header |

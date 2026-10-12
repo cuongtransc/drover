@@ -9,6 +9,7 @@ import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
 import type { FindStatus } from "./find";
 import { FindBar } from "./FindBar";
+import { FolderView } from "./FolderView";
 import { FileView, type FileMode } from "./FileView";
 import { latestOnly, STALE } from "./latest";
 import { HIGHLIGHT_LIMIT } from "./limits";
@@ -33,6 +34,9 @@ export function FileViewer({ item }: Props) {
   const [doc, setDoc] = useState<{ rel: string; content: FileContent } | null>(null);
   const [error, setError] = useState<{ rel: string; message: string } | null>(null);
   const [removed, setRemoved] = useState<string | null>(null);
+  /** Set when `rel` turned out to be a folder: it is listed instead. */
+  const [folder, setFolder] = useState<string | null>(null);
+  const [folderReload, setFolderReload] = useState(0);
   const [findOpen, setFindOpen] = useState(false);
   /** Bumped by ⌘F, so an open find bar takes the focus again. */
   const [findFocus, setFindFocus] = useState(0);
@@ -56,9 +60,14 @@ export function FileViewer({ item }: Props) {
           setDoc({ rel: r, content });
           setError(null);
           setRemoved(null);
+          setFolder(null);
         },
         (e) => {
-          if ((e as { code?: string } | null)?.code === "not_found") setRemoved(r);
+          const code = (e as { code?: string } | null)?.code;
+          if (code === "is_dir") {
+            setFolder(r);
+            setFolderReload((n) => n + 1);
+          } else if (code === "not_found") setRemoved(r);
           else setError({ rel: r, message: errMessage(e) });
         },
       );
@@ -82,7 +91,9 @@ export function FileViewer({ item }: Props) {
       if (own.removed) setRemoved(rel);
       else load(rel);
     } else if (batch.changes.some(above)) load(rel);
-  }, [batch, rel, load]);
+    // A listed folder: a name in it came, went or changed.
+    else if (folder === rel && batch.changes.some((c) => c.path.startsWith(rel + "/"))) setFolderReload((n) => n + 1);
+  }, [batch, rel, load, folder]);
 
   // A link's fragment waits on the bus under the key of the file it targets; this viewer takes its own.
   const itemId = itemKey(item);
@@ -242,6 +253,8 @@ export function FileViewer({ item }: Props) {
             outline={outline}
             onOutline={setHasOutline}
           />
+        ) : folder === rel ? (
+          <FolderView ws={ws} root={root} rel={rel} reload={folderReload} />
         ) : error && error.rel === rel ? (
           <div className="files-notice" role="alert">{error.message}</div>
         ) : null}

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 /** File texts that files_read answers with, by rel ("x" otherwise). */
 const texts = vi.hoisted(() => ({}) as Record<string, string>);
 /** Rels that files_read reports as cut at the read limit. */
@@ -193,6 +193,50 @@ describe("FileViewer", () => {
       }) as never);
       return () => vi.mocked(invoke).mockImplementation(prev);
     };
+
+    describe("a folder opened as a file (a folder path clicked in Chat)", () => {
+      const undo = (restore: () => unknown) => onTestFinished(() => void restore());
+      const listing = (entries: { name: string; kind: string }[]) => {
+        const prev = vi.mocked(invoke).getMockImplementation()!;
+        vi.mocked(invoke).mockImplementation((async (cmd: string, args?: unknown) => {
+          if (cmd === "files_list_dir") return entries;
+          return prev(cmd, args as never);
+        }) as never);
+        return () => vi.mocked(invoke).mockImplementation(prev);
+      };
+
+      it("lists what is in it, hidden folders too, instead of saying File removed", async () => {
+        undo(failing("is_dir", "a folder"));
+        undo(listing([{ name: ".worktrees", kind: "dir" }, { name: "shot.png", kind: "file" }]));
+        render(<FileViewer item={file("tmp/mockups")} online />);
+        const list = await screen.findByRole("list", { name: "tmp/mockups" });
+        expect([...list.querySelectorAll("button")].map((b) => b.textContent)).toEqual([".worktrees", "shot.png"]);
+        expect(screen.queryByText("File removed")).toBeNull();
+        expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_list_dir", { machineId: "local", root: "/r", rel: "tmp/mockups", showHeavy: true, hidden: [] });
+      });
+
+      it("lists it again when something in it changes", async () => {
+        undo(failing("is_dir", "a folder"));
+        undo(listing([{ name: "a.png", kind: "file" }]));
+        render(<FileViewer item={file("tmp")} online />);
+        await screen.findByRole("button", { name: "a.png" });
+        undo(listing([{ name: "a.png", kind: "file" }, { name: "b.png", kind: "file" }]));
+        publish([{ path: "tmp/b.png", isDir: false, removed: false }]);
+        expect(await screen.findByRole("button", { name: "b.png" })).toBeTruthy();
+      });
+
+      it("opens a file or a folder in it from a click", async () => {
+        undo(failing("is_dir", "a folder"));
+        undo(listing([{ name: "sub", kind: "dir" }, { name: "shot.png", kind: "file" }]));
+        const openFile = vi.fn();
+        useApp.setState({ openFile });
+        render(<FileViewer item={file("tmp")} online />);
+        fireEvent.click(await screen.findByRole("button", { name: "shot.png" }));
+        expect(openFile).toHaveBeenCalledWith(ref, "/r", "tmp/shot.png", { pin: false });
+        fireEvent.click(screen.getByRole("button", { name: "sub" }));
+        expect(openFile).toHaveBeenCalledWith(ref, "/r", "tmp/sub", { pin: false });
+      });
+    });
 
     it("shows a read error in place of the file", async () => {
       const restore = failing("io", "permission denied");
