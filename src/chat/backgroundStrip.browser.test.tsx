@@ -39,17 +39,29 @@ beforeEach(() => {
   document.body.innerHTML = "";
 });
 
-it.each(["light", "dark"] as const)("lines the strip up with the Working line (%s)", async (theme) => {
+it.each(["light", "dark"] as const)("lines the folded strip up with the Working line (%s)", async (theme) => {
   const host = await render(theme);
+  const summary = host.querySelector(".chat-background-summary")!;
+  expect(host.querySelectorAll(".chat-background-row")).toHaveLength(0);
+  expect(Math.abs(left(summary.querySelector(".spin")!) - left(host.querySelector(".chat-working .spin")!))).toBeLessThanOrEqual(1);
+  expect(Math.abs(right(summary.querySelector(".chat-background-time")!) - (900 - 28))).toBeLessThanOrEqual(1);
+  expect(getComputedStyle(summary).fontSize).toBe(getComputedStyle(host.querySelector(".chat-working")!).fontSize);
+  await page.screenshot({ path: `../../.vitest/herdr-bg-strip-folded-${theme}.png`, element: host });
+});
+
+it.each(["light", "dark"] as const)("opens into rows on the same columns (%s)", async (theme) => {
+  const host = await render(theme);
+  const summary = host.querySelector<HTMLButtonElement>(".chat-background-summary")!;
+  await act(async () => summary.click());
   const descs = [...host.querySelectorAll(".chat-background-desc")];
   const times = [...host.querySelectorAll(".chat-background-time")];
-  const stripSpin = host.querySelector(".chat-background .spin")!;
-  const workSpin = host.querySelector(".chat-working .spin")!;
   expect(descs).toHaveLength(2);
+  expect(times).toHaveLength(3);
+  // The summary is one row high: the larger chevron must not grow the line.
+  expect(summary.getBoundingClientRect().height).toBeCloseTo(host.querySelector(".chat-background-row")!.getBoundingClientRect().height, 0);
+  expect(left(host.querySelector(".chat-background-kind")!)).toBeCloseTo(left(summary.querySelector(".chat-background-count")!), 0);
   expect(Math.abs(left(descs[0]) - left(descs[1]))).toBeLessThanOrEqual(0.5);
-  expect(Math.abs(left(stripSpin) - left(workSpin))).toBeLessThanOrEqual(1);
-  expect(Math.abs(right(times[0]) - right(times[1]))).toBeLessThanOrEqual(0.5);
-  expect(Math.abs(right(times[0]) - (900 - 28))).toBeLessThanOrEqual(1);
+  for (const t of times) expect(Math.abs(right(t) - (900 - 28))).toBeLessThanOrEqual(1);
   expect(getComputedStyle(host.querySelector(".chat-background-row")!).fontSize).toBe(getComputedStyle(host.querySelector(".chat-working")!).fontSize);
-  await page.screenshot({ path: `../../.vitest/herdr-bg-strip-${theme}.png`, element: host });
+  await page.screenshot({ path: `../../.vitest/herdr-bg-strip-open-${theme}.png`, element: host });
 });

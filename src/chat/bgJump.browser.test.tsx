@@ -85,6 +85,7 @@ beforeEach(() => {
 
 it("a loaded call far up: clicking the strip row brings its card into view", async () => {
   const host = await openWith("t120", 500); // loaded window: turns 100..199
+  act(() => host.querySelector<HTMLButtonElement>(".chat-background-summary")!.click());
   const row = host.querySelector<HTMLButtonElement>('[aria-label="Background tasks"] button')!;
   act(() => row.click());
   await settle(1500);
@@ -94,6 +95,7 @@ it("a loaded call far up: clicking the strip row brings its card into view", asy
 
 it("a call older than the loaded window: clicking pages in and brings its card into view", async () => {
   const host = await openWith("t30", 500);
+  act(() => host.querySelector<HTMLButtonElement>(".chat-background-summary")!.click());
   const row = host.querySelector<HTMLButtonElement>('[aria-label="Background tasks"] button')!;
   act(() => row.click());
   await settle(3000);
