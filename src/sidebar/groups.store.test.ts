@@ -38,7 +38,7 @@ describe("layout file", () => {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify({ tree: [], bookmarks: ["old/y"] }));
     const f = io(l);
     await initLayout(f);
-    expect(useLayout.getState().layout).toEqual(l);
+    expect(useLayout.getState().layout).toEqual({ ...l, kept: {} });
     expect(f.save).not.toHaveBeenCalled();
     expect(localStorage.getItem(LAYOUT_KEY)).toBeNull();
   });
@@ -47,8 +47,8 @@ describe("layout file", () => {
     const f = io(null);
     await initLayout(f);
     await flush();
-    expect(useLayout.getState().layout).toEqual(l);
-    expect(f.save).toHaveBeenCalledWith(l);
+    expect(useLayout.getState().layout).toEqual({ ...l, kept: {} });
+    expect(f.save).toHaveBeenCalledWith({ ...l, kept: {} });
     expect(localStorage.getItem(LAYOUT_KEY)).toBeNull();
   });
   it("keeps the old key when the migration write fails", async () => {
@@ -65,7 +65,7 @@ describe("layout file", () => {
     const f = io({ tree: 3 });
     await initLayout(f);
     await flush();
-    expect(f.save).toHaveBeenCalledWith(l);
+    expect(f.save).toHaveBeenCalledWith({ ...l, kept: {} });
   });
   it("writes nothing when neither the file nor localStorage has a layout", async () => {
     const f = io(null);
@@ -98,7 +98,7 @@ describe("layout file", () => {
     localStorage.setItem(LAYOUT_KEY, JSON.stringify(l));
     const f = { load: vi.fn().mockRejectedValue(new Error("ipc")), save: vi.fn() };
     await initLayout(f);
-    expect(useLayout.getState().layout).toEqual(l);
+    expect(useLayout.getState().layout).toEqual({ ...l, kept: {} });
     useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
     await flush();
     expect(f.save).not.toHaveBeenCalled();
@@ -109,7 +109,22 @@ describe("layout file", () => {
     expect(useLayout.getState().layout.kept).toEqual({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } });
     useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
     await flush();
-    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ future: { v: 2 } }));
+    expect(f.save).toHaveBeenCalledWith(
+      expect.objectContaining({ future: { v: 2 }, kept: expect.objectContaining({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } }) }),
+    );
+  });
+  it("reads a file with no kept field as an empty kept object", async () => {
+    const f = io({ tree: l.tree, bookmarks: l.bookmarks });
+    await initLayout(f);
+    expect(useLayout.getState().layout.kept).toEqual({});
+  });
+  it("keeps fields inside a kept entry that this build does not know", async () => {
+    const f = io({ ...l, kept: { "local/x/app": { folder: "/a", tint: "blue" } } });
+    await initLayout(f);
+    expect(useLayout.getState().layout.kept?.["local/x/app"]).toEqual({ folder: "/a", tint: "blue" });
+    useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ kept: { "local/x/app": { folder: "/a", tint: "blue" } } }));
   });
 });
 

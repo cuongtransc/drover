@@ -238,7 +238,8 @@ export function setKept(layout: Layout, key: ProjectKey, folder: string | null):
   const kept = layout.kept ?? {};
   const current = kept[key];
   if (current && current.folder === folder) return layout;
-  return { ...layout, kept: { ...kept, [key]: { folder } } };
+  // Changing the folder merges into the entry, so fields this build does not know survive (ADR 0008).
+  return { ...layout, kept: { ...kept, [key]: { ...(current as object | undefined), folder } as KeptEntry } };
 }
 
 /** Stop keeping a Workspace; its Bookmark goes with it. */
@@ -388,7 +389,8 @@ function parseKept(v: unknown): Record<ProjectKey, KeptEntry> | undefined {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const { folder } = entry as { folder?: unknown };
     if (typeof folder !== "string" && folder !== null) continue;
-    out[k] = { folder };
+    // Copy the entry, so fields this build does not know are written back unchanged (ADR 0008).
+    out[k] = { ...(entry as Record<string, unknown>), folder } as KeptEntry;
   }
   return out;
 }
@@ -398,12 +400,12 @@ function parseLayout(v: unknown): Layout | null {
   if (!p || !Array.isArray(p.tree) || !Array.isArray(p.bookmarks)) return null;
   // `rest` keeps fields this build does not know, so the next save writes them back.
   const { kept: raw, ...rest } = p;
-  const kept = parseKept(raw);
   return {
     ...rest,
     tree: p.tree,
     bookmarks: p.bookmarks.filter(isProjectKey),
-    ...(kept && Object.keys(kept).length ? { kept } : {}),
+    // A missing or malformed field reads as `{}` (the spec's rule), never as absent.
+    kept: parseKept(raw) ?? {},
   };
 }
 

@@ -3,7 +3,7 @@ import {
   EMPTY_LAYOUT, addGroup, canMove, deleteGroup, forgetKept, forgetMachine, forgetSessions, groupPaths, moveBookmark,
   moveNode, projectKey, renameGroup, renameProjectKey, renameSessionKey, sessionKey, setBookmarked, setKept,
 } from "./groups";
-import type { GroupNode, Layout, LayoutNode, SessionNode } from "./groups";
+import type { GroupNode, KeptEntry, Layout, LayoutNode, SessionNode } from "./groups";
 
 const s = (key: string): SessionNode => ({ kind: "session", key });
 const g = (id: string, ...children: LayoutNode[]): GroupNode => ({ kind: "group", id, label: id.toUpperCase(), children });
@@ -224,5 +224,12 @@ describe("kept workspaces", () => {
     expect(future(renameSessionKey(x, sessionKey("local", "ai"), sessionKey("local", "b")))).toBe(1);
     expect(future(forgetMachine(x, "local"))).toBe(1);
     expect(future(renameProjectKey(x, k, projectKey("local", "ai", "z")))).toBe(1);
+  });
+  it("changing the folder keeps the fields inside a kept entry that it does not know", () => {
+    const base = { ...EMPTY_LAYOUT, kept: { [k]: { folder: "/x", tint: "blue" } as KeptEntry } };
+    expect(setKept(base, k, "/x")).toBe(base);
+    const entry = setKept(base, k, "/y").kept?.[k] as unknown as { folder: string | null; tint?: string };
+    expect(entry.folder).toBe("/y");
+    expect(entry.tint).toBe("blue");
   });
 });
