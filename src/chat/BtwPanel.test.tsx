@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ herdrCall: vi.fn().mockResolvedValue({}) }));
 import { herdrCall } from "../lib/ipc";
@@ -12,7 +12,7 @@ const put = (a: Partial<Aside>) =>
   useBtw.setState({ asides: { [KEY]: { question: "why that file?", phase: "asking", signal: { cancelled: false }, ...a } } });
 
 afterEach(() => {
-  useBtw.setState({ asides: {}, history: {} });
+  useBtw.setState({ asides: {}, history: {}, open: {} });
   vi.mocked(herdrCall).mockClear();
 });
 
@@ -67,5 +67,85 @@ describe("BtwPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open terminal" }));
     expect(useApp.getState().lens[KEY]).toBe("terminal");
     expect(useBtw.getState().asides[KEY]).toBeUndefined();
+  });
+
+  it("widens by dragging its left edge, remembers the width, and a double-click restores 360px", () => {
+    localStorage.clear();
+    act(() => useBtw.getState().openBtw(pane));
+    const { unmount } = render(<BtwPanel pane={pane} />);
+    const column = () => screen.getByRole("region", { name: "Side question" });
+    const edge = screen.getByRole("separator", { name: "Resize side question" });
+    expect(column().style.width).toBe("360px");
+    fireEvent.pointerDown(edge, { clientX: 1000, pointerId: 1 });
+    fireEvent.pointerMove(edge, { clientX: 900, pointerId: 1 });
+    fireEvent.pointerUp(edge, { clientX: 900, pointerId: 1 });
+    expect(column().style.width).toBe("460px");
+    unmount();
+    render(<BtwPanel pane={pane} />);
+    expect(column().style.width).toBe("460px");
+    fireEvent.doubleClick(screen.getByRole("separator", { name: "Resize side question" }));
+    expect(column().style.width).toBe("360px");
+  });
+
+  describe("its own box", () => {
+    const box = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Side question" });
+    const send = () => screen.getByRole<HTMLButtonElement>("button", { name: "Ask" });
+
+    it("opens empty from the /btw key, focused, Ask held until something is typed", () => {
+      render(<BtwPanel pane={pane} />);
+      act(() => useBtw.getState().openBtw(pane));
+      screen.getByRole("region", { name: "Side question" });
+      expect(document.activeElement).toBe(box());
+      expect(send().disabled).toBe(true);
+      fireEvent.change(box(), { target: { value: "why that file?" } });
+      expect(send().disabled).toBe(false);
+    });
+
+    it("sends what is typed as /btw and follows it for the answer", async () => {
+      const ask = vi.fn().mockResolvedValue(undefined);
+      useBtw.setState({ ask });
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "  why that file?  " } });
+      fireEvent.keyDown(box(), { key: "Enter" });
+      expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "agent.prompt", { target: "w1:p1", text: "/btw why that file?" });
+      await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
+      expect(box().value).toBe("");
+    });
+
+    it("keeps a newline on Shift+Enter", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why" } });
+      fireEvent.keyDown(box(), { key: "Enter", shiftKey: true });
+      expect(herdrCall).not.toHaveBeenCalled();
+    });
+
+    it("holds Ask while Claude answers, since its panel takes the keys", () => {
+      put({});
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "and the test?" } });
+      expect(send().disabled).toBe(true);
+      fireEvent.keyDown(box(), { key: "Enter" });
+      expect(herdrCall).not.toHaveBeenCalled();
+      expect(box().value).toBe("and the test?");
+    });
+
+    it("closes the column on Esc", () => {
+      put({ phase: "done", answer: "Because." });
+      render(<BtwPanel pane={pane} />);
+      fireEvent.keyDown(box(), { key: "Escape" });
+      expect(useBtw.getState().asides[KEY]).toBeUndefined();
+      expect(useBtw.getState().open[KEY]).toBeFalsy();
+      expect(screen.queryByRole("region", { name: "Side question" })).toBeNull();
+    });
+
+    it("pastes through pane.send_input for an agent herdr does not track", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} untracked />);
+      fireEvent.change(box(), { target: { value: "why" } });
+      fireEvent.keyDown(box(), { key: "Enter" });
+      expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_input", { pane_id: "w1:p1", text: "\x1b[200~/btw why\x1b[201~", keys: ["enter"] });
+    });
   });
 });

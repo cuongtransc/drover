@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronIcon } from "../ui/icons";
 import type { OutlineEntry } from "./outline";
+import { ResizeEdge } from "./ResizeEdge";
 import {
   clampOutlineWidth,
   loadOutlineCollapsed,
@@ -22,8 +23,6 @@ export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntr
     saveOutlineCollapsed(to);
     setCollapsed(to);
   };
-  // Where a drag of the left edge began: the rail sits at the right, so moving left widens it.
-  const drag = useRef<{ x: number; width: number } | null>(null);
   // Keep the highlighted turn in the rail's own view as the chat scrolls past it.
   useEffect(() => {
     const el = listRef.current?.children[current]?.firstElementChild as HTMLElement | null | undefined;
@@ -33,25 +32,6 @@ export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntr
     const w = clampOutlineWidth(px);
     setWidth(w);
     return w;
-  };
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    drag.current = { x: e.clientX, width };
-  };
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (drag.current) resize(drag.current.width + drag.current.x - e.clientX);
-  };
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    saveOutlineWidth(resize(drag.current.width + drag.current.x - e.clientX));
-    drag.current = null;
-  };
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const step = e.key === "ArrowLeft" ? 16 : e.key === "ArrowRight" ? -16 : 0;
-    if (step === 0) return;
-    e.preventDefault();
-    saveOutlineWidth(resize(width + step));
   };
 
   if (collapsed)
@@ -65,21 +45,14 @@ export function ChatOutline({ entries, current, onJump }: { entries: OutlineEntr
 
   return (
     <nav className="chat-outline" aria-label="Conversation outline" style={{ width }}>
-      <div
-        className="chat-outline-resize"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize outline"
-        aria-valuemin={OUTLINE_MIN}
-        aria-valuemax={OUTLINE_MAX}
-        aria-valuenow={width}
-        tabIndex={0}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onDoubleClick={() => saveOutlineWidth(resize(OUTLINE_DEFAULT))}
-        onKeyDown={onKeyDown}
+      <ResizeEdge
+        label="Resize outline"
+        width={width}
+        min={OUTLINE_MIN}
+        max={OUTLINE_MAX}
+        fallback={OUTLINE_DEFAULT}
+        resize={resize}
+        save={saveOutlineWidth}
       />
       <div className="chat-outline-head">
         <span>Outline</span>

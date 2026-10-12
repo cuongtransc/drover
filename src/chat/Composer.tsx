@@ -66,7 +66,7 @@ function ContextRing({ pct }: { pct: number }) {
 const bracketedPaste = (text: string) => `\x1b[200~${text}\x1b[201~`;
 
 /** An `agent.*` call as the `pane.*` call that does the same, for an agent herdr does not track. */
-function asPaneCall(method: string, params: unknown): [string, unknown] {
+export function asPaneCall(method: string, params: unknown): [string, unknown] {
   const p = params as { target?: string; text?: string; keys?: string[] };
   // agent.prompt pastes the text, then submits it.
   if (method === "agent.prompt") return ["pane.send_input", { pane_id: p.target, text: bracketedPaste(p.text ?? ""), keys: ["enter"] }];
@@ -367,15 +367,8 @@ export function Composer({
     });
   }, [fill, key]);
 
-  /** Puts `/btw ` before what is typed (once) and returns to the box, caret at the end. */
-  const startBtw = () => {
-    setText((cur) => (/^\s*\/btw\s/.test(cur) ? cur : `/btw ${cur.replace(/^\s+/, "")}`));
-    box.current?.focus();
-    requestAnimationFrame(() => {
-      const el = box.current;
-      if (el) el.setSelectionRange(el.value.length, el.value.length);
-    });
-  };
+  /** Opens the /btw column beside the chat; what is typed here stays for the main session. */
+  const startBtw = () => useBtw.getState().openBtw(pane);
 
   /** A canned reply goes straight out; what is typed in the box stays a draft. */
   const sendQuick = (reply: string) => {

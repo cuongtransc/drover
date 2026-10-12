@@ -45,3 +45,25 @@ export function saveOutlineCollapsed(collapsed: boolean): void {
     /* ignore */
   }
 }
+
+export const BTW_MIN = 280;
+export const BTW_MAX = 640;
+export const BTW_DEFAULT = 360;
+
+export function clampBtwWidth(px: number): number {
+  return Math.round(Math.min(BTW_MAX, Math.max(BTW_MIN, px)));
+}
+
+/** The /btw column's width, the same in every pane. */
+export function loadBtwWidth(): number {
+  const w = readRaw().btwWidth;
+  return typeof w === "number" && Number.isFinite(w) ? clampBtwWidth(w) : BTW_DEFAULT;
+}
+
+export function saveBtwWidth(px: number): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readRaw(), btwWidth: clampBtwWidth(px) }));
+  } catch {
+    /* ignore */
+  }
+}

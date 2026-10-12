@@ -19,6 +19,7 @@ import { QueuedMessages } from "./QueuedMessages";
 import { BackgroundTasks } from "./BackgroundTasks";
 import { BackgroundContext, stableBackground, taskEnds, type BackgroundState } from "./backgroundTaskState";
 import { BtwPanel } from "./BtwPanel";
+import { useBtw } from "./btw";
 import { EditPanel } from "./EditPanel";
 import { ChatEditContext } from "./editContext";
 import { editLast } from "./rewind";
@@ -391,6 +392,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   // Edit takes the user's last message back through Claude's Rewind: Claude only, a session
   // herdr tracks, and not while the lens previews another session's history (a new fork).
   const editable = view.agent === "claude" && !view.untracked && !preview;
+  const btwOpen = useBtw((s) => !!s.open[key] || !!s.asides[key]);
   const lastUser = useMemo(() => {
     for (let i = items.length - 1; i >= 0; i--) if (items[i].kind === "user") return items[i];
     return null;
@@ -479,7 +481,6 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       )}
       {view.agent && <BackgroundTasks tasks={state.background} onJump={jumpToCall} />}
       <QueuedMessages texts={state.queued} />
-      <BtwPanel pane={pane} />
       <EditPanel pane={pane} />
       <WorkingIndicator status={view.status} start={start} />
       {view.status === "blocked" || picker.open ? (
@@ -488,7 +489,8 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={state.meta} sessionPrompts={sessionPrompts} />
       )}
     </div>
-    <ChatOutline entries={entries} current={current} onJump={jumpTo} />
+    {/* The /btw column takes the outline's place while it is open. */}
+    {btwOpen ? <BtwPanel pane={pane} untracked={view.untracked} /> : <ChatOutline entries={entries} current={current} onJump={jumpTo} />}
     </div>
     </BackgroundContext.Provider>
     </ChatOpenContext.Provider>

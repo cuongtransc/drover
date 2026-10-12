@@ -70,15 +70,15 @@ describe("Composer", () => {
     await waitFor(() => expect(ask).toHaveBeenCalledWith(pane, "why that file?", expect.any(Function)));
   });
 
-  it("starts a side question from its /btw key, keeping what was typed", () => {
+  it("opens the side column from its /btw key, leaving the draft here alone", () => {
+    useBtw.setState({ open: {} });
     render(<Composer pane={pane} agent="claude" />);
     const box = screen.getByRole<HTMLTextAreaElement>("textbox");
-    fireEvent.change(box, { target: { value: "why that file?" } });
+    fireEvent.change(box, { target: { value: "and rename the Header" } });
     fireEvent.click(screen.getByRole("button", { name: "/btw" }));
-    expect(box.value).toBe("/btw why that file?");
-    expect(document.activeElement).toBe(box);
-    fireEvent.click(screen.getByRole("button", { name: "/btw" }));
-    expect(box.value).toBe("/btw why that file?");
+    expect(useBtw.getState().open["devtuf/default/w1:p1"]).toBe(true);
+    expect(box.value).toBe("and rename the Header");
+    expect(herdrCall).not.toHaveBeenCalled();
   });
 
   it("has no /btw key for other agents", () => {
