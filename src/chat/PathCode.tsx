@@ -12,8 +12,8 @@ const message = (e: unknown) => String((e as { message?: string } | null)?.messa
 
 /**
  * Inline code in a chat message. A file path becomes a link: inside the pane's workspace folder it
- * opens in Files (at its `:line`), outside it opens on this Mac. Anything else, or a path this app
- * cannot reach, renders as plain code.
+ * opens in Files (at its `:line`), outside it opens on this Mac, or on another machine in a file tab
+ * rooted at its own folder. Anything else, or a path this app cannot reach, renders as plain code.
  */
 export function PathCode({ text, children }: { text: string; children?: ReactNode }) {
   const pane = useContext(ChatPaneContext);
@@ -38,6 +38,10 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
       openInFiles(wsRef, root, target.abs, target.line);
       return;
     }
+    if (target.kind === "remote") {
+      openInFiles(wsRef, target.abs.slice(0, target.abs.lastIndexOf("/")) || "/", target.abs, target.line);
+      return;
+    }
     openLocalFile(target.abs).then(
       (done) => {
         if (done === "revealed") showToast(`Shown in Finder: ${target.abs}`, { alert: false });
@@ -49,7 +53,7 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
     <a
       className="chat-path"
       href={target.abs}
-      title={target.kind === "files" ? "Open in Files" : "Open on this Mac"}
+      title={target.kind === "files" ? "Open in Files" : target.kind === "remote" ? `Open from ${machine?.label ?? pane?.machine_id}` : "Open on this Mac"}
       onClick={(e) => {
         e.preventDefault();
         open();

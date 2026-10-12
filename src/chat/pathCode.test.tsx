@@ -51,11 +51,20 @@ describe("paths in chat", () => {
     expect(useApp.getState().openItems.items).toEqual([]);
   });
 
-  it("leaves a path outside the folder on another machine, and code that is not a path, as code", () => {
+  it("opens a path outside the folder on another machine in Files, from its own folder", () => {
     useApp.setState({ machines: { m1: machine("ssh") } });
-    show("`/private/tmp/a.png` and `mise run ci`");
+    show("Saved at `/tmp/claude-1000/x/fe-reply.md:7`.");
+    fireEvent.click(screen.getByRole("link", { name: "/tmp/claude-1000/x/fe-reply.md:7" }));
+    const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+    expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/tmp/claude-1000/x", rel: "fe-reply.md" }]);
+    expect(useFilesBus.getState().jump?.hash).toBe("L7");
+    expect(openLocalFile).not.toHaveBeenCalled();
+  });
+
+  it("leaves code that is not a path as code", () => {
+    show("`mise run ci`");
     expect(screen.queryByRole("link")).toBeNull();
-    expect(screen.getByText("/private/tmp/a.png").tagName).toBe("CODE");
+    expect(screen.getByText("mise run ci").tagName).toBe("CODE");
   });
 
   it("never links code inside a fenced block", () => {
