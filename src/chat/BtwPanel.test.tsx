@@ -12,7 +12,7 @@ const put = (a: Partial<Aside>) =>
   useBtw.setState({ asides: { [KEY]: { question: "why that file?", phase: "asking", signal: { cancelled: false }, ...a } } });
 
 afterEach(() => {
-  useBtw.setState({ asides: {}, history: {}, open: {} });
+  useBtw.setState({ asides: {}, history: {}, open: {}, drafts: {} });
   vi.mocked(herdrCall).mockClear();
 });
 
@@ -146,6 +146,38 @@ describe("BtwPanel", () => {
       fireEvent.change(box(), { target: { value: "why" } });
       fireEvent.keyDown(box(), { key: "Enter" });
       expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_input", { pane_id: "w1:p1", text: "\x1b[200~/btw why\x1b[201~", keys: ["enter"] });
+    });
+
+    it("keeps the unsent question when the pane is left and come back to", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      const { unmount } = render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why 4659?" } });
+      unmount();
+      render(<BtwPanel pane={pane} />);
+      expect(box().value).toBe("why 4659?");
+    });
+
+    it("keeps each pane's unsent question to that pane", () => {
+      const other = { ...pane, pane_id: "w1:p2" };
+      act(() => {
+        useBtw.getState().openBtw(pane);
+        useBtw.getState().openBtw(other);
+      });
+      const { rerender } = render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why 4659?" } });
+      rerender(<BtwPanel pane={other} />);
+      expect(box().value).toBe("");
+      rerender(<BtwPanel pane={pane} />);
+      expect(box().value).toBe("why 4659?");
+    });
+
+    it("drops the unsent question when the column is closed", () => {
+      act(() => useBtw.getState().openBtw(pane));
+      render(<BtwPanel pane={pane} />);
+      fireEvent.change(box(), { target: { value: "why 4659?" } });
+      fireEvent.keyDown(box(), { key: "Escape" });
+      act(() => useBtw.getState().openBtw(pane));
+      expect(box().value).toBe("");
     });
   });
 });

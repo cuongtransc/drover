@@ -1274,7 +1274,7 @@ kbd {
 }
 .btw-compose textarea:focus-visible { outline: none; box-shadow: none; }
 .btw-compose textarea::placeholder { color: var(--fg-3); }
-.btw-compose .send { width: 26px; height: 26px; border-radius: 7px; margin-left: 0; }
+.btw-compose .send { width: 26px; height: 26px; border-radius: var(--r-sm); margin-left: 0; }
 .chat-lens { position: relative; }
 @container (max-width: 899px) {
   .btw-side { position: absolute; top: 0; right: 0; bottom: 0; z-index: 6; max-width: 100%; box-shadow: var(--shadow-dialog); }
