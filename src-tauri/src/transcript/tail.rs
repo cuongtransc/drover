@@ -1,4 +1,5 @@
 //! Stream a transcript file with `tail -F` on the Machine and feed a parser.
+use super::cache;
 use super::images::{ImageSink, ImageStore, IMAGE_BUDGET, PARKED_IMAGE_BUDGET};
 use super::{ChatEvent, ChatItem, ChatMeta, Parser, ParserOutput};
 use crate::error::AppError;
@@ -24,6 +25,67 @@ const MAX_LINE: usize = 32 * 1024 * 1024;
 const SLOW_OPEN: Duration = Duration::from_millis(500);
 
 pub type Sink = Arc<dyn Fn(ChatEvent) + Send + Sync>;
+
+/// How the backlog crosses the wire. The Machine falls back from zstd to gzip to raw when a
+/// tool is missing, and says in the header which it used.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Codec {
+    #[default]
+    Raw,
+    Gzip,
+    Zstd,
+}
+
+impl Codec {
+    fn name(self) -> &'static str {
+        match self {
+            Codec::Raw => "raw",
+            Codec::Gzip => "gzip",
+            Codec::Zstd => "zstd",
+        }
+    }
+
+    fn parse(s: &str) -> Option<Codec> {
+        match s {
+            "raw" => Some(Codec::Raw),
+            "gzip" => Some(Codec::Gzip),
+            "zstd" => Some(Codec::Zstd),
+            _ => None,
+        }
+    }
+
+    fn decode(self, bytes: &[u8]) -> std::io::Result<Vec<u8>> {
+        match self {
+            Codec::Raw => Ok(bytes.to_vec()),
+            Codec::Zstd => zstd::stream::decode_all(bytes),
+            Codec::Gzip => {
+                let mut out = Vec::new();
+                std::io::Read::read_to_end(&mut flate2::read::GzDecoder::new(bytes), &mut out)?;
+                Ok(out)
+            }
+        }
+    }
+}
+
+/// How a tail gets its backlog: from a cached copy plus what was appended, and compressed.
+#[derive(Clone, Debug, Default)]
+pub struct Fetch {
+    pub cache: Option<cache::Slot>,
+    pub codec: Codec,
+}
+
+impl Fetch {
+    /// A Machine over ssh caches and compresses; the local Machine reads its own disk.
+    pub fn for_machine(machine_id: &str, path: &str) -> Fetch {
+        if machine_id == crate::machines::LOCAL {
+            return Fetch::default();
+        }
+        Fetch {
+            cache: cache::Slot::for_transcript(machine_id, path),
+            codec: Codec::Zstd,
+        }
+    }
+}
 
 /// Where a tail's events go. `sink` is None while the tail is parked; `attach` leaves the
 /// new sink in `pending` for the parse thread to adopt, so attaching never blocks.
@@ -114,9 +176,10 @@ struct State {
     consumed: u64,
     /// When the last byte arrived; None until the first.
     last_byte: Option<Instant>,
-    /// For the slow-open log: the file, when the tail started, and the time spent parsing
-    /// the backlog.
+    /// For the slow-open log: the file, how its backlog was fetched, when the tail started,
+    /// and the time spent parsing the backlog.
     path: String,
+    fetched: Option<Header>,
     began: Instant,
     parse_time: Duration,
     /// Dropped with the State, so any end of the parse thread (Eof, closed channel, panic,
@@ -133,22 +196,57 @@ impl Drop for DoneOnDrop {
 }
 
 /// The log line for an open that took `took` to its first Reset, if that is slow.
-fn slow_open(took: Duration, parse: Duration, bytes: u64, items: usize) -> Option<String> {
+fn slow_open(
+    took: Duration,
+    parse: Duration,
+    bytes: u64,
+    items: usize,
+    fetched: Option<&Header>,
+) -> Option<String> {
     if took < SLOW_OPEN {
         return None;
     }
     let ms = |d: Duration| d.as_millis();
+    let how = match fetched {
+        Some(h) => format!(
+            ", {} bytes cached, {} bytes fetched {}",
+            h.from,
+            h.len,
+            h.codec.name()
+        ),
+        None => String::new(),
+    };
     Some(format!(
-        "{} ms to the first Reset: {bytes} bytes, {items} items, {} ms parsing, {} ms reading",
+        "{} ms to the first Reset: {bytes} bytes, {items} items, {} ms parsing, {} ms reading{how}",
         ms(took),
         ms(parse),
         ms(took.saturating_sub(parse))
     ))
 }
 
-/// The header line is `wc -c` output: the size, maybe space-padded.
-fn parse_header(line: &[u8]) -> Option<u64> {
-    std::str::from_utf8(line).ok()?.trim().parse().ok()
+/// The first line the Machine sends: `<size> <from> <len> <codec>`. The backlog is the file's
+/// first `size` bytes: `from` of them are the cached copy's, the rest follow as `len` bytes
+/// in `codec`.
+#[derive(Clone, Debug, PartialEq)]
+struct Header {
+    size: u64,
+    from: u64,
+    len: u64,
+    codec: Codec,
+}
+
+fn parse_header(line: &[u8]) -> Option<Header> {
+    let mut f = std::str::from_utf8(line).ok()?.split_whitespace();
+    let h = Header {
+        size: f.next()?.parse().ok()?,
+        from: f.next()?.parse().ok()?,
+        len: f.next()?.parse().ok()?,
+        codec: Codec::parse(f.next()?)?,
+    };
+    if f.next().is_some() || h.from > h.size {
+        return None;
+    }
+    Some(h)
 }
 
 impl State {
@@ -215,7 +313,9 @@ impl State {
             let ev = Self::reset_event(&self.items.lock().unwrap());
             if let ChatEvent::Reset { total, .. } = &ev {
                 let bytes = self.size.unwrap_or(self.consumed);
-                if let Some(line) = slow_open(self.began.elapsed(), self.parse_time, bytes, *total)
+                let took = self.began.elapsed();
+                if let Some(line) =
+                    slow_open(took, self.parse_time, bytes, *total, self.fetched.as_ref())
                 {
                     tracing::warn!("chat open slow: {}: {line}", self.path);
                 }
@@ -282,6 +382,16 @@ pub fn spawn_tail(
     parser: Box<dyn Parser>,
     sink: Sink,
 ) -> TailHandle {
+    spawn_tail_with(t, path, Fetch::default(), parser, sink)
+}
+
+pub fn spawn_tail_with(
+    t: Arc<dyn Transport>,
+    path: String,
+    fetch: Fetch,
+    parser: Box<dyn Parser>,
+    sink: Sink,
+) -> TailHandle {
     let items: Arc<Mutex<Vec<ChatItem>>> = Arc::default();
     let images = Arc::new(Mutex::new(ImageStore::new(IMAGE_BUDGET)));
     let done: Arc<AtomicBool> = Arc::default();
@@ -301,6 +411,7 @@ pub fn spawn_tail(
         consumed: 0,
         last_byte: None,
         path: path.clone(),
+        fetched: None,
         began: Instant::now(),
         parse_time: Duration::ZERO,
         _done: DoneOnDrop(done.clone()),
@@ -320,7 +431,7 @@ pub fn spawn_tail(
             },
         );
     }
-    let task = tokio::spawn(read(t, path, link.clone(), tx));
+    let task = tokio::spawn(read(t, path, fetch, link.clone(), tx));
     TailHandle {
         items,
         images,
@@ -332,8 +443,8 @@ pub fn spawn_tail(
 
 /// What the reader tells the parse thread.
 enum Msg {
-    /// The size header line, parsed.
-    Header(Option<u64>),
+    /// The header line, parsed.
+    Header(Option<Header>),
     /// One line, without its newline.
     Line(Vec<u8>),
     /// Raw bytes read after the header, sent once the chunk's lines are.
@@ -347,8 +458,9 @@ fn parse_loop(mut st: State, mut rx: tokio::sync::mpsc::Receiver<Msg>) {
     while let Some(m) = rx.blocking_recv() {
         st.adopt_pending();
         match m {
-            Msg::Header(size) => {
-                st.size = size;
+            Msg::Header(h) => {
+                st.size = h.as_ref().map(|h| h.size);
+                st.fetched = h;
                 st.last_byte = Some(Instant::now());
             }
             Msg::Line(mut bytes) => {
@@ -376,19 +488,109 @@ fn parse_loop(mut st: State, mut rx: tokio::sync::mpsc::Receiver<Msg>) {
     }
 }
 
+/// The remote script: `$1` the file, `$2` the cached copy's size (0 for none), `$3` the
+/// `cksum` of its last bytes, `$4` the codec to try. It prints the header, the backlog
+/// after the cached part, then follows the file.
+///
+/// The backlog comes from `head`, and `tail` follows from the byte after it: macOS's
+/// `tail -c +1` reads ~28 MB/s, which made a 50 MB transcript take 1.8 s to open. It ends
+/// (and kills tail) when its stdin reaches EOF, i.e. when the handle drops: closing stdin
+/// is the only reliable cleanup over ssh without a tty.
+const SCRIPT: &str = r#"f=$1 c=$2 k=$3 z=$4
+s=$(wc -c < "$f" 2>/dev/null) || s=0; s=$((s + 0)); from=0
+if [ "$c" -gt 0 ] && [ "$s" -ge "$c" ]; then
+  w=4096; [ "$c" -lt "$w" ] && w=$c
+  [ "$(tail -c +$((c - w + 1)) "$f" 2>/dev/null | head -c "$w" | cksum)" = "$k" ] && from=$c
+fi
+n=$((s - from))
+part() { if [ "$from" -gt 0 ]; then tail -c +$((from + 1)) "$f" 2>/dev/null | head -c "$n"; else head -c "$n" "$f" 2>/dev/null; fi; }
+[ "$z" = zstd ] && ! command -v zstd >/dev/null 2>&1 && z=gzip
+[ "$z" = gzip ] && ! command -v gzip >/dev/null 2>&1 && z=raw
+[ "$n" -gt 0 ] || z=raw
+t=
+if [ "$z" != raw ]; then t=$(mktemp 2>/dev/null) || z=raw; fi
+if [ "$z" = zstd ]; then part | zstd -q -3 -c > "$t" || z=raw; fi
+if [ "$z" = gzip ]; then part | gzip -1 -c > "$t" || z=raw; fi
+if [ "$z" = raw ]; then echo "$s $from $n raw"; part; else l=$(wc -c < "$t"); echo "$s $from $((l + 0)) $z"; cat "$t"; fi
+[ -n "$t" ] && rm -f "$t"
+tail -c +$((s + 1)) -F "$f" & p=$!; cat >/dev/null; kill $p 2>/dev/null"#;
+
+/// Splits the stream into lines for the parse thread.
+#[derive(Default)]
+struct Splitter {
+    buf: Vec<u8>,
+    dropping: bool,
+}
+
+impl Splitter {
+    /// Sends `data`'s complete lines, then its size. False once the parse thread is gone.
+    async fn feed(&mut self, data: &[u8], tx: &tokio::sync::mpsc::Sender<Msg>) -> bool {
+        for part in data.split_inclusive(|b| *b == b'\n') {
+            if !self.dropping {
+                self.buf
+                    .extend_from_slice(part.strip_suffix(b"\n").unwrap_or(part));
+                if self.buf.len() > MAX_LINE {
+                    self.dropping = true;
+                    self.buf.clear();
+                }
+            }
+            if part.ends_with(b"\n") {
+                if !self.dropping
+                    && tx
+                        .send(Msg::Line(std::mem::take(&mut self.buf)))
+                        .await
+                        .is_err()
+                {
+                    return false;
+                }
+                self.dropping = false;
+                self.buf.clear();
+            }
+        }
+        // Sent even when 0, so a header still arriving starts the quiet clock.
+        tx.send(Msg::Bytes(data.len())).await.is_ok()
+    }
+}
+
+enum Phase {
+    /// The header line so far.
+    Header(Vec<u8>),
+    /// The fetched part of the backlog so far.
+    Backlog(Header, Vec<u8>),
+    /// Lines from `tail -F` (or everything after an unreadable header).
+    Follow,
+}
+
 async fn read(
     t: Arc<dyn Transport>,
     path: String,
+    fetch: Fetch,
     link: SharedLink,
     tx: tokio::sync::mpsc::Sender<Msg>,
 ) {
-    // The remote command ends (and kills tail) when its stdin reaches EOF, i.e. when the
-    // handle drops: closing stdin is the only reliable cleanup over ssh without a tty.
-    // The backlog comes from `head`, then `tail` follows from the byte after it: macOS's
-    // `tail -c +1` reads ~28 MB/s, which made a 50 MB transcript take 1.8 s to open.
-    let script = r#"s=$(wc -c < "$1" 2>/dev/null) || s=0; s=$((s + 0)); echo "$s"; head -c "$s" "$1" 2>/dev/null; tail -c +$((s + 1)) -F "$1" & p=$!; cat >/dev/null; kill $p 2>/dev/null"#;
+    let slot = fetch.cache.clone();
+    let cached = match slot.clone() {
+        Some(s) => tokio::task::spawn_blocking(move || s.load())
+            .await
+            .unwrap_or_default(),
+        None => Vec::new(),
+    };
+    let (c, k) = if cached.is_empty() {
+        ("0".to_string(), "0".to_string())
+    } else {
+        (cached.len().to_string(), cache::window_cksum(&cached))
+    };
     let argv = t.wrap(
-        &["sh".into(), "-c".into(), script.into(), "sh".into(), path],
+        &[
+            "sh".into(),
+            "-c".into(),
+            SCRIPT.into(),
+            "sh".into(),
+            path.clone(),
+            c,
+            k,
+            fetch.codec.name().into(),
+        ],
         false,
     );
     let spawned = Command::new(&argv[0])
@@ -409,45 +611,67 @@ async fn read(
     let mut tick = tokio::time::interval_at(tokio::time::Instant::now() + BATCH, BATCH);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     let mut chunk = vec![0u8; 64 * 1024];
-    let mut buf: Vec<u8> = Vec::new();
-    let mut dropping = false;
-    let mut header = true;
+    let mut lines = Splitter::default();
+    let mut phase = Phase::Header(Vec::new());
+    let mut cached = Some(cached);
     loop {
         tokio::select! {
             n = stdout.read(&mut chunk) => {
                 let n = match n { Ok(0) | Err(_) => break, Ok(n) => n };
-                // Header bytes are not counted: they are not part of the file.
-                let mut raw = 0usize;
-                for part in chunk[..n].split_inclusive(|b| *b == b'\n') {
-                    let complete = part.ends_with(b"\n");
-                    if header {
-                        buf.extend_from_slice(part.strip_suffix(b"\n").unwrap_or(part));
-                        if complete {
-                            let size = parse_header(&buf);
-                            buf.clear();
-                            header = false;
-                            if tx.send(Msg::Header(size)).await.is_err() { return; }
+                let mut data = &chunk[..n];
+                if let Phase::Header(h) = &mut phase {
+                    let Some(i) = data.iter().position(|b| *b == b'\n') else {
+                        h.extend_from_slice(data);
+                        if tx.send(Msg::Bytes(0)).await.is_err() { return; }
+                        continue;
+                    };
+                    h.extend_from_slice(&data[..i]);
+                    data = &data[i + 1..];
+                    let header = parse_header(h);
+                    if tx.send(Msg::Header(header.clone())).await.is_err() { return; }
+                    phase = match header {
+                        Some(h) => {
+                            let cap = usize::try_from(h.len).unwrap_or(0).min(MAX_LINE);
+                            Phase::Backlog(h, Vec::with_capacity(cap))
                         }
+                        None => Phase::Follow,
+                    };
+                }
+                if let Phase::Backlog(h, got) = &mut phase {
+                    let want = usize::try_from(h.len).unwrap_or(usize::MAX) - got.len();
+                    let take = want.min(data.len());
+                    got.extend_from_slice(&data[..take]);
+                    data = &data[take..];
+                    if (got.len() as u64) < h.len {
+                        if tx.send(Msg::Bytes(0)).await.is_err() { return; }
                         continue;
                     }
-                    raw += part.len();
-                    if !dropping {
-                        buf.extend_from_slice(part.strip_suffix(b"\n").unwrap_or(part));
-                        if buf.len() > MAX_LINE {
-                            dropping = true;
-                            buf.clear();
-                        }
-                    }
-                    if complete {
-                        if !dropping && tx.send(Msg::Line(std::mem::take(&mut buf))).await.is_err() {
+                    let h = h.clone();
+                    let wire = std::mem::take(got);
+                    let mine = cached.take().unwrap_or_default();
+                    let backlog = match backlog(&h, mine, wire).await {
+                        Ok(b) => b,
+                        Err(e) => {
+                            emit(&link, ChatEvent::Error { error: AppError::new("io", e) });
                             return;
                         }
-                        dropping = false;
-                        buf.clear();
+                    };
+                    if let Some(s) = slot.clone() {
+                        // Unchanged since the cached copy: nothing to write.
+                        if h.from < h.size {
+                            let b = backlog.clone();
+                            let path = path.clone();
+                            tokio::task::spawn_blocking(move || {
+                                if let Err(e) = s.store(&b) {
+                                    tracing::warn!("chat cache write failed: {path}: {e}");
+                                }
+                            });
+                        }
                     }
+                    if !lines.feed(&backlog, &tx).await { return; }
+                    phase = Phase::Follow;
                 }
-                // Sent even when 0, so a header still arriving starts the quiet clock.
-                if tx.send(Msg::Bytes(raw)).await.is_err() { return; }
+                if !lines.feed(data, &tx).await { return; }
             }
             _ = tick.tick() => {
                 if tx.send(Msg::Tick).await.is_err() { return; }
@@ -455,6 +679,25 @@ async fn read(
         }
     }
     let _ = tx.send(Msg::Eof).await;
+}
+
+/// The file's first `h.size` bytes: the cached copy's first `h.from`, then `wire` decoded.
+async fn backlog(h: &Header, mut cached: Vec<u8>, wire: Vec<u8>) -> Result<Vec<u8>, String> {
+    let codec = h.codec;
+    let fetched = tokio::task::spawn_blocking(move || codec.decode(&wire))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("transcript {} backlog: {e}", codec.name()))?;
+    let from = usize::try_from(h.from).map_err(|e| e.to_string())?;
+    if from > cached.len() {
+        return Err(format!(
+            "transcript cache: the Machine kept {from} bytes of a {}-byte copy",
+            cached.len()
+        ));
+    }
+    cached.truncate(from);
+    cached.extend_from_slice(&fetched);
+    Ok(cached)
 }
 
 #[cfg(test)]
@@ -526,10 +769,20 @@ mod tests {
     #[test]
     fn a_slow_open_is_logged_with_where_the_time_went() {
         let ms = Duration::from_millis;
-        assert_eq!(slow_open(ms(499), ms(100), 1_000, 10), None);
+        assert_eq!(slow_open(ms(499), ms(100), 1_000, 10, None), None);
         assert_eq!(
-            slow_open(ms(1931), ms(101), 50_910_806, 7985).as_deref(),
+            slow_open(ms(1931), ms(101), 50_910_806, 7985, None).as_deref(),
             Some("1931 ms to the first Reset: 50910806 bytes, 7985 items, 101 ms parsing, 1830 ms reading")
+        );
+        let h = Header {
+            size: 8_319_778,
+            from: 7_755_017,
+            len: 98_304,
+            codec: Codec::Zstd,
+        };
+        assert_eq!(
+            slow_open(ms(600), ms(50), h.size, 867, Some(&h)).as_deref(),
+            Some("600 ms to the first Reset: 8319778 bytes, 867 items, 50 ms parsing, 550 ms reading, 7755017 bytes cached, 98304 bytes fetched zstd")
         );
     }
 
@@ -979,6 +1232,7 @@ mod tests {
             consumed: 0,
             last_byte: None,
             path: String::new(),
+            fetched: None,
             began: Instant::now(),
             parse_time: Duration::ZERO,
             _done: DoneOnDrop(Arc::default()),
@@ -1035,10 +1289,207 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_size_header() {
-        assert_eq!(parse_header(b"   1234"), Some(1234));
-        assert_eq!(parse_header(b"0"), Some(0));
+    fn reads_the_header() {
+        assert_eq!(
+            parse_header(b"   1234 1000      56 zstd"),
+            Some(Header {
+                size: 1234,
+                from: 1000,
+                len: 56,
+                codec: Codec::Zstd
+            })
+        );
+        assert_eq!(
+            parse_header(b"0 0 0 raw"),
+            Some(Header {
+                size: 0,
+                from: 0,
+                len: 0,
+                codec: Codec::Raw
+            })
+        );
         assert_eq!(parse_header(b" junk"), None);
+        assert_eq!(parse_header(b"1 0 1 lz4"), None);
+        assert_eq!(parse_header(b"1 2 0 raw"), None, "from past the end");
+    }
+
+    fn user_text(i: &ChatItem) -> &str {
+        match i {
+            ChatItem::User { text, .. } => text,
+            _ => "",
+        }
+    }
+
+    fn open_with(p: &std::path::Path, fetch: Fetch) -> (TailHandle, Arc<Mutex<Vec<ChatEvent>>>) {
+        let got: Arc<Mutex<Vec<ChatEvent>>> = Arc::default();
+        let g = got.clone();
+        let h = spawn_tail_with(
+            Arc::new(crate::transport::local::LocalTransport),
+            p.to_string_lossy().into(),
+            fetch,
+            Box::new(Lines),
+            Arc::new(move |e| g.lock().unwrap().push(e)),
+        );
+        (h, got)
+    }
+
+    fn append(p: &std::path::Path, bytes: &[u8]) {
+        use std::io::Write;
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(p)
+            .unwrap()
+            .write_all(bytes)
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn each_codec_delivers_the_backlog_then_follows() {
+        for codec in [Codec::Zstd, Codec::Gzip, Codec::Raw] {
+            let d = tempfile::tempdir().unwrap();
+            let p = d.path().join("t.jsonl");
+            std::fs::write(&p, (0..2000).map(|i| format!("m{i}\n")).collect::<String>()).unwrap();
+            let (_h, got) = open_with(&p, Fetch { cache: None, codec });
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            append(&p, b"x\n");
+            tokio::time::sleep(Duration::from_millis(1200)).await;
+            let ev = got.lock().unwrap();
+            assert!(
+                matches!(&ev[0], ChatEvent::Reset { total: 2000, items } if user_text(&items[0]) == "m1500"),
+                "{codec:?}: {:?}",
+                ev.first()
+            );
+            assert!(
+                ev.iter().any(|e| matches!(e, ChatEvent::Append { items } if items.len() == 1 && user_text(&items[0]) == "x")),
+                "{codec:?}: {ev:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_a_machine_over_ssh_caches_and_compresses() {
+        let local = Fetch::for_machine(crate::machines::LOCAL, "/t");
+        assert!(local.cache.is_none());
+        assert_eq!(local.codec, Codec::Raw);
+        assert_eq!(Fetch::for_machine("ct-hms", "/t").codec, Codec::Zstd);
+    }
+
+    #[test]
+    fn the_script_compresses_with_the_codec_asked_for() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        let body = "line\n".repeat(1000);
+        std::fs::write(&p, &body).unwrap();
+        for (ask, c, k, want) in [
+            ("zstd", "0".to_string(), "0".to_string(), "zstd"),
+            ("gzip", "0".into(), "0".into(), "gzip"),
+            ("raw", "0".into(), "0".into(), "raw"),
+            // All of it cached: nothing to send, so nothing to compress.
+            (
+                "zstd",
+                body.len().to_string(),
+                cache::window_cksum(body.as_bytes()),
+                "raw",
+            ),
+        ] {
+            let mut child = std::process::Command::new("sh")
+                .args(["-c", SCRIPT, "sh", p.to_str().unwrap(), &c, &k, ask])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .unwrap();
+            let mut out = child.stdout.take().unwrap();
+            let mut first = Vec::new();
+            let mut b = [0u8; 1];
+            while std::io::Read::read(&mut out, &mut b).unwrap() == 1 && b[0] != b'\n' {
+                first.push(b[0]);
+            }
+            drop(child.stdin.take());
+            let h = parse_header(&first).unwrap();
+            assert_eq!(h.codec.name(), want, "{ask} {c}");
+            let mut wire = vec![0u8; h.len as usize];
+            std::io::Read::read_exact(&mut out, &mut wire).unwrap();
+            let got = h.codec.decode(&wire).unwrap();
+            assert_eq!(got.len() as u64, h.size - h.from);
+            if want != "raw" {
+                assert!(wire.len() < body.len() / 10, "{ask}: {} bytes", wire.len());
+            }
+            let _ = child.wait();
+        }
+    }
+
+    /// `a` then enough lines that the first is outside the checked window.
+    fn long_file() -> Vec<u8> {
+        let mut v = b"a\n".to_vec();
+        for i in 0..1000 {
+            v.extend_from_slice(format!("z{i:05}\n").as_bytes());
+        }
+        v
+    }
+
+    #[tokio::test]
+    async fn a_reopen_reads_the_backlog_from_the_cache() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        let first = long_file();
+        std::fs::write(&p, &first).unwrap();
+        let slot = cache::Slot::in_dir(&d.path().join("cache"), "m", "/t");
+        let fetch = || Fetch {
+            cache: Some(slot.clone()),
+            codec: Codec::Zstd,
+        };
+        let (h, got) = open_with(&p, fetch());
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert!(matches!(
+            &got.lock().unwrap()[0],
+            ChatEvent::Reset { total: 1001, .. }
+        ));
+        drop(h);
+        assert_eq!(slot.load(), first, "the backlog was cached");
+        // Mark the cached copy where the Machine does not check it, so items from it show.
+        let mut marked = first.clone();
+        marked[0] = b'Q';
+        slot.store(&marked).unwrap();
+        append(&p, b"c\n");
+        let (h, got) = open_with(&p, fetch());
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        assert!(matches!(
+            &got.lock().unwrap()[0],
+            ChatEvent::Reset { total: 1002, .. }
+        ));
+        assert_eq!(
+            user_text(&h.page(1, 1)[0]),
+            "Q",
+            "the backlog did not come from the cache"
+        );
+        assert_eq!(user_text(&h.page(1002, 1)[0]), "c");
+        assert_eq!(slot.load(), [&marked[..], b"c\n"].concat());
+    }
+
+    #[tokio::test]
+    async fn a_cache_that_no_longer_matches_is_replaced() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        std::fs::write(&p, "a\nb\n").unwrap();
+        // Longer than the file, then as long but different: both mean the file was rewritten.
+        for stale in [&b"x\ny\nz\n"[..], b"a\nc\n"] {
+            let slot = cache::Slot::in_dir(&d.path().join("cache"), "m", "/t");
+            slot.store(stale).unwrap();
+            let (h, got) = open_with(
+                &p,
+                Fetch {
+                    cache: Some(slot.clone()),
+                    codec: Codec::Gzip,
+                },
+            );
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            assert!(matches!(
+                &got.lock().unwrap()[0],
+                ChatEvent::Reset { total: 2, .. }
+            ));
+            assert_eq!(user_text(&h.page(2, 1)[0]), "b");
+            assert_eq!(slot.load(), b"a\nb\n");
+        }
     }
 
     #[tokio::test]

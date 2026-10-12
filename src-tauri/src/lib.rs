@@ -102,6 +102,11 @@ pub fn run() {
             init_logging(app.path().app_log_dir()?)?;
             tracing::info!("drover starting");
             transport::use_runtime_dir_for(&app.config().identifier);
+            let chat_cache = app.path().app_cache_dir()?.join("transcripts");
+            transcript::cache::use_dir(chat_cache.clone());
+            std::thread::spawn(move || {
+                transcript::cache::prune(&chat_cache, transcript::cache::BUDGET)
+            });
             notify::init(app.handle());
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
