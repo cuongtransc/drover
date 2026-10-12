@@ -16,6 +16,8 @@ const MAX_LEN = 512;
 const RELATIVE = /^(?:\.{1,2}\/)?[\w@+~-][\w.@+~-]*(?:\/[\w.@+~-]+)*\/[\w@+~-][\w.@+~-]*\.[A-Za-z0-9]{1,10}$/;
 /** An absolute or home path may hold spaces (macOS folders do), not quotes, backticks or brackets. */
 const ABSOLUTE = /^~?\/[^\s/`"'<>|][^`"'<>|\n\t]*$/;
+/** A shell glob (`*`, `?`, `{a,b}`) names many files or none, so it is not one file to open. */
+const GLOB = /[*?]|\{[^}]*,[^}]*\}/;
 
 /** The path in an inline-code span such as `src/a.ts:12` or `~/shot.png`, or null for other code. */
 export function parsePathRef(text: string): PathRef | null {
@@ -24,7 +26,7 @@ export function parsePathRef(text: string): PathRef | null {
   const m = /^(.*?)(?::(\d+))?(?::\d+)?$/.exec(t);
   const path = m?.[1] ?? "";
   const line = m?.[2] ? Number(m[2]) : null;
-  if (path.startsWith("/") || path.startsWith("~/")) return ABSOLUTE.test(path) ? { path, line } : null;
+  if (path.startsWith("/") || path.startsWith("~/")) return ABSOLUTE.test(path) && !GLOB.test(path) ? { path, line } : null;
   return RELATIVE.test(path) ? { path, line } : null;
 }
 
