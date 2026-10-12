@@ -121,9 +121,13 @@ run = [
   "node scripts/ui-map.mjs",
 ]
 
+# A backtrace in every failure: attach::reopen_after_unacked_backlog_still_delivers failed twice on
+# the first gate in a fresh worktree (2026-10-06, 2026-10-12), panicking inside its wait_for helper,
+# and without the trace the timed-out call was unknown. Two cold re-runs passed.
 [tasks."test:backend"]
 description = "Backend unit tests"
 dir = "src-tauri"
+env = { RUST_BACKTRACE = "1" }
 run = "cargo test"
 
 # A throwaway keychain and a tiny bundle; never the login keychain or /Applications.
