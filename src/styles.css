@@ -1898,6 +1898,10 @@ button.composer-model:disabled { cursor: default; }
 .files-outline-toggle .icon { width: 12px; height: 12px; transition: transform var(--t-fast); }
 .files-outline-toggle.open .icon { transform: rotate(90deg); }
 .files-outline-toggle[role="button"]:hover { background: var(--active); color: var(--fg); }
+/* A folder opened as an item: its names, as rows like the tree's. */
+.files-folder { list-style: none; margin: 0; padding: 4px 0; overflow: auto; font-size: 12.5px; }
+.files-folder .files-tree-row { width: 100%; padding-left: 12px; border: 0; background: none; font: inherit; text-align: left; }
+.files-folder .files-tree-row:focus-visible { background: var(--active); color: var(--fg); outline: none; box-shadow: inset 2px 0 0 var(--accent); }
 .files-notice { flex: 1; display: grid; place-content: center; justify-items: center; gap: 4px; color: var(--fg-3); font-size: 13px; }
 .files-notice-size { font-size: 12px; font-variant-numeric: tabular-nums; }
 .files-markdown-image { max-width: 100%; }

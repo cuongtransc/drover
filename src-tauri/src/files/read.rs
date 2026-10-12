@@ -30,11 +30,13 @@ pub struct FileStat {
 
 /// `$1` root, `$2` file below it, `$3` is `img` when the content is not wanted, `$4` the bytes
 /// sniffed for a NUL, `$5` the most bytes of text read.
+/// Exit 6 for a folder, 3 for anything else that is not a file.
 /// Prints `size mtime` (GNU stat first, BSD/macOS stat as the fallback), a `1`/`0`
 /// binary flag, then up to `$5` bytes of text. `od -c` writes a NUL byte as the two
 /// characters backslash-zero, which `grep -F` matches portably.
 const READ_SCRIPT: &str = r#"cd "$1" || exit 3
 f="./$2"
+[ -d "$f" ] && exit 6
 [ -f "$f" ] || exit 3
 stat -L -c '%s %Y' -- "$f" 2>/dev/null || stat -L -f '%z %m' -- "$f" || exit 3
 [ "$3" = img ] && exit 0
@@ -46,6 +48,7 @@ head -c "$5" -- "$f""#;
 /// exit 5 when the size is not a number, else the raw bytes.
 const IMAGE_SCRIPT: &str = r#"cd "$1" || exit 3
 f="./$2"
+[ -d "$f" ] && exit 6
 [ -f "$f" ] || exit 3
 s=$(stat -L -c '%s %Y' -- "$f" 2>/dev/null || stat -L -f '%z %m' -- "$f") || exit 3
 echo "$s"
@@ -72,6 +75,7 @@ fn split_line(bytes: &[u8]) -> (&[u8], &[u8]) {
 fn script_error(status: i32, stderr: &str, what: &str) -> AppError {
     match status {
         3 => AppError::new("not_found", format!("no such file: {what:?}")),
+        6 => AppError::new("is_dir", format!("a folder: {what:?}")),
         _ => io_error(status, stderr),
     }
 }
@@ -233,6 +237,15 @@ mod tests {
                 .code,
             "not_found"
         );
+    }
+
+    #[tokio::test]
+    async fn a_folder_is_is_dir_not_missing() {
+        let (_t, r) = root();
+        let e = read_file(&LocalTransport, &r, "src").await.unwrap_err();
+        assert_eq!(e.code, "is_dir");
+        let e = read_image(&LocalTransport, &r, "src").await.unwrap_err();
+        assert_eq!(e.code, "is_dir");
     }
 
     #[tokio::test]
