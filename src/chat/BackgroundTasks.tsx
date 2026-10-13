@@ -3,7 +3,7 @@ import { useSecondClock } from "../dashboard/QuotaColumn";
 import type { BackgroundTask } from "../lib/types";
 import { formatWorkDuration } from "./workBlocks";
 
-// Shells, Monitors and sub-Agents Claude started in the background and has not finished: they outlive the
+// Shells, Monitors, sub-Agents and Workflows Claude started in the background and has not finished: they outlive the
 // turn, so they sit above the Composer until their end lands in the transcript. Folded to one
 // line by default, as Claude Code's status line says "3 shells": the list opens on a click.
 export function BackgroundTasks({ tasks, onJump }: { tasks: BackgroundTask[]; onJump: (callId: string) => void }) {
@@ -11,11 +11,12 @@ export function BackgroundTasks({ tasks, onJump }: { tasks: BackgroundTask[]; on
   return <Strip tasks={tasks} onJump={onJump} />;
 }
 
-const KIND: Record<BackgroundTask["kind"], string> = { bash: "Shell", agent: "Agent", monitor: "Monitor" };
+const KIND: Record<BackgroundTask["kind"], string> = { bash: "Shell", agent: "Agent", monitor: "Monitor", workflow: "Workflow" };
 
-/** "2 shells · 1 agent": only the kinds running. A Monitor counts as a shell, as Claude Code's does. */
+/** "2 shells · 1 agent": only the kinds running. A Monitor counts as a shell, as Claude Code's does;
+ *  a Workflow, which runs agents, as an agent. */
 function counts(tasks: BackgroundTask[]): string {
-  const agents = tasks.filter((t) => t.kind === "agent").length;
+  const agents = tasks.filter((t) => t.kind === "agent" || t.kind === "workflow").length;
   const shells = tasks.length - agents;
   const parts: string[] = [];
   if (shells > 0) parts.push(`${shells} shell${shells === 1 ? "" : "s"}`);

@@ -57,6 +57,15 @@ it("counts a Monitor as a shell, as Claude Code does, and names it in the list",
   ]);
 });
 
+it("counts a Workflow as an agent and names it in the list", () => {
+  const flow = { call_id: "w1", kind: "workflow" as const, description: "Code review", started: "2026-10-10T17:10:30.000Z" };
+  render(<BackgroundTasks tasks={[ci, flow]} onJump={() => {}} />);
+  expect(summary().textContent).toBe("1 shell · 1 agent in background›3m 12s");
+  fireEvent.click(summary());
+  const list = screen.getByRole("list", { name: "Background tasks" });
+  expect([...list.querySelectorAll("button")].map((r) => r.textContent)).toEqual(["ShellRun full dotfiles CI3m 12s", "WorkflowCode review42s"]);
+});
+
 it("jumps to the task's tool card", () => {
   const onJump = vi.fn();
   render(<BackgroundTasks tasks={[ci]} onJump={onJump} />);

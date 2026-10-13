@@ -58,6 +58,7 @@ pub enum BackgroundKind {
     Bash,
     Agent,
     Monitor,
+    Workflow,
 }
 
 /// A command or agent the CLI runs in the background, from its start to its notification.
