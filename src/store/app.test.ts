@@ -372,6 +372,19 @@ describe("opening a project", () => {
     expect(useApp.getState().selected).toEqual(pane("default", "w1:p1"));
   });
 
+  it("goes back to a pane selected before the snapshot listed it", () => {
+    // A new tab's pane is selected as soon as herdr creates it, before a snapshot lists it.
+    const withNew: MachineView = { ...machine, sessions: [{ ...s, workspaces: [{ ...s.workspaces[0], tabs: [
+      ...s.workspaces[0].tabs,
+      { ...s.workspaces[0].tabs[0], tab_id: "w1:t9", panes: [{ ...s.workspaces[0].tabs[0].panes[0], pane_id: "w1:p9" }] },
+    ] }] }, other] };
+    useApp.getState().select(pane("default", "w1:p9"));
+    useApp.getState().upsertMachine(withNew);
+    useApp.getState().select(pane("other", "w2:p1"));
+    useApp.getState().openProject(at, project("working"));
+    expect(useApp.getState().selected).toEqual(pane("default", "w1:p9"));
+  });
+
   it("opens its lead pane when the remembered one is gone", () => {
     useApp.setState({ lastInProject: { [`${sessionKey("local", "default")}/w1`]: pane("default", "w1:p9") } });
     useApp.getState().openProject(at, project("working"));

@@ -177,8 +177,11 @@ export const useApp = create<AppState>((set, get) => ({
       const doneSeen = seenAfterSnapshot(s.doneSeen, shared, s.dashboardOpen || !document.hasFocus() ? null : s.selected);
       const statusSince = sinceAfterSnapshot(s.statusSince, s.machines[v.id], shared, Date.now());
       const openItems = itemsAfterSnapshot(s.openItems, s.machines[v.id], shared, s.selected);
+      const machines = s.machines[v.id] === shared ? s.machines : { ...s.machines, [v.id]: shared };
       return {
-        machines: s.machines[v.id] === shared ? s.machines : { ...s.machines, [v.id]: shared },
+        machines,
+        // A pane selected before a snapshot listed it (a new tab) is remembered once one does.
+        lastInProject: rememberUnlisted(s.lastInProject, s.machines, machines, s.selected),
         lensOverride: claudeStarted(s, shared) ? { ...s.lensOverride, [paneKey(s.selected!)]: "terminal" } : s.lensOverride,
         order: s.order.includes(v.id) ? s.order : [...s.order, v.id],
         doneSeen: sameKeys(doneSeen, s.doneSeen) ? s.doneSeen : doneSeen,
@@ -344,6 +347,15 @@ function workspaceOf(machines: Record<string, MachineView>, ref: PaneRef): strin
 function rememberInProject(last: Record<string, PaneRef>, machines: Record<string, MachineView>, ref: PaneRef | null): Record<string, PaneRef> {
   const ws = ref && workspaceOf(machines, ref);
   return ref && ws ? { ...last, [projectPaneKey(ref, ws)]: ref } : last;
+}
+
+function rememberUnlisted(
+  last: Record<string, PaneRef>,
+  before: Record<string, MachineView>,
+  after: Record<string, MachineView>,
+  ref: PaneRef | null,
+): Record<string, PaneRef> {
+  return ref && !workspaceOf(before, ref) ? rememberInProject(last, after, ref) : last;
 }
 
 function firstPane(machines: Record<string, MachineView>, ref: SessionRef): PaneRef | null {
