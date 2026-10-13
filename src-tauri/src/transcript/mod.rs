@@ -57,6 +57,7 @@ pub struct ChatMeta {
 pub enum BackgroundKind {
     Bash,
     Agent,
+    Monitor,
 }
 
 /// A command or agent the CLI runs in the background, from its start to its notification.

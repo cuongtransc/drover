@@ -48,21 +48,33 @@ fn started_prefix(kind: &BackgroundKind) -> &'static str {
     match kind {
         BackgroundKind::Bash => "Command running in background with ID:",
         BackgroundKind::Agent => "Async agent launched",
+        BackgroundKind::Monitor => "Monitor started",
     }
 }
 
-/// The task id a start result names: Bash `ID: <id>.`, Agent `agentId: <id>`.
+/// The task id a start result names: Bash `ID: <id>.`, Agent `agentId: <id>`,
+/// Monitor `(task <id>, …`.
 fn task_id_of(kind: &BackgroundKind, output: &str) -> Option<String> {
     let marker = match kind {
         BackgroundKind::Bash => "ID:",
         BackgroundKind::Agent => "agentId:",
+        BackgroundKind::Monitor => "(task ",
     };
     let rest = output[output.find(marker)? + marker.len()..].trim_start();
     let id: String = rest
         .chars()
-        .take_while(|c| !c.is_whitespace() && *c != '.')
+        .take_while(|c| !c.is_whitespace() && *c != '.' && *c != ',')
         .collect();
     (!id.is_empty()).then_some(id)
+}
+
+/// A Monitor's mid-stream event: it names the task but does not end it. Only its
+/// expiry or timeout notice, or a notification with a `<status>`, does.
+fn monitor_event(text: &str) -> bool {
+    tag(text, "status").is_none()
+        && tag(text, "event").is_some_and(|e| {
+            !e.starts_with("[Monitor expired") && !e.starts_with("[Monitor timed out")
+        })
 }
 
 /// The `N` of `(exit code N)` in a task's summary.
@@ -271,6 +283,16 @@ impl ClaudeParser {
     /// notice repeats once per orphaned task. The first end carries the summary.
     fn task_notification(&mut self, text: &str, ts: &Option<String>) -> ParserOutput {
         let summary = tag(text, "summary");
+        if monitor_event(text) {
+            return match summary {
+                Some(text) => ParserOutput::Append(vec![ChatItem::System {
+                    ts: ts.clone(),
+                    text: text.to_string(),
+                    task: None,
+                }]),
+                None => ParserOutput::None,
+            };
+        }
         let mut calls: Vec<String> = tag(text, "tool-use-id")
             .filter(|id| !id.is_empty())
             .map(str::to_string)
@@ -565,6 +587,10 @@ impl ClaudeParser {
                                 )),
                                 "Agent" => Some((
                                     BackgroundKind::Agent,
+                                    field("description").unwrap_or("").to_string(),
+                                )),
+                                "Monitor" => Some((
+                                    BackgroundKind::Monitor,
                                     field("description").unwrap_or("").to_string(),
                                 )),
                                 _ => None,
@@ -1585,6 +1611,78 @@ mod tests {
             &notification("a1", "failed", Some("Agent \"Whole-branch review\" failed")),
         );
         assert!(matches!(&items[..], [System { task, .. }] if *task == end("a1", "failed", None)));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    const MONITOR_STARTED: &str = "Monitor started (task bu1kyucyo, expires in 5m unless the source ends first; you get one notice at expiry — re-arm if you still need the watch). You will be notified on each event. Keep working — do not poll or sleep.";
+    fn monitor_call(id: &str) -> String {
+        serde_json::json!({"type":"assistant","timestamp":"2026-10-13T17:34:15.000Z","message":{"content":[{"type":"tool_use","id":id,"name":"Monitor","input":{"command":"tail -f ci.log | grep exit=","description":"Wait for the parallel run's wall time","until":"exit=","timeout":"900000"}}]}}).to_string()
+    }
+    fn monitor_event(event: &str) -> String {
+        serde_json::json!({"type":"user","promptSource":"system","origin":{"kind":"task-notification"},"message":{"content":format!("<task-notification>\n<task-id>bu1kyucyo</task-id>\n<summary>Monitor event: \"Wait for the parallel run's wall time\"</summary>\n<event>{event}</event>\n</task-notification>")}}).to_string()
+    }
+
+    #[test]
+    fn a_monitor_runs_through_its_events_until_it_expires() {
+        let (_, _, mut p) = run_with(
+            &[
+                monitor_call("m1"),
+                tool_result("m1", MONITOR_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(
+            p.meta().background,
+            vec![BackgroundTask {
+                call_id: "m1".into(),
+                kind: BackgroundKind::Monitor,
+                description: "Wait for the parallel run's wall time".into(),
+                started: Some("2026-10-13T17:34:15.000Z".into()),
+            }]
+        );
+        let items = push(&mut p, &monitor_event("real 282.93"));
+        assert!(matches!(&items[..], [System { task: None, .. }]));
+        assert_eq!(p.meta().background.len(), 1);
+        let items = push(
+            &mut p,
+            &monitor_event("[Monitor expired after 5m with 3 events delivered. Re-arm it if you still need the watch.]"),
+        );
+        assert!(matches!(&items[..], [System { task, .. }] if *task == end("m1", "", None)));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_monitor_ends_when_it_times_out() {
+        let (_, _, mut p) = run_with(
+            &[
+                monitor_call("m1"),
+                tool_result("m1", MONITOR_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        push(
+            &mut p,
+            &monitor_event("[Monitor timed out — re-arm if needed.]"),
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_monitor_ends_when_its_stream_ends() {
+        let (_, _, mut p) = run_with(
+            &[
+                monitor_call("m1"),
+                tool_result("m1", MONITOR_STARTED, false),
+            ]
+            .join("\n"),
+        );
+        let items = push(
+            &mut p,
+            &notification("m1", "completed", Some("Monitor \"wait\" stream ended")),
+        );
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("m1", "completed", None))
+        );
         assert_eq!(p.meta().background, vec![]);
     }
 
