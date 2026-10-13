@@ -3,7 +3,7 @@ import { useSecondClock } from "../dashboard/QuotaColumn";
 import type { BackgroundTask } from "../lib/types";
 import { formatWorkDuration } from "./workBlocks";
 
-// Shells and sub-Agents Claude started in the background and has not finished: they outlive the
+// Shells, Monitors and sub-Agents Claude started in the background and has not finished: they outlive the
 // turn, so they sit above the Composer until their end lands in the transcript. Folded to one
 // line by default, as Claude Code's status line says "3 shells": the list opens on a click.
 export function BackgroundTasks({ tasks, onJump }: { tasks: BackgroundTask[]; onJump: (callId: string) => void }) {
@@ -11,7 +11,9 @@ export function BackgroundTasks({ tasks, onJump }: { tasks: BackgroundTask[]; on
   return <Strip tasks={tasks} onJump={onJump} />;
 }
 
-/** "2 shells · 1 agent": only the kinds running. */
+const KIND: Record<BackgroundTask["kind"], string> = { bash: "Shell", agent: "Agent", monitor: "Monitor" };
+
+/** "2 shells · 1 agent": only the kinds running. A Monitor counts as a shell, as Claude Code's does. */
 function counts(tasks: BackgroundTask[]): string {
   const agents = tasks.filter((t) => t.kind === "agent").length;
   const shells = tasks.length - agents;
@@ -44,7 +46,7 @@ function Strip({ tasks, onJump }: { tasks: BackgroundTask[]; onJump: (callId: st
             <li key={t.call_id}>
               <button type="button" className="chat-background-row" onClick={() => onJump(t.call_id)}>
                 <span aria-hidden="true" />
-                <span className="chat-background-kind">{t.kind === "agent" ? "Agent" : "Shell"}</span>
+                <span className="chat-background-kind">{KIND[t.kind]}</span>
                 <span className="chat-background-desc">{t.description}</span>
                 <span className="chat-background-time">{formatWorkDuration(t.started, now)}</span>
               </button>
