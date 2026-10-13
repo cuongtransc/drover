@@ -4,6 +4,7 @@ vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined
 import { herdrCall, sessionRename, sessionStart, sessionStop } from "../lib/ipc";
 import { useProtect } from "../agents/protect";
 import { useApp } from "../store/app";
+import { resetReopenPending } from "../workspaces/keptActions";
 import { EMPTY_LAYOUT, projectKey, sessionKey, setBookmarked, setKept, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
@@ -25,6 +26,7 @@ const work = { kind: "group" as const, id: "g1", label: "Work", children: [{ kin
 describe("Sidebar", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetReopenPending();
     localStorage.clear();
     useApp.setState({ machines: { box: m }, order: ["box"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: EMPTY_LAYOUT });

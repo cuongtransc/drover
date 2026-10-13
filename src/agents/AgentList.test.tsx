@@ -13,6 +13,7 @@ import { useApp } from "../store/app";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import { EMPTY_LAYOUT, projectKey, setBookmarked, setKept, useLayout } from "../sidebar/groups";
 import { setFolder } from "../workspaces/folder";
+import { resetReopenPending } from "../workspaces/keptActions";
 import { AgentList, workspaceGroups } from "./AgentList";
 import { ClosedSection } from "./ClosedSection";
 import { Sidebar } from "../sidebar/Sidebar";
@@ -56,6 +57,7 @@ describe("workspaceGroups", () => {
 describe("AgentList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetReopenPending();
     vi.mocked(herdrCall).mockResolvedValue(undefined);
     localStorage.clear();
     useProtect.setState({ marks: {} });
@@ -651,6 +653,17 @@ describe("AgentList", () => {
     ]);
     await act(async () => done({ workspace: { workspace_id: "w4" }, root_pane: { pane_id: "p40" } }));
     expect(useApp.getState().selected).toEqual({ machine_id: "local", session: "default", pane_id: "p40" });
+  });
+
+  it("issues no second create after create resolves and before the snapshot lists the workspace, from Closed and Bookmark", async () => {
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, keyOf("agent"), true, "/c/agent") });
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    vi.mocked(herdrCall).mockResolvedValue({ workspace: { workspace_id: "w4" }, root_pane: { pane_id: "p40" } });
+    render(<><AgentList /><Sidebar /></>);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Reopen agent" })));
+    fireEvent.click(screen.getByRole("button", { name: "Reopen agent" }));
+    fireEvent.click(screen.getByRole("button", { name: "agent, default, closed" }));
+    expect(vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "workspace.create")).toHaveLength(1);
   });
 
   it("issues no second create while a reopen is pending, from the row menu too", async () => {

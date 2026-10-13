@@ -7,11 +7,24 @@ import { herdrCall } from "../lib/ipc";
 import { projectKey, setKept, useLayout } from "../sidebar/groups";
 import type { ProjectKey } from "../sidebar/groups";
 import { useApp } from "../store/app";
-import { setFolder } from "./folder";
+import { isSnapshot, setFolder } from "./folder";
 import type { WorkspaceRef } from "./folder";
 import type { ClosedKept } from "./kept";
 
+/** How long a created Workspace may stay unlisted before its row is clickable again. */
+const SETTLE_MS = 10_000;
+
+// A key is pending while `workspace.create` is in flight (`pending`) and, after it resolved, until a
+// snapshot of the Session lists the label or SETTLE_MS passes (`settling`). Without the second part a
+// click in the gap before the snapshot arrives would create a duplicate.
 const pending = new Set<ProjectKey>();
+interface Settling {
+  machineId: string;
+  session: string;
+  label: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+const settling = new Map<ProjectKey, Settling>();
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 const subscribe = (l: () => void) => {
@@ -21,13 +34,40 @@ const subscribe = (l: () => void) => {
   };
 };
 
+const isPending = (key: ProjectKey) => pending.has(key) || settling.has(key);
+
 export function isReopenPending(key: ProjectKey): boolean {
-  return pending.has(key);
+  return isPending(key);
 }
 
-/** True while `workspace.create` for this kept key is in flight. Shared by Closed and Bookmarks. */
+/** True while a reopen of this kept key is in flight or its Workspace is not listed yet. Shared by Closed and Bookmarks. */
 export function useReopenPending(key: ProjectKey): boolean {
-  return useSyncExternalStore(subscribe, () => pending.has(key));
+  return useSyncExternalStore(subscribe, () => isPending(key));
+}
+
+const listed = (machineId: string, session: string, label: string): boolean => {
+  const s = useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session);
+  return !!s && isSnapshot(s) && s.workspaces.some((w) => w.label === label);
+};
+
+const settle = (key: ProjectKey) => {
+  const s = settling.get(key);
+  if (!s) return;
+  clearTimeout(s.timer);
+  settling.delete(key);
+  notify();
+};
+
+useApp.subscribe(() => {
+  for (const [key, s] of settling) if (listed(s.machineId, s.session, s.label)) settle(key);
+});
+
+/** Forget every pending reopen. For tests: this state outlives a test's stores. */
+export function resetReopenPending(): void {
+  pending.clear();
+  for (const s of settling.values()) clearTimeout(s.timer);
+  settling.clear();
+  notify();
 }
 
 interface WorkspaceCreated {
@@ -38,10 +78,11 @@ interface WorkspaceCreated {
 /**
  * Open a closed kept Workspace again in the folder it was kept with (herdr's default
  * when it had none) and select its terminal. A herdr error rejects as it is, and the
- * Workspace stays kept so the row is still there to retry.
+ * Workspace stays kept so the row is still there to retry. After a successful create the
+ * key stays pending until a snapshot lists the label (10 s at most).
  */
 export async function reopenKept(machineId: string, session: string, c: ClosedKept): Promise<void> {
-  if (pending.has(c.key)) return;
+  if (isPending(c.key)) return;
   pending.add(c.key);
   notify();
   try {
@@ -55,6 +96,9 @@ export async function reopenKept(machineId: string, session: string, c: ClosedKe
       setFolder({ machine_id: machineId, session, workspace_id: workspaceId }, c.folder);
     }
     useApp.getState().select({ machine_id: machineId, session, pane_id: res.root_pane.pane_id });
+    if (!listed(machineId, session, c.label)) {
+      settling.set(c.key, { machineId, session, label: c.label, timer: setTimeout(() => settle(c.key), SETTLE_MS) });
+    }
   } finally {
     pending.delete(c.key);
     notify();
