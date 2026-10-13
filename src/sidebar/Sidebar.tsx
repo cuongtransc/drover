@@ -35,7 +35,8 @@ import {
   UnplugIcon,
 } from "../ui/icons";
 import { forgetSessions, renameSessionKey, sessionKey, useLayout } from "./groups";
-import { useSessionFilter, useSidebarSessions, useViewOrigin } from "./activeFilter";
+import { useSessionFilter, useSessionQuery, useSidebarSessions, useViewOrigin } from "./activeFilter";
+import { SessionFilter } from "./SessionFilter";
 import type { RBookmark, RSession } from "./groups";
 import { GroupTree } from "./GroupTree";
 import { BookmarkRow } from "./BookmarkRow";
@@ -56,10 +57,12 @@ export function SessionRow({ node }: { node: RSession }) {
   const clickedHere = useViewOrigin((s) => s.from === "sessions");
   const setOrigin = useViewOrigin((s) => s.set);
   // A Session lists its projects, which carry what needs the user.
-  const projects = useProjects(machine, session);
+  const projects = useProjects(machine, session, node.match);
   // A Session with projects folds them; a fold keeps what asks for the user (ProjectRows).
+  // Words in the Sessions filter unfold it, so the Workspaces they found show.
   const foldKey = `session:${key}`;
-  const unfolded = useApp((s) => s.expanded[foldKey] ?? true);
+  const searching = useSessionQuery((s) => s.query.trim() !== "");
+  const unfolded = useApp((s) => s.expanded[foldKey] ?? true) || searching;
   const toggle = useApp((s) => s.toggle);
   const foldable = projects.rows.length > 0;
   const view = useApp((s) => s.view);
@@ -280,7 +283,7 @@ function SectionHeader({ id, label, icon, defaultOpen = true }: { id: string; la
 }
 
 /** The Sessions section: its header carries Active N (Active leaves out sessions with no agent
- *  work, see `isActiveSession`, in Bookmarks too), then the Groups tree. */
+ *  work, see `isActiveSession`, in Bookmarks too), then the filter, then the Groups tree. */
 function SessionsSection({ kept }: { kept: number }) {
   const filter = useSessionFilter((s) => s.filter);
   const setFilter = useSessionFilter((s) => s.setFilter);
@@ -291,6 +294,7 @@ function SessionsSection({ kept }: { kept: number }) {
         <SectionHeader id="sessions" label="Sessions" />
         <ActiveToggle on={filter === "active"} count={kept} onChange={(on) => setFilter(on ? "active" : "all")} />
       </div>
+      {open && <SessionFilter />}
       {open && <GroupTree />}
     </section>
   );

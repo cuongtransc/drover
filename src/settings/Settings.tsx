@@ -9,6 +9,7 @@ import { CHAT_WIDTHS, NEW_AGENT_LENSES, useLensSettings } from "./lens";
 import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
 import { ACTIVE_MINUTES, idleLabel, useActiveWindow } from "../agents/paneFilter";
+import { useShowDefault } from "../sidebar/activeFilter";
 import { DEFAULT_QUICK_REPLIES, moveReply, moveReplyTo, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, slotAt, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
@@ -49,6 +50,7 @@ function GeneralSettings() {
   const newTab = useNewTab();
   const tabKey = useShortcutLabel("tabs.new");
   const active = useActiveWindow();
+  const showDefault = useShowDefault();
   return (
     <>
       <div className="setting-row">
@@ -85,6 +87,11 @@ function GeneralSettings() {
         </div>
       </div>
       <p className="note">How long an idle agent stays in Active, in Sessions and Panes. Blocked, working and unread Done agents always stay.</p>
+      <label className="switch">
+        <span>Show herdr's default session</span>
+        <input type="checkbox" role="switch" checked={showDefault.show} onChange={(e) => showDefault.setShow(e.target.checked)} />
+      </label>
+      <p className="note">The session herdr starts when run without a name, on each machine. Off, Sessions lists it only while an agent runs in it.</p>
       <label className="switch">
         <span>Notifications</span>
         <input

@@ -7,6 +7,7 @@ import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { resolve, sessionKey, useLayout } from "./groups";
 import type { RBookmark, RNode, RSession } from "./groups";
+import { isIdleDefault, queryResolved, queryWords } from "./sessionQuery";
 
 /** Shared with the other settings writers: one JSON object, each writer merges its own keys. */
 const SETTINGS_KEY = "drover:settings";
@@ -37,6 +38,23 @@ export const useSessionFilter = create<{ filter: SessionFilter; setFilter: (f: S
   setFilter: (filter) => {
     save({ sessionFilter: filter });
     set({ filter });
+  },
+}));
+
+/** The Sessions filter's words and machine chip: what the user is looking for now, so not saved. */
+export const useSessionQuery = create<{ query: string; machine: string | null; setQuery: (q: string) => void; setMachine: (id: string | null) => void }>((set) => ({
+  query: "",
+  machine: null,
+  setQuery: (query) => set({ query }),
+  setMachine: (machine) => set({ machine }),
+}));
+
+/** Settings: list herdr's `default` Session while it has no agent (`isIdleDefault`). Off by default. */
+export const useShowDefault = create<{ show: boolean; setShow: (show: boolean) => void }>((set) => ({
+  show: readRaw().showDefaultSession === true,
+  setShow: (show) => {
+    save({ showDefaultSession: show });
+    set({ show });
   },
 }));
 
@@ -87,11 +105,13 @@ export const useViewOrigin = create<{ from: "bookmarks" | "sessions"; set: (from
   set: (from) => set({ from }),
 }));
 
-/** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped.
- *  Bookmarks stay whole: a bookmarked project is wanted even while its Session is quiet. */
+/** The resolved sidebar with only the sessions `keep` accepts: order kept, emptied groups dropped unless
+ *  `keepGroups` (every group stays, as under All). Bookmarks stay whole: a bookmarked project is wanted
+ *  even while its Session is quiet. */
 export function filterResolved(
   r: { tree: RNode[]; bookmarks: RBookmark[] },
   keep: (s: RSession) => boolean,
+  keepGroups = false,
 ): { tree: RNode[]; bookmarks: RBookmark[]; hidden: number; kept: number } {
   let hidden = 0;
   let kept = 0;
@@ -106,14 +126,24 @@ export function filterResolved(
         return [];
       }
       const children = walk(n.children);
-      return children.length ? [{ ...n, children }] : [];
+      return children.length || keepGroups ? [{ ...n, children }] : [];
     });
   const tree = walk(r.tree);
   return { tree, bookmarks: r.bookmarks, hidden, kept };
 }
 
-/** The sidebar's sessions under the current filter, and how many Active leaves out. */
-export function useSidebarSessions(): { tree: RNode[]; bookmarks: RBookmark[]; hidden: number; kept: number; active: boolean } {
+/** The sidebar's sessions under the current filters, and how many Active leaves out. A machine chip keeps
+ *  that machine's sessions; words typed keep what they find, past Active (`queryResolved`); an idle
+ *  `default` stays out unless Settings shows it, the words look for it, or it is being viewed. */
+export function useSidebarSessions(): {
+  tree: RNode[];
+  bookmarks: RBookmark[];
+  hidden: number;
+  kept: number;
+  active: boolean;
+  /** Words typed, or a machine chip on: an empty tree then says so. */
+  narrowed: boolean;
+} {
   const machines = useApp((s) => s.machines);
   const order = useApp((s) => s.order);
   const doneSeen = useApp((s) => s.doneSeen);
@@ -124,9 +154,20 @@ export function useSidebarSessions(): { tree: RNode[]; bookmarks: RBookmark[]; h
   const viewedKey = useApp((s) => (s.viewed ? sessionKey(s.viewed.machine_id, s.viewed.session) : null));
   const layout = useLayout((s) => s.layout);
   const filter = useSessionFilter((s) => s.filter);
+  const query = useSessionQuery((s) => s.query);
+  const chip = useSessionQuery((s) => s.machine);
+  const showDefault = useShowDefault((s) => s.show);
   return useMemo(() => {
+    const words = queryWords(query);
+    // A chip for a machine since removed keeps nothing out.
+    const machine = chip && order.includes(chip) ? chip : null;
     const r = resolve(layout, machines, order);
-    const f = filterResolved(r, (s) => s.key === viewedKey || isActiveSession(s.machine, s.session, doneSeen, since, now, keptMs));
-    return filter === "active" ? { ...f, active: true } : { ...f, tree: r.tree, bookmarks: r.bookmarks, active: false };
-  }, [layout, machines, order, doneSeen, since, now, keptMs, viewedKey, filter]);
+    const base = filterResolved(r, (s) =>
+      (machine === null || s.machine.id === machine) &&
+      (showDefault || words.length > 0 || s.key === viewedKey || !isIdleDefault(s.session)), true);
+    const f = filterResolved(base, (s) => s.key === viewedKey || isActiveSession(s.machine, s.session, doneSeen, since, now, keptMs));
+    const narrowed = words.length > 0 || machine !== null;
+    if (words.length > 0) return { ...queryResolved(base, words), hidden: 0, kept: f.kept, active: false, narrowed };
+    return filter === "active" ? { ...f, active: true, narrowed } : { ...f, tree: base.tree, active: false, narrowed };
+  }, [layout, machines, order, doneSeen, since, now, keptMs, viewedKey, filter, query, chip, showDefault]);
 }

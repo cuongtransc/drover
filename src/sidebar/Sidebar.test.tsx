@@ -7,7 +7,7 @@ import { useApp } from "../store/app";
 import { resetReopenPending } from "../workspaces/keptActions";
 import { EMPTY_LAYOUT, projectKey, sessionKey, setBookmarked, setKept, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
-import { useSessionFilter, useViewOrigin } from "./activeFilter";
+import { useSessionFilter, useSessionQuery, useShowDefault, useViewOrigin } from "./activeFilter";
 import type { MachineView } from "../lib/types";
 
 const m: MachineView = {
@@ -472,4 +472,85 @@ describe("Sidebar tree", () => {
     expect(useSessionFilter.getState().filter).toBe("all");
   });
 
+});
+
+describe("Sessions filter", () => {
+  const p = (id: string, agent: string | null = "claude") => ({ pane_id: id, terminal_id: "t" + id, title: id, cwd: "/x", agent, status: "idle" as const });
+  const ws = (id: string, label: string, agent: string | null = "claude") =>
+    ({ workspace_id: id, label, number: 1, status: "idle" as const, tabs: [{ tab_id: id + ":t", label: "1", number: 1, status: "idle" as const, panes: [p(id + "p", agent)] }] });
+  const s = (name: string, workspaces: ReturnType<typeof ws>[]) => ({ name, running: true, status: "idle" as const, error: null, workspaces });
+  const local: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
+    sessions: [s("default", [ws("w0", "~", null)]), s("w-xb", [ws("w1", "notes")]), s("w-wd", [ws("w2", "bmf-oms"), ws("w3", "xbit-specs")])] };
+  const dev: MachineView = { ...local, id: "dev", label: "ct-dev", kind: "ssh",
+    sessions: [s("default", [ws("w4", "~", null)]), s("dw-wd", [ws("w5", "bmf-oms")])] };
+  const sessions = () => within(screen.getByRole("region", { name: "Sessions" }));
+  const names = () => sessions().queryAllByText(/^(default|w-xb|w-wd|dw-wd)$/).map((e) => e.textContent);
+  const input = () => sessions().getByRole("searchbox", { name: "Filter sessions" });
+
+  beforeEach(() => {
+    localStorage.clear();
+    useApp.setState({ machines: { local, dev }, order: ["local", "dev"], selected: null, viewed: null, expanded: {} });
+    useLayout.setState({ layout: EMPTY_LAYOUT });
+    useSessionFilter.setState({ filter: "active" });
+    useSessionQuery.setState({ query: "", machine: null });
+    useShowDefault.setState({ show: false });
+  });
+
+  it("hides herdr's default Session while it has no agent, unless Settings shows it", () => {
+    useSessionFilter.setState({ filter: "all" });
+    const { rerender } = render(<Sidebar />);
+    expect(names()).toEqual(["w-xb", "w-wd", "dw-wd"]);
+    act(() => useShowDefault.getState().setShow(true));
+    rerender(<Sidebar />);
+    expect(names()).toEqual(["default", "w-xb", "w-wd", "default", "dw-wd"]);
+  });
+
+  it("narrows the tree to the words typed, past Active, showing a Session's matching Workspaces", () => {
+    render(<Sidebar />);
+    expect(names()).toEqual([]);
+    fireEvent.change(input(), { target: { value: "xb" } });
+    expect(names()).toEqual(["w-xb", "w-wd"]);
+    // w-wd is kept for one Workspace: only that one is listed under it
+    expect(sessions().queryByRole("button", { name: /^bmf-oms/ })).toBeNull();
+    expect(sessions().getByRole("button", { name: /^xbit-specs/ })).toBeTruthy();
+    fireEvent.change(input(), { target: { value: "default" } });
+    expect(names()).toEqual(["default", "default"]);
+  });
+
+  it("Esc clears the words, and a second Esc leaves the field", () => {
+    render(<Sidebar />);
+    input().focus();
+    fireEvent.change(input(), { target: { value: "bmf" } });
+    fireEvent.keyDown(input(), { key: "Escape" });
+    expect((input() as HTMLInputElement).value).toBe("");
+    expect(document.activeElement).toBe(input());
+    fireEvent.keyDown(input(), { key: "Escape" });
+    expect(document.activeElement).not.toBe(input());
+  });
+
+  it("a machine chip keeps that machine's Sessions, with the words too; a second click shows every machine", () => {
+    useSessionFilter.setState({ filter: "all" });
+    render(<Sidebar />);
+    const chip = sessions().getByRole("button", { name: "ct-dev" });
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    expect(names()).toEqual(["dw-wd"]);
+    fireEvent.change(input(), { target: { value: "bmf" } });
+    expect(names()).toEqual(["dw-wd"]);
+    fireEvent.click(chip);
+    expect(names()).toEqual(["w-wd", "dw-wd"]);
+  });
+
+  it("offers no machine chips with a single machine", () => {
+    useApp.setState({ machines: { local }, order: ["local"] });
+    render(<Sidebar />);
+    expect(sessions().queryByRole("button", { name: "local" })).toBeNull();
+  });
+
+  it("says what it filtered by when nothing matches", () => {
+    render(<Sidebar />);
+    fireEvent.click(sessions().getByRole("button", { name: "ct-dev" }));
+    fireEvent.change(input(), { target: { value: "vault" } });
+    expect(sessions().getByText('No session on ct-dev matches "vault"')).toBeTruthy();
+  });
 });

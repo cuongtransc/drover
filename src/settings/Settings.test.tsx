@@ -13,6 +13,7 @@ import { Settings, useSettingsOpen } from "./Settings";
 import { DEFAULTS, loadFonts, useSettings } from "./store";
 import { useTheme } from "./theme";
 import { useActiveWindow } from "../agents/paneFilter";
+import { useShowDefault } from "../sidebar/activeFilter";
 import { loadBindings, useShortcuts } from "../shortcuts/store";
 
 beforeEach(() => {
@@ -61,6 +62,17 @@ describe("Settings dialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "15m" }));
     expect(useActiveWindow.getState().minutes).toBe(15);
     expect(JSON.parse(localStorage.getItem("drover:settings")!).activeMinutes).toBe(15);
+  });
+
+  it("shows herdr's default session in Sessions when switched on, off by default, and remembers it", () => {
+    useShowDefault.setState({ show: false });
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const sw = screen.getByRole<HTMLInputElement>("switch", { name: "Show herdr's default session" });
+    expect(sw.checked).toBe(false);
+    fireEvent.click(sw);
+    expect(useShowDefault.getState().show).toBe(true);
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).showDefaultSession).toBe(true);
   });
 
   it("opens as a dialog on the General section and switches sections", () => {

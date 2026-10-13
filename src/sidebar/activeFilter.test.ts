@@ -76,3 +76,12 @@ describe("isActiveSession, recently active", () => {
     expect(isActiveSession(machine, s, {}, {}, 100 * MIN)).toBe(false);
   });
 });
+
+describe("filterResolved, keepGroups", () => {
+  const s = (key: string): RSession => ({ kind: "session", key, machine, session: session(key, []) });
+  it("keeps every group, emptied or empty, as All shows them", () => {
+    const tree: RNode[] = [{ kind: "group", id: "g", label: "G", children: [s("a")] }, { kind: "group", id: "e", label: "E", children: [] }];
+    const r = filterResolved({ tree, bookmarks: [] }, () => false, true);
+    expect(r.tree).toEqual([{ kind: "group", id: "g", label: "G", children: [] }, { kind: "group", id: "e", label: "E", children: [] }]);
+  });
+});

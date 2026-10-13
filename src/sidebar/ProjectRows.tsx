@@ -6,7 +6,7 @@ import { CheckIcon, StarIcon, StarOffIcon } from "../ui/icons";
 import { firstWorkspaceFolder } from "../workspaces/folder";
 import { useActions } from "./actions";
 import { projectKey, setBookmarked, useLayout } from "./groups";
-import { useSessionFilter, useViewOrigin } from "./activeFilter";
+import { useSessionFilter, useSessionQuery, useViewOrigin } from "./activeFilter";
 import { sessionProjects } from "./projects";
 import type { ProjectRow } from "./projects";
 
@@ -22,14 +22,19 @@ function useSelectedWorkspace(machineId: string, session: SessionView): string |
   );
 }
 
-/** A Session's projects (its Workspaces with agent work; every one under All) as rows under it. */
-export function useProjects(machine: MachineView, session: SessionView): { rows: ProjectRow[]; current: string | null } {
+/** A Session's projects (its Workspaces with agent work; every one under All) as rows under it. Under
+ *  words in the Sessions filter, every one they found (`match`: some; none given: all). */
+export function useProjects(machine: MachineView, session: SessionView, match?: string[]): { rows: ProjectRow[]; current: string | null } {
   const doneSeen = useApp((s) => s.doneSeen);
   const since = useApp((s) => s.statusSince);
   const now = useMinuteClock();
-  const all = useSessionFilter((s) => s.filter === "all");
+  const searching = useSessionQuery((s) => s.query.trim() !== "");
+  const all = useSessionFilter((s) => s.filter === "all") || searching;
   const keptMs = useActiveKeptMs();
-  const rows = useMemo(() => sessionProjects(machine, session, doneSeen, all, since, now, keptMs), [machine, session, doneSeen, all, since, now, keptMs]);
+  const rows = useMemo(() => {
+    const r = sessionProjects(machine, session, doneSeen, all, since, now, keptMs);
+    return searching && match ? r.filter((x) => match.includes(x.id)) : r;
+  }, [machine, session, doneSeen, all, since, now, keptMs, searching, match]);
   const selectedWs = useSelectedWorkspace(machine.id, session);
   const fromTree = useViewOrigin((s) => s.from === "sessions");
   return { rows, current: fromTree && rows.some((r) => r.id === selectedWs) ? selectedWs : null };

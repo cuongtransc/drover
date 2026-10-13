@@ -289,6 +289,29 @@ kbd {
 .link-btn { padding: 0; border: 0; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
 .link-btn:hover { text-decoration: underline; }
 
+/* The Sessions filter under its header: words, then one chip per machine in the Active toggle's look. */
+.session-filter { display: flex; flex-direction: column; gap: 6px; padding: 2px 8px 6px; }
+.session-filter-field {
+  display: flex; align-items: center; height: 26px; box-sizing: border-box;
+  border: 1px solid var(--line-2); border-radius: var(--r-sm); background: var(--surface-0); color: var(--fg-3);
+}
+.session-filter-field:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+.session-filter-field .icon { flex: none; width: 13px; height: 13px; margin: 0 6px 0 8px; }
+.session-filter-field input {
+  flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: none;
+  color: var(--fg); font: inherit; font-size: var(--fs-s);
+}
+.session-filter-field input::placeholder { color: var(--fg-3); }
+.session-filter-field input::-webkit-search-cancel-button { display: none; }
+.session-filter-clear {
+  flex: none; margin: 0 5px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; background: none;
+  color: var(--fg-3); font: inherit; font-size: var(--fs-xs); line-height: 16px; cursor: pointer;
+}
+.session-filter-clear:hover { color: var(--fg); }
+.machine-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.machine-chips .active-toggle { height: 22px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; line-height: 20px; }
+.filter-empty { margin: 4px 0 0; padding: 6px 8px; color: var(--fg-2); font-size: var(--fs-s); }
+
 /* ---------- Layout: ⌘B hides the sidebar, ⇧⌘B the Agents column too ---------- */
 .sidebar[hidden], .agents[hidden] { display: none; }
 /* Beside the traffic lights in every layout; above the dashboard. */
