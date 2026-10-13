@@ -97,4 +97,10 @@ describe("recallList", () => {
   it("adds prompts sent since, unless the session already shows them", () => {
     expect(recallList(["x"], ["s1"], ["s1", "s2"])).toEqual(["x", "s1", "s2"]);
   });
+  it("skips the marker Claude records when a turn is stopped, but not a prompt that quotes it", () => {
+    const quoted = "why does Up show\n\n[Request interrupted by user]";
+    expect(
+      recallList(["x"], ["s1", "[Request interrupted by user]", "[Request interrupted by user for tool use]", quoted], []),
+    ).toEqual(["x", "s1", quoted]);
+  });
 });
