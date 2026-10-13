@@ -96,6 +96,16 @@ describe("ChatLens", () => {
     expect(screen.getByRole("textbox")).toBeTruthy();
   });
 
+  it("names a new Claude's Model from its startup banner until a reply names it", async () => {
+    shown = " ▐▛███▛█   Claude Code v2.1.296\n▝▜██████▀  Opus 5.5 · Claude Max\n";
+    opened = Promise.resolve({ agent: "claude", path: "/h/sid.jsonl", ambiguous: false, candidates: ["/h/sid.jsonl"], pending: true });
+    render(<ChatLens pane={pane} view={{ status: "idle", agent: "claude", title: "claude" } as PaneView} />);
+    expect(await screen.findByRole("button", { name: "Opus 5.5" })).toBeTruthy();
+    await waitFor(() => expect(channels.length).toBe(1));
+    act(() => channels[0].onmessage({ type: "meta", model: "claude-opus-5-5", effort: "high", context_tokens: null, queued: [], background: [] }));
+    expect(await screen.findByRole("button", { name: "claude-opus-5-5 · high" })).toBeTruthy();
+  });
+
   it("shows pi's model picker as a card once /model is sent, though pi stays idle", async () => {
     render(<ChatLens pane={pane} view={idlePi} />);
     const box = screen.getByRole("textbox");

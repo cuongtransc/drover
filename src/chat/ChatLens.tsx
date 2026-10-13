@@ -25,6 +25,7 @@ import { ChatEditContext } from "./editContext";
 import { editLast } from "./rewind";
 import { WorkingIndicator } from "./WorkingIndicator";
 import { usePiModelPicker } from "./usePiModelPicker";
+import { useStartupModel } from "./startupModel";
 import { usePendingTranscript } from "./pendingTranscript";
 import { ArrowDownIcon, GitBranchIcon } from "../ui/icons";
 import { useLensSettings } from "../settings/lens";
@@ -81,6 +82,9 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const [modelFor, setModelFor] = useState<string | null>(null);
   const picker = usePiModelPicker(pane, modelFor === key && view.agent === "pi", () => setModelFor(null));
   useEffect(() => setModelFor(null), [key]);
+  // Before the first reply the transcript names no Model; Claude's startup banner does.
+  const startupModel = useStartupModel(pane, view.agent === "claude" && !state.meta.model);
+  const meta = startupModel && !state.meta.model ? { ...state.meta, model: startupModel } : state.meta;
 
   // `known`: where `path` was located, when the caller already knows (kept over what opening returns).
   const open = useCallback(
@@ -486,7 +490,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       {view.status === "blocked" || picker.open ? (
         <PromptPanel pane={pane} view={view} fallback={view.status === "blocked"} asked={asked} />
       ) : (
-        <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={state.meta} sessionPrompts={sessionPrompts} />
+        <Composer pane={pane} agent={view.agent} status={view.status} untracked={view.untracked} onPiModel={() => setModelFor(key)} meta={meta} sessionPrompts={sessionPrompts} />
       )}
     </div>
     {/* The /btw column takes the outline's place while it is open. */}
