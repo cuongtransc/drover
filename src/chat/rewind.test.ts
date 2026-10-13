@@ -81,7 +81,7 @@ function claude({ code }: { code: boolean }) {
     if (k === "esc esc up enter") return screen(code ? "confirm-code" : "confirm-nocode");
     if (code && k === "esc esc up enter down") return screen("confirm-code-down");
     if (/enter (down )?enter$/.test(k)) return code ? screen("restored").replace(BANANA, WRITE) : screen("restored");
-    if (k.endsWith("ctrl+u")) return screen("cleared");
+    if (k.endsWith("ctrl+c")) return screen("cleared");
     return screen("interrupted");
   };
 }
@@ -90,7 +90,19 @@ describe("runRewind", () => {
   it("rewinds to before the last message and clears what Claude put back in its box", async () => {
     const { call, keys } = fakePane(claude({ code: false }));
     await runRewind(call, "w1:p1", BANANA, { status: idle, choose: vi.fn(), timing: fast });
-    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+u"]);
+    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+c"]);
+  });
+
+  it("empties every line of a message of several lines from Claude's box", async () => {
+    // Claude as measured (2.1.296): Ctrl+U clears the line the cursor is on, Ctrl+C the whole box.
+    const lines = [BANANA, "second line", "third line"];
+    const box = (keys: string[]) => (keys.includes("ctrl+c") ? [] : lines.slice(0, lines.length - keys.filter((k) => k === "ctrl+u").length));
+    const base = claude({ code: false });
+    const shown = (left: string[]) =>
+      left.length === 0 ? screen("cleared") : screen("restored").replace(`❯ ${BANANA}`, [`❯ ${left[0]}`, ...left.slice(1).map((l) => `  ${l}`)].join("\n"));
+    const { call, keys } = fakePane((k) => (/enter (down )?enter/.test(k.join(" ")) ? shown(box(k)) : base(k)));
+    await runRewind(call, "w1:p1", lines.join("\n"), { status: idle, choose: vi.fn(), timing: fast });
+    expect(box(keys)).toEqual([]);
   });
 
   it("asks what to do with the code when the message changed files, and does it", async () => {
@@ -98,13 +110,13 @@ describe("runRewind", () => {
     const choose = vi.fn().mockResolvedValue("conversation");
     await runRewind(call, "w1:p1", WRITE, { status: idle, choose, timing: fast });
     expect(choose).toHaveBeenCalledWith("The code will be restored -1 in note.txt.");
-    expect(keys).toEqual(["esc", "esc", "up", "enter", "down", "enter", "ctrl+u"]);
+    expect(keys).toEqual(["esc", "esc", "up", "enter", "down", "enter", "ctrl+c"]);
   });
 
   it("restores the code too when asked to", async () => {
     const { call, keys } = fakePane(claude({ code: true }));
     await runRewind(call, "w1:p1", WRITE, { status: idle, choose: vi.fn().mockResolvedValue("both"), timing: fast });
-    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+u"]);
+    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+c"]);
   });
 
   it("backs out of Claude's screens when the choice is cancelled", async () => {
@@ -130,7 +142,7 @@ describe("runRewind", () => {
     state = "idle";
     keys.length = 0;
     await run;
-    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+u"]);
+    expect(keys).toEqual(["esc", "esc", "up", "enter", "enter", "ctrl+c"]);
   });
 
   it("fails, sending nothing more, when the picker does not open", async () => {
