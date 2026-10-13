@@ -370,7 +370,13 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           // a rejection leaves the layout as it is.
           beginWorkspaceRename(from, to);
           return call("workspace.rename", { workspace_id: ws.workspace_id, label })()
-            .then(() => useLayout.getState().update((l) => renameProjectKey(l, from, to)))
+            .then(() => {
+              // Another live Workspace still carrying the old label keeps the kept entry and Bookmark;
+              // the renamed one starts un-kept.
+              const sibling = useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)
+                ?.workspaces.some((w) => w.workspace_id !== ws.workspace_id && w.label === ws.label);
+              if (!sibling) useLayout.getState().update((l) => renameProjectKey(l, from, to));
+            })
             .finally(() => endWorkspaceRename(from, to));
         }) },
         {

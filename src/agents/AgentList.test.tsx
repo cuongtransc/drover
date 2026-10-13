@@ -808,6 +808,22 @@ describe("AgentList", () => {
     act(() => useApp.setState({ machines: { local: gone } }));
     expect(screen.getByRole("region", { name: "Closed" })).toBeTruthy();
   });
+
+  it("keeps the kept entry and Bookmark on a label another live workspace still carries", async () => {
+    const dup = structuredClone(m);
+    const second = structuredClone(dup.sessions[0].workspaces[1]);
+    second.workspace_id = "w4";
+    dup.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { local: dup } });
+    useLayout.setState({ layout: setBookmarked(setKept(EMPTY_LAYOUT, keyOf("web"), "/c/web"), keyOf("web"), true) });
+    render(<AgentList />);
+    vi.mocked(herdrCall).mockResolvedValue({});
+    renameWeb();
+    await act(async () => {});
+    expect(herdrCall).toHaveBeenCalledWith("local", "default", "workspace.rename", { workspace_id: "w2", label: "web-2" });
+    expect(useLayout.getState().layout.kept).toEqual({ [keyOf("web")]: { folder: "/c/web" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([keyOf("web")]);
+  });
 });
 
 describe("AgentList lanes", () => {
