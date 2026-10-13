@@ -66,6 +66,13 @@ it("counts a Workflow as an agent and names it in the list", () => {
   expect([...list.querySelectorAll("button")].map((r) => r.textContent)).toEqual(["ShellRun full dotfiles CI3m 12s", "WorkflowCode review42s"]);
 });
 
+it("marks an agent waiting on its own background work", () => {
+  render(<BackgroundTasks tasks={[{ ...review, waiting: true }]} onJump={() => {}} />);
+  fireEvent.click(summary());
+  const list = screen.getByRole("list", { name: "Background tasks" });
+  expect([...list.querySelectorAll("button")].map((r) => r.textContent)).toEqual(["AgentWhole-branch reviewwaiting · 42s"]);
+});
+
 it("jumps to the task's tool card", () => {
   const onJump = vi.fn();
   render(<BackgroundTasks tasks={[ci]} onJump={onJump} />);

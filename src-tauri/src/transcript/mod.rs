@@ -68,6 +68,9 @@ pub struct BackgroundTask {
     pub kind: BackgroundKind,
     pub description: String,
     pub started: Option<String>,
+    /// An agent that stopped with background work of its own still running: it may
+    /// resume on its own, so it is not over until its next notification.
+    pub waiting: bool,
 }
 
 /// How a background task ended, as its notification reports it.

@@ -114,6 +114,12 @@ fn finished_output(output: &str) -> Option<(&str, &str)> {
         .then_some((tag(output, "task_id")?, status))
 }
 
+/// An agent's stop while background work of its own still runs: it may resume on its own,
+/// so the notification does not end it.
+fn still_working(text: &str) -> bool {
+    tag(text, "note").is_some_and(|n| n.contains("background work of its own still running"))
+}
+
 /// A Monitor's mid-stream event: it names the task but does not end it. Only its
 /// expiry or timeout notice, or a notification with a `<status>`, does.
 fn monitor_event(text: &str) -> bool {
@@ -329,7 +335,13 @@ impl ClaudeParser {
     /// notice repeats once per orphaned task. The first end carries the summary.
     fn task_notification(&mut self, text: &str, ts: &Option<String>) -> ParserOutput {
         let summary = tag(text, "summary");
-        if monitor_event(text) {
+        if monitor_event(text) || still_working(text) {
+            if still_working(text) {
+                let calls = self.notified_calls(text);
+                for t in &mut self.background {
+                    t.waiting |= calls.contains(&t.call_id);
+                }
+            }
             return match summary {
                 Some(text) => ParserOutput::Append(vec![ChatItem::System {
                     ts: ts.clone(),
@@ -388,23 +400,24 @@ impl ClaudeParser {
             .unwrap_or_else(|| to.to_string())
     }
 
-    /// The calls a notification names: its `<tool-use-id>`, and the call of each `<task-id>`.
+    /// The calls a notification names: its `<tool-use-id>`, and every call of each
+    /// `<task-id>`: an agent woken by a message while it waited runs under both calls.
     fn notified_calls(&self, text: &str) -> Vec<String> {
         let mut calls: Vec<String> = tag(text, "tool-use-id")
             .filter(|id| !id.is_empty())
             .map(str::to_string)
             .into_iter()
             .collect();
+        let named = calls.len();
         for task in tags(text, "task-id") {
-            let call = self
-                .task_ids
-                .iter()
-                .find(|(_, id)| id.as_str() == task)
-                .map(|(call, _)| call.clone());
-            if let Some(call) = call.filter(|c| !calls.contains(c)) {
-                calls.push(call);
+            for (call, id) in &self.task_ids {
+                if id == task && !calls.contains(call) {
+                    calls.push(call.clone());
+                }
             }
         }
+        // The map has no order; the first call shown carries the summary.
+        calls[named..].sort();
         calls
     }
 
@@ -445,9 +458,9 @@ impl ClaudeParser {
             Some("enqueue") => {
                 // A task's end is queued as it happens and may never be delivered (the
                 // session closed first): the task has ended either way.
-                if let Some(text) =
-                    content.filter(|t| t.starts_with("<task-notification>") && !monitor_event(t))
-                {
+                if let Some(text) = content.filter(|t| {
+                    t.starts_with("<task-notification>") && !monitor_event(t) && !still_working(t)
+                }) {
                     let calls = self.notified_calls(text);
                     self.background.retain(|t| !calls.contains(&t.call_id));
                 }
@@ -628,6 +641,7 @@ impl ClaudeParser {
                                         kind,
                                         description: summary.unwrap_or(description),
                                         started,
+                                        waiting: false,
                                     });
                                 }
                             }
@@ -1674,6 +1688,7 @@ mod tests {
                 kind: BackgroundKind::Bash,
                 description: "Run full dotfiles CI in background".into(),
                 started: Some("2026-10-10T17:08:00.000Z".into()),
+                waiting: false,
             }]
         );
         let summary =
@@ -1739,6 +1754,7 @@ mod tests {
                 kind: BackgroundKind::Monitor,
                 description: "Wait for the parallel run's wall time".into(),
                 started: Some("2026-10-13T17:34:15.000Z".into()),
+                waiting: false,
             }]
         );
         let items = push(&mut p, &monitor_event("real 282.93"));
@@ -1837,7 +1853,7 @@ mod tests {
 
     #[test]
     fn a_task_output_that_times_out_keeps_the_task_running() {
-        let (_, _, mut p) = run_with(
+        let (_, _, p) = run_with(
             &[
                 started("t1", "b9gjyugpx"),
                 task_output("o1", "b9gjyugpx", "timeout", "running"),
@@ -1867,6 +1883,60 @@ mod tests {
         ]
     }
 
+    fn agent_note(status: &str, note: &str) -> String {
+        format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<tool-use-id>a1</tool-use-id>\n<status>{status}</status>\n<summary>Agent \"Whole-branch review\" finished</summary>\n<note>{note}</note>\n</task-notification>")
+    }
+    const STILL_RUNNING: &str = "This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports.";
+
+    #[test]
+    fn an_agent_waiting_on_its_own_background_work_stays_until_it_ends() {
+        let (_, _, mut p) = run_with(&finished_agent()[..2].join("\n"));
+        let items = push(&mut p, &delivered(&agent_note("completed", STILL_RUNNING)));
+        // Its summary is shown, with no end on the agent's card.
+        assert!(
+            matches!(&items[..], [System { task: None, text, .. }] if text == "Agent \"Whole-branch review\" finished")
+        );
+        let bg = p.meta().background;
+        assert_eq!((bg.len(), bg[0].waiting), (1, true));
+        let items = push(
+            &mut p,
+            &delivered(&agent_note("completed", "A task-notification fires each time this agent stops with no live background children of its own.")),
+        );
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("a1", "completed", None))
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn an_agent_woken_while_waiting_ends_every_call_that_ran_it() {
+        let resumed = serde_json::json!({"success":true,"message":"Resuming agent a18a42e","resumedAgentId":AGENT_ID}).to_string();
+        let (_, _, mut p) = run_with(
+            &[
+                finished_agent()[..2].to_vec(),
+                vec![delivered(&agent_note("completed", STILL_RUNNING))],
+                send_message("s1", AGENT_ID, &resumed),
+            ]
+            .concat()
+            .join("\n"),
+        );
+        assert_eq!(p.meta().background.len(), 2);
+        // The end names the agent alone, as a resumed run's notification does.
+        let end_note = format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<status>completed</status>\n</task-notification>");
+        push(&mut p, &delivered(&end_note));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_queued_note_of_background_work_still_running_does_not_end_the_agent() {
+        let (_, _, mut p) = run_with(&finished_agent()[..2].join("\n"));
+        push(
+            &mut p,
+            &queue_op("enqueue", Some(&agent_note("completed", STILL_RUNNING))),
+        );
+        assert_eq!(p.meta().background.len(), 1);
+    }
+
     #[test]
     fn a_message_that_resumes_a_finished_agent_runs_it_again() {
         let resumed = serde_json::json!({"success":true,"message":"Resuming agent a18a42e","resumedAgentId":AGENT_ID}).to_string();
@@ -1882,6 +1952,7 @@ mod tests {
                 kind: BackgroundKind::Agent,
                 description: "Whole-branch review".into(),
                 started: Some("2026-10-10T17:30:00.000Z".into()),
+                waiting: false,
             }]
         );
         // An older CLI names the first Agent call; the agent id still finds the resumed run.
@@ -2192,6 +2263,176 @@ mod tests {
                 if let Some(tool) = tools.get(&call).filter(|_| !p.tracked.contains(&call)) {
                     println!("UNTRACKED\t{file}\t{call}\t{tool}");
                 }
+            }
+        }
+    }
+
+    /// What a transcript line proves still running: a Monitor event that is not its expiry,
+    /// a `TaskOutput` that finds its task `running`, a `TaskStop` that stops it (stopping a
+    /// finished task fails with "No task found"). Only a record's first copy counts: a
+    /// notification is written when queued and again when delivered, maybe after the task
+    /// ended, and a resumed transcript repeats old calls.
+    #[derive(Default)]
+    struct Proofs {
+        /// `TaskOutput` / `TaskStop` / `KillShell` calls awaiting their result: tool, target.
+        calls: HashMap<String, (String, String)>,
+        /// Tool calls and notifications already read.
+        seen: std::collections::HashSet<String>,
+        /// Tasks whose own end the CLI wrote first: a `killed` notification comes before
+        /// the `TaskStop` result that caused it, and a Monitor may flush one more event
+        /// after its expiry.
+        finished: std::collections::HashSet<String>,
+    }
+
+    fn running_proofs(line: &str, state: &mut Proofs) -> Vec<(String, &'static str)> {
+        let Proofs {
+            calls,
+            seen,
+            finished,
+        } = state;
+        let Ok(v) = serde_json::from_str::<Value>(line) else {
+            return vec![];
+        };
+        let mut proofs = vec![];
+        let note = ["/content", "/message/content", "/attachment/prompt"]
+            .into_iter()
+            .find_map(|at| v.pointer(at).and_then(Value::as_str))
+            .filter(|t| t.starts_with("<task-notification>"));
+        if let Some(text) = note.filter(|t| super::monitor_event(t) && seen.insert(t.to_string())) {
+            for task in tags(text, "task-id") {
+                proofs.push((task.to_string(), "monitor-event"));
+            }
+        }
+        if let Some(text) = note.filter(|t| {
+            tag(t, "status") == Some("killed")
+                || tag(t, "event").is_some_and(|e| e.starts_with("[Monitor "))
+        }) {
+            finished.extend(tags(text, "task-id").into_iter().map(str::to_string));
+        }
+        if let Some(Value::Array(blocks)) = v.pointer("/message/content") {
+            for b in blocks {
+                let field = |k: &str| b.get(k).and_then(Value::as_str).unwrap_or("");
+                match field("type") {
+                    "tool_use" => {
+                        let input =
+                            |k: &str| b.pointer(&format!("/input/{k}")).and_then(Value::as_str);
+                        let target = match field("name") {
+                            "TaskOutput" | "TaskStop" => input("task_id"),
+                            "KillShell" => input("shell_id"),
+                            _ => None,
+                        };
+                        if let Some(target) = target.filter(|_| seen.insert(field("id").into())) {
+                            calls.insert(field("id").into(), (field("name").into(), target.into()));
+                        }
+                    }
+                    "tool_result" if !flag(b, "is_error") => {
+                        let Some((tool, target)) = calls.remove(field("tool_use_id")) else {
+                            continue;
+                        };
+                        let output = result_text(b.get("content"));
+                        if tool == "TaskOutput" {
+                            if output.starts_with("<retrieval_status>")
+                                && tag(&output, "status") == Some("running")
+                            {
+                                proofs.push((target, "task-output-running"));
+                            }
+                        } else if output.contains("stopped task") || output.contains("killed") {
+                            proofs.push((target, "task-stop"));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        proofs.retain(|(task, _)| !finished.contains(task));
+        proofs
+    }
+
+    #[test]
+    fn running_proofs_reads_monitor_events_task_output_and_stops() {
+        let mut calls = Proofs::default();
+        let event = "<task-notification>\n<task-id>bu1</task-id>\n<summary>Monitor event: \"w\"</summary>\n<event>ok 1</event>\n</task-notification>";
+        let expired = "<task-notification>\n<task-id>bu1</task-id>\n<summary>Monitor event: \"w\"</summary>\n<event>[Monitor expired after 5m]</event>\n</task-notification>";
+        assert_eq!(
+            running_proofs(&queue_op("enqueue", Some(event)), &mut calls),
+            vec![("bu1".to_string(), "monitor-event")]
+        );
+        assert_eq!(
+            running_proofs(&queue_op("enqueue", Some(expired)), &mut calls),
+            vec![]
+        );
+        let [call, result] = &task_output("o1", "b9", "timeout", "running")[..] else {
+            unreachable!()
+        };
+        running_proofs(call, &mut calls);
+        assert_eq!(
+            running_proofs(result, &mut calls),
+            vec![("b9".to_string(), "task-output-running")]
+        );
+        running_proofs(&stop_call("s1", "TaskStop", "task_id", "b7"), &mut calls);
+        assert_eq!(
+            running_proofs(&stop_result("s1", "b7", false), &mut calls),
+            vec![("b7".to_string(), "task-stop")]
+        );
+        running_proofs(&stop_call("s2", "TaskStop", "task_id", "b8"), &mut calls);
+        assert_eq!(
+            running_proofs(&stop_result("s2", "b8", true), &mut calls),
+            vec![]
+        );
+        // The delivered copy of a queued event, and a resumed copy of a stop, prove nothing new.
+        assert_eq!(running_proofs(&delivered(event), &mut calls), vec![]);
+        running_proofs(&stop_call("s1", "TaskStop", "task_id", "b7"), &mut calls);
+        assert_eq!(
+            running_proofs(&stop_result("s1", "b7", false), &mut calls),
+            vec![]
+        );
+        // An event flushed after the Monitor's expiry proves nothing.
+        let flushed = event.replace("ok 1", "done");
+        assert_eq!(
+            running_proofs(&queue_op("enqueue", Some(&flushed)), &mut calls),
+            vec![]
+        );
+        // A stop whose `killed` notification was written first ended the task itself.
+        let killed = "<task-notification>\n<task-id>b6</task-id>\n<status>killed</status>\n</task-notification>";
+        running_proofs(&queue_op("enqueue", Some(killed)), &mut calls);
+        running_proofs(&stop_call("s3", "TaskStop", "task_id", "b6"), &mut calls);
+        assert_eq!(
+            running_proofs(&stop_result("s3", "b6", false), &mut calls),
+            vec![]
+        );
+    }
+
+    /// Runs the parser over real transcripts line by line and prints every task the
+    /// transcript shows still running after the parser ended it (`EARLY`), the other
+    /// side of `audit_background_tasks_left_running`; `LIST` as there.
+    #[test]
+    #[ignore = "reads local transcripts"]
+    fn audit_background_tasks_ended_early() {
+        let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
+            return;
+        };
+        for file in list.unwrap_or_default().lines() {
+            let Ok(text) = std::fs::read_to_string(file) else {
+                continue;
+            };
+            let mut p = ClaudeParser::default();
+            let mut sink: Vec<(String, String, Vec<u8>)> = vec![];
+            let mut known = std::collections::HashSet::new();
+            let mut calls = Proofs::default();
+            for line in text.lines() {
+                known.extend(p.task_ids.values().cloned());
+                let running: Vec<&String> = p
+                    .background
+                    .iter()
+                    .filter_map(|t| p.task_ids.get(&t.call_id))
+                    .collect();
+                for (task, proof) in running_proofs(line, &mut calls) {
+                    // A task from another transcript (a resumed session) cannot be judged here.
+                    if known.contains(&task) && !running.contains(&&task) {
+                        println!("EARLY\t{file}\t{task}\t{proof}");
+                    }
+                }
+                p.push_line(line, &mut sink);
             }
         }
     }
