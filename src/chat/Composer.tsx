@@ -19,6 +19,7 @@ import { useFitHeight } from "./useFitHeight";
 import { useCompletions } from "./useCompletions";
 import { BTW_TOO_LONG, btwPrompt, btwQuestion, closeBtw, useBtw } from "./btw";
 import { useComposerFill, useRewind } from "./rewind";
+import { takeBackStopped } from "./stopRestore";
 import { IMAGE_EXTS } from "../terminal/imagePaste";
 
 // Key names verified against herdr's key parser (pane.send_keys accepts esc, ctrl+c,
@@ -313,6 +314,33 @@ export function Composer({
     return call("agent.prompt", { target, text: sent.trim() ? `${mentions} ${sent}` : mentions });
   };
 
+  // Stopping a Claude turn that has not answered yet puts its prompt back in Claude's box: the
+  // Composer takes it (stopRestore.ts), and a send waits until the box is empty again.
+  const restoring = useRef<Promise<void> | null>(null);
+  const gone = useRef(false);
+  useEffect(() => {
+    gone.current = false;
+    return () => {
+      gone.current = true;
+    };
+  }, []);
+  const stop = () => {
+    const esc = call("agent.send_keys", { target: pane.pane_id, keys: ["esc"] });
+    if (agent !== "claude" || status !== "working") return void esc.catch(() => {});
+    const sent = sentHere.current[sentHere.current.length - 1];
+    const read = (m: string, p: unknown) => herdrCall(pane.machine_id, pane.session, m, p);
+    const run: Promise<void> = esc
+      .then(() => takeBackStopped(read, pane.pane_id, sent, () => gone.current))
+      .then((back) => {
+        if (back !== null) useComposerFill.setState((s) => ({ fill: { ...s.fill, [key]: back } }));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (restoring.current === run) restoring.current = null;
+      });
+    restoring.current = run;
+  };
+
   const send = () => {
     if (!canSend) return;
     const sent = text;
@@ -325,7 +353,8 @@ export function Composer({
     clearSuggestion();
     setSending(true);
     // Optimistic clear; restore the draft if the prompt did not go through (unless the user typed meanwhile).
-    submit(btwText ?? sent, sentImages.map((a) => a.path as string))
+    const go = () => submit(btwText ?? sent, sentImages.map((a) => a.path as string));
+    (restoring.current ? restoring.current.then(go) : go())
       .then(
         () => {
           sentImages.forEach(revoke);
@@ -412,7 +441,7 @@ export function Composer({
             </button>
           )}
           {KEYS.map((k) => (
-            <button key={k.key} className="keycap" onClick={() => call("agent.send_keys", { target: pane.pane_id, keys: [k.key] }).catch(() => {})}>
+            <button key={k.key} className="keycap" onClick={() => (k.key === "esc" ? stop() : call("agent.send_keys", { target: pane.pane_id, keys: [k.key] }).catch(() => {}))}>
               {k.label}
             </button>
           ))}
@@ -569,7 +598,7 @@ export function Composer({
             aria-label="Stop"
             title="Stop (Esc)"
             disabled={status !== "working"}
-            onClick={() => call("agent.send_keys", { target: pane.pane_id, keys: ["esc"] }).catch(() => {})}
+            onClick={stop}
           >
             <StopIcon />
           </button>

@@ -255,6 +255,55 @@ describe("Composer", () => {
     expect(sendButton().disabled).toBe(false);
   });
 
+  describe("Stop before Claude answers", () => {
+    const BOX_RULE = "\u001b[38;2;138;138;138m" + "─".repeat(60) + "\u001b[0m";
+    const withBox = (text: string) => ["● done", BOX_RULE, `❯ ${text}`, BOX_RULE, "  ⏵⏵ auto mode on"].join("\r\n");
+    // Claude's screen: the stopped prompt back in its box until Ctrl+C empties it.
+    const claudeKeepsPrompt = (prompt: string) => {
+      let box = prompt;
+      vi.mocked(herdrCall).mockImplementation(async (_m, _s, method, params) => {
+        if (method === "pane.read") return { text: withBox(box) };
+        if (method === "pane.send_keys" && (params as { keys: string[] }).keys[0] === "ctrl+c") box = "";
+        return {};
+      });
+    };
+    const methods = () => vi.mocked(herdrCall).mock.calls.map((c) => (String(c[2]).endsWith("send_keys") ? `keys ${(c[3] as { keys: string[] }).keys}` : `${c[2]} ${(c[3] as { text?: string }).text ?? ""}`.trim()));
+
+    it("moves the prompt Claude put back in its box into the Composer", async () => {
+      claudeKeepsPrompt("");
+      render(<Composer pane={pane} agent="claude" status="working" />);
+      const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+      fireEvent.change(box, { target: { value: "run sleep 60" } });
+      fireEvent.keyDown(box, { key: "Enter" });
+      await waitFor(() => expect(box.value).toBe(""));
+      claudeKeepsPrompt("run sleep 60");
+      fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+      await waitFor(() => expect(box.value).toBe("run sleep 60"));
+      expect(herdrCall).toHaveBeenCalledWith("devtuf", "default", "pane.send_keys", { pane_id: "w1:p1", keys: ["ctrl+c"] });
+    });
+
+    it("sends a prompt typed right after Stop only once Claude's box is empty", async () => {
+      claudeKeepsPrompt("typed in the terminal");
+      render(<Composer pane={pane} agent="claude" status="working" />);
+      const box = screen.getByRole("textbox") as HTMLTextAreaElement;
+      fireEvent.click(screen.getByRole("button", { name: "Esc" }));
+      fireEvent.change(box, { target: { value: "say hi" } });
+      fireEvent.keyDown(box, { key: "Enter" });
+      await waitFor(() => expect(methods()).toContain("agent.prompt say hi"));
+      expect(methods().indexOf("keys ctrl+c")).toBeGreaterThan(-1);
+      expect(methods().indexOf("keys ctrl+c")).toBeLessThan(methods().indexOf("agent.prompt say hi"));
+      await waitFor(() => expect(box.value).toBe("typed in the terminal"));
+    });
+
+    it("leaves other agents' input alone", async () => {
+      claudeKeepsPrompt("pi text");
+      render(<Composer pane={pane} agent="pi" status="working" />);
+      fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+      await act(async () => {});
+      expect(methods()).toEqual(["keys esc"]);
+    });
+  });
+
   it("keeps each pane's unsent text across remounts and clears it once sent", () => {
     const other = { ...pane, pane_id: "w1:p2" };
     const first = render(<Composer pane={pane} agent="claude" />);

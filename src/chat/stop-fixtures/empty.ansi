@@ -1,0 +1,56 @@
+  Euclid proved around 300 BCE that there are infinitely many primes. His
+  argument is short: take any finite list of primes, multiply them together,
+  and add 1. The result has no factor in the list, since dividing it by any
+  listed prime leaves remainder 1. So it has a prime factor that is not on
+  the list. No finite list can contain all primes.
+ 
+  Finding primes is harder than proving they exist. The Sieve of Eratosthenes
+  is the classic method. Write down the integers from 2 to N, then
+  repeatedly cross out the multiples of each prime you find. Every number
+  left standing is prime. The sieve runs in roughly O(N log log N) time,
+  which is fast enough for tables of millions of entries. For a single large
+  number, trial division by primes up to its square root works, but it
+  becomes slow for numbers with hundreds of digits. 
+
+  Primality testing is a different problem from factoring. Modern tests such
+  as Miller-Rabin are fast and probabilistic: they can declare a number
+  composite with certainty, but declare it prime only with very high
+  probability. The AKS test, published in 2002, was the first deterministic
+  polynomial-time test, though it is too slow for everyday use. Miller-Rabin
+  is what most software actually runs.
+
+  Primes matter in practice because factoring large numbers is hard.
+  Public-key systems such as RSA rely on the fact that multiplying two large
+  primes is easy while recovering them from the product is, as far as anyone
+  knows, computationally infeasible at sufficient size. A 2048-bit RSA
+  modulus is the product of two roughly 1024-bit primes. Elliptic-curve
+  cryptography and Diffie-Hellman rely on related hardness assumptions over
+  prime fields. The security of much of the internet's encryption depends on
+  the difficulty of this one problem.
+
+  Many questions about primes remain open. The Twin Prime Conjecture asserts
+  there are infinitely many pairs of primes differing by 2, such as (11, 13)
+  and (17, 19). In 2013, Yitang Zhang proved that infinitely many pairs
+  differ by some fixed bound below 70 million, and subsequent work reduced
+  that bound to 246. The conjecture itself is still unproven. Goldbach's
+  Conjecture, that every even integer greater than 2 is a sum of two primes,
+  has been checked by computer far beyond 10^18 but has no proof.
+
+  The Prime Number Theorem describes how primes thin out. The count of primes
+  up to x is approximately x / ln(x). The Riemann Hypothesis, one of the
+  most famous unsolved problems in mathematics, concerns the error term in
+  this approximation and is equivalent to a precise statement about where the
+  zeros of the Riemann zeta function lie. A proof would give far tighter
+  control over the distribution of primes than anything currently known.
+
+  Primes are simple to define and difficult to fully understand. They appear
+  in number theory, cryptography, and computing, and their deepest patterns
+  remain unresolved.
+
+[0m[38;2;102;102;102m✻ Baked for 8s · done 11:16 PM[0m
+
+[0m[38;2;138;138;138m─────────────────────────────────────────────────────────────────────────────[0m
+❯ 
+[0m[38;2;138;138;138m─────────────────────────────────────────────────────────────────────────────[0m
+  [0m[38;5;3m👤 default[0m[38;2;102;102;102m [0m[38;5;4m|[0m[38;2;102;102;102m [0m[38;5;6m📁 probe[0m[38;2;102;102;102m [0m[38;5;4m|[0m[38;2;102;102;102m [0m[38;5;5mHaiku 5.5[0m[38;2;102;102;102m [0m[38;5;4m|[0m[38;2;102;102;102m Context: [0m[38;5;2m3%[0m[38;2;102;102;102m [0m[38;5;4m|[0m[38;2;102;102;102m [0m[38;5;8m5h [0m[38;5;2m48%[0m[38;2;102;102;102m [0m[38;5;8m(17s)[0m[38;2;102;102;102m [0m[38;5;4m|[0m[38;2;102;102;102m [0m[38;5;8m7d [0m[38;5;1m77%[0m[38;2;102;102;102m [0m[38;5;8m…[0m
+  [0m[38;2;150;108;30m⏵⏵ auto mode on[0m[38;2;102;102;102m (shift+tab to cycle) · ← for agents[0m

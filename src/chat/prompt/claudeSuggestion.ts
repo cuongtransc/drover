@@ -12,7 +12,7 @@ const CLAUDE_TIP_RE = /^Try "/;
  * [text, dim, inverse] runs. Only SGR sequences change the state; 38/48 colors are skipped whole,
  * so the 2 of `38;2;r;g;b` is a color mode, not dim. Other escapes are dropped.
  */
-function sgrRuns(line: string): [string, boolean, boolean][] {
+export function sgrRuns(line: string): [string, boolean, boolean][] {
   const runs: [string, boolean, boolean][] = [];
   let dim = false;
   let inverse = false;
