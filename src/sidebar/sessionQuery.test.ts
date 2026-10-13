@@ -19,21 +19,23 @@ describe("queryWords", () => {
 
 describe("matchSession", () => {
   const s = session("dw-xb", [ws("w1", "xbit-vault-engine"), ws("w2", "notes")]);
-  it("keeps the whole Session when the words find its name, its machine or one of its groups", () => {
-    expect(matchSession(dev, s, [], ["xb"])).toBe("all");
-    expect(matchSession(dev, s, [], ["ct-dev"])).toBe("all");
-    expect(matchSession(dev, s, ["Work"], ["work"])).toBe("all");
+  it("keeps the whole Session when the words find its name or one of its groups", () => {
+    expect(matchSession(s, [], ["xb"])).toBe("all");
+    expect(matchSession(s, ["Work"], ["work"])).toBe("all");
   });
   it("keeps only the Workspaces the words find, a word on the Session counting for each", () => {
-    expect(matchSession(dev, s, [], ["vault"])).toEqual(["w1"]);
-    expect(matchSession(dev, s, [], ["dev", "notes"])).toEqual(["w2"]);
+    expect(matchSession(s, [], ["vault"])).toEqual(["w1"]);
+    expect(matchSession(s, [], ["dw", "notes"])).toEqual(["w2"]);
   });
   it("finds nothing when one word matches nowhere", () => {
-    expect(matchSession(dev, s, [], ["xb", "bmf"])).toBeNull();
-    expect(matchSession(local, s, [], ["ct-dev"])).toBeNull();
+    expect(matchSession(s, [], ["xb", "bmf"])).toBeNull();
+  });
+  it("leaves the machine's label to the chips: `ca` does not find every Session on `local`", () => {
+    expect(matchSession(session("w-xb"), [], ["ca"])).toBeNull();
+    expect(matchSession(s, [], ["ct-dev"])).toBeNull();
   });
   it("matches a substring, not a scattered subsequence", () => {
-    expect(matchSession(dev, s, [], ["dxb"])).toBeNull();
+    expect(matchSession(s, [], ["dxb"])).toBeNull();
   });
 });
 
