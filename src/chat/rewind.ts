@@ -168,10 +168,11 @@ export async function runRewind(call: Call, paneId: string, message: string, opt
   }
   await keys("enter");
 
-  // Claude puts the message back in its input box: the Composer takes it from here.
+  // Claude puts the message back in its input box: the Composer takes it from here. Ctrl+C empties
+  // the box whatever its lines; Ctrl+U would clear only the one the cursor is on.
   const restored = await until((s) => (parseRewind(s) === null && boxHolds(s, message) ? true : null), timing.stepMs);
   if (!restored) throw new Error("Rewound, but Claude's input box did not show the message: check the Terminal lens");
-  await keys("ctrl+u");
+  await keys("ctrl+c");
 }
 
 /** Whether Claude's input box (the `❯` line between two rules) starts with `message`. */
