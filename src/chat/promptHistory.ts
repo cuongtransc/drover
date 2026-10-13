@@ -37,9 +37,13 @@ export function withSent(agent: string[], sent: string[]): string[] {
   return out.slice(-HISTORY_MAX);
 }
 
+/** What Claude records as a user message when a turn is stopped; not something the user typed. */
+const INTERRUPTED = new Set(["[Request interrupted by user]", "[Request interrupted by user for tool use]"]);
+
 /** What Up walks, oldest first: the folder's other prompts, then this session's (Claude recalls
  *  the running session's first), then those sent since the session was read. */
-export function recallList(folder: string[], session: string[], sent: string[]): string[] {
+export function recallList(folder: string[], all: string[], sent: string[]): string[] {
+  const session = all.filter((p) => !INTERRUPTED.has(p));
   const inSession = new Set(session);
   return withSent(
     [...folder.filter((p) => !inSession.has(p)), ...session],
