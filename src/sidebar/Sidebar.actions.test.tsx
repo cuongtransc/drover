@@ -11,7 +11,7 @@ import { machineConnect, sessionDelete, sessionRename, sessionsRefresh, sessionS
 import { getFolder, setFolder } from "../workspaces/folder";
 import { useApp } from "../store/app";
 import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "./groups";
-import { useSessionFilter } from "./activeFilter";
+import { useSessionFilter, useShowDefault } from "./activeFilter";
 import { Sidebar } from "./Sidebar";
 import type { MachineView } from "../lib/types";
 
@@ -28,6 +28,8 @@ describe("Sidebar machine actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useSessionFilter.setState({ filter: "all" });
+    // Its fixtures name sessions "default" with no agent, which the sidebar hides unless shown.
+    useShowDefault.setState({ show: true });
   });
   it("offers Retry for the local machine in error", () => {
     set([{ ...local, state: "error", error: { code: "herdr_not_found", message: "herdr was not found" }, sessions: [] }]);

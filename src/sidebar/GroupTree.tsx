@@ -2,7 +2,7 @@ import type { MouseEvent } from "react";
 import { useApp } from "../store/app";
 import { useActions } from "./actions";
 import { addGroup, deleteGroup, renameGroup, useLayout } from "./groups";
-import { useSessionFilter, useSidebarSessions } from "./activeFilter";
+import { useSessionFilter, useSessionQuery, useSidebarSessions } from "./activeFilter";
 import type { RGroup, RNode } from "./groups";
 import { Chevron, SessionRow } from "./Sidebar";
 import { useDragState } from "./dnd";
@@ -20,7 +20,9 @@ function newSessionItem(a: Actions, groupId?: string): MenuItem[] {
 
 function GroupRow({ group }: { group: RGroup }) {
   const key = `group:${group.id}`;
-  const open = useApp((s) => s.expanded[key] ?? true);
+  // Words in the Sessions filter open it while they are there, so what they found shows.
+  const searching = useSessionQuery((s) => s.query.trim() !== "");
+  const open = useApp((s) => s.expanded[key] ?? true) || searching;
   const toggle = useApp((s) => s.toggle);
   const a = useActions();
   const drag = useDragState();
@@ -72,8 +74,17 @@ function Nodes({ nodes }: { nodes: RNode[] }) {
   );
 }
 
+/** An empty tree under the Sessions filter: what it filtered by, so the user knows what to undo. */
+function NoMatch() {
+  const query = useSessionQuery((s) => s.query.trim());
+  const chip = useSessionQuery((s) => s.machine);
+  const label = useApp((s) => (chip ? s.machines[chip]?.label : undefined));
+  const on = label ? ` on ${label}` : "";
+  return <p className="filter-empty">{query ? `No session${on} matches "${query}"` : `No session${on}`}</p>;
+}
+
 export function GroupTree() {
-  const { tree, hidden, active } = useSidebarSessions();
+  const { tree, hidden, active, narrowed } = useSidebarSessions();
   const setFilter = useSessionFilter((s) => s.setFilter);
   const a = useActions();
   const endDnd = useTreeEndDnd();
@@ -95,6 +106,7 @@ export function GroupTree() {
       <ul className="tree section-list">
         {tree.map((n) => (n.kind === "group" ? <GroupRow key={n.id} group={n} /> : <SessionRow key={n.key} node={n} />))}
       </ul>
+      {narrowed && tree.length === 0 && <NoMatch />}
       {active && hidden > 0 && (
         <div className="filter-hidden">
           <span>{hidden} hidden · idle or stopped</span>

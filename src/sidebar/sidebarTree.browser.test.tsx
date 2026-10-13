@@ -18,7 +18,7 @@ const { useApp } = await import("../store/app");
 const { useLayout, sessionKey, projectKey } = await import("./groups");
 const { Sidebar } = await import("./Sidebar");
 const { QuotaStrip } = await import("./QuotaStrip");
-const { useSessionFilter } = await import("./activeFilter");
+const { useSessionFilter, useShowDefault } = await import("./activeFilter");
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,6 +40,8 @@ beforeEach(async () => {
     { kind: "group", id: "g1", label: "Work", children: [{ kind: "session", key: sessionKey("local", "ca") }, { kind: "session", key: sessionKey("local", "ct") }] },
   ] } as never });
   useSessionFilter.setState({ filter: "all" });
+  // The fixture measures rows on a `default` with no agent, which Sessions hides unless shown.
+  useShowDefault.setState({ show: true });
   const app = document.createElement("div");
   app.style.cssText = "display:flex;height:100vh";
   app.innerHTML = '<nav class="sidebar"><div class="sidebar-scroll" id="root"></div><div id="foot"></div></nav><main style="flex:1"></main>';
@@ -97,7 +99,8 @@ it("centres every first glyph at 24 and starts every name at 40, children one st
 });
 
 it("ends the right column 17px from the edge and centres the + over the status dots", () => {
-  for (const el of all(".active-toggle, .machine-chip, .project-word, .quota-val")) near(fromRight(el), 17);
+  // The Sessions filter's machine chips run from the left, as words do.
+  for (const el of all(".active-toggle:not(.machine-chips *), .machine-chip, .project-word, .quota-val")) near(fromRight(el), 17);
   const plus = document.querySelector(".section-action svg")!;
   for (const dot of all("li.machine .dot")) near(centre(plus), centre(dot));
 });
@@ -121,4 +124,16 @@ it("keeps the Active toggle still when switching it changes whether the list scr
   await act(async () => (toggle() as HTMLElement).click());
   expect(scroller.scrollHeight).toBeLessThanOrEqual(scroller.clientHeight);
   expect(toggle().getBoundingClientRect().right).toBe(before);
+});
+
+it("lays the Sessions filter between the columns, three machines' chips on one row", async () => {
+  const dev: MachineView = { ...lan, id: "dev", label: "ct-dev", sessions: [] };
+  await act(async () => useApp.setState({ machines: { local, lan, dev }, order: ["local", "lan", "dev"] } as never));
+  const field = document.querySelector(".session-filter-field")!;
+  near(left(field), 16);
+  near(fromRight(field), 17);
+  const chips = all(".machine-chips .active-toggle");
+  expect(chips.map((c) => c.textContent)).toEqual(["local", "ct-hms-lan", "ct-dev"]);
+  near(left(chips[0]), 16);
+  expect(new Set(chips.map((c) => Math.round(c.getBoundingClientRect().top))).size).toBe(1);
 });

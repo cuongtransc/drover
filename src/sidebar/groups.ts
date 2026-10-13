@@ -536,7 +536,8 @@ export const useLayout = create<LayoutState>((set, get) => ({
   },
 }));
 
-export type RSession = { kind: "session"; key: SessionKey; machine: MachineView; session: SessionView };
+/** `match`: under a Sessions filter that found only some of its Workspaces, their ids (sessionQuery). */
+export type RSession = { kind: "session"; key: SessionKey; machine: MachineView; session: SessionView; match?: string[] };
 /** A bookmarked project joined with its live Session, which is null while the Session is not known. */
 export type RBookmark = { kind: "bookmark"; key: ProjectKey; label: string; sessionName: string; node: RSession | null };
 export type RGroup = { kind: "group"; id: string; label: string; children: RNode[] };
