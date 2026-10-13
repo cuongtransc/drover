@@ -16,6 +16,15 @@ const FRAME = /^[\s▐▛█▜▝▘▀▌▙▟▄▗▖│]+|[\s│]+$/g;
  * reply, so until then the banner is the only place the Model shows.
  */
 export function parseStartupModel(screen: string): string | null {
+  const line = bannerLine(screen);
+  return line ? line.replace(BANNER_EFFORT, "") : null;
+}
+
+// After a non-default `/effort` the banner reads `Opus 5.5 with max effort · Claude Max`.
+const BANNER_EFFORT = / with (\S+) effort$/;
+
+/** The banner's `<model> · <plan>` line, up to the ` · `; null when no banner is on the screen. */
+function bannerLine(screen: string): string | null {
   const lines = screen.split("\n");
   const head = lines.findIndex((l) => /Claude Code v\d/.test(l));
   if (head < 0) return null;
@@ -26,17 +35,41 @@ export function parseStartupModel(screen: string): string | null {
   return null;
 }
 
+/**
+ * The Reasoning effort a new Claude shows before its first reply: the banner's `with <level>
+ * effort`, else the `◐ medium · /effort` line above the message box. Null without a banner, so
+ * a line of a later conversation is not taken for it.
+ */
+export function parseStartupEffort(screen: string): string | null {
+  const line = bannerLine(screen);
+  if (!line) return null;
+  const inBanner = BANNER_EFFORT.exec(line);
+  if (inBanner) return inBanner[1];
+  for (const l of screen.split("\n")) {
+    const m = /^[\s▔]*\S (\w+) · \/effort[\s▔]*$/.exec(l);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 interface ReadResult {
   text?: string;
   read?: { text?: string };
 }
 
-/** Reads the banner's Model off the pane while `armed`, until it shows or the wait runs out. */
-export function useStartupModel(pane: PaneRef, armed: boolean): string | null {
-  const [model, setModel] = useState<string | null>(null);
+export interface StartupMeta {
+  model: string | null;
+  effort: string | null;
+}
+
+const NONE: StartupMeta = { model: null, effort: null };
+
+/** Reads the Model and effort off the pane while `armed`, until both show or the wait runs out. */
+export function useStartupModel(pane: PaneRef, armed: boolean): StartupMeta {
+  const [found, setFound] = useState<StartupMeta>(NONE);
 
   useEffect(() => {
-    setModel(null);
+    setFound(NONE);
     if (!armed) return;
     let live = true;
     let reading = false;
@@ -58,11 +91,11 @@ export function useStartupModel(pane: PaneRef, armed: boolean): string | null {
         .then(
           (r) => {
             if (!live) return;
-            const found = parseStartupModel((r as ReadResult | undefined)?.text ?? (r as ReadResult | undefined)?.read?.text ?? "");
-            if (found) {
-              setModel(found);
-              stop();
-            }
+            const screen = (r as ReadResult | undefined)?.text ?? (r as ReadResult | undefined)?.read?.text ?? "";
+            const model = parseStartupModel(screen);
+            const effort = parseStartupEffort(screen);
+            if (model || effort) setFound((f) => ({ model: model ?? f.model, effort: effort ?? f.effort }));
+            if (model && effort) stop();
           },
           (e) => console.error("pane.read failed", e),
         )
@@ -76,5 +109,5 @@ export function useStartupModel(pane: PaneRef, armed: boolean): string | null {
     return stop;
   }, [armed, pane.machine_id, pane.session, pane.pane_id]);
 
-  return armed ? model : null;
+  return armed ? found : NONE;
 }

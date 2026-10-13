@@ -82,9 +82,12 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const [modelFor, setModelFor] = useState<string | null>(null);
   const picker = usePiModelPicker(pane, modelFor === key && view.agent === "pi", () => setModelFor(null));
   useEffect(() => setModelFor(null), [key]);
-  // Before the first reply the transcript names no Model; Claude's startup banner does.
-  const startupModel = useStartupModel(pane, view.agent === "claude" && !state.meta.model);
-  const meta = startupModel && !state.meta.model ? { ...state.meta, model: startupModel } : state.meta;
+  // Before the first reply the transcript names no Model or effort; Claude's startup screen does.
+  const startup = useStartupModel(pane, view.agent === "claude" && !state.meta.model);
+  const meta =
+    !state.meta.model && (startup.model || startup.effort)
+      ? { ...state.meta, model: startup.model, effort: state.meta.effort ?? startup.effort }
+      : state.meta;
 
   // `known`: where `path` was located, when the caller already knows (kept over what opening returns).
   const open = useCallback(
