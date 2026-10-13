@@ -304,9 +304,12 @@ impl State {
     fn flush(&mut self) {
         if !self.sent_first {
             // Wait until the backlog's bytes have all been read (or, with no usable size,
-            // the stream goes quiet), then send one Reset covering everything.
-            let caught_up = self.size.is_some_and(|s| self.consumed >= s)
-                || self.last_byte.is_some_and(|t| t.elapsed() >= QUIET);
+            // the stream goes quiet), then send one Reset covering everything. A known size
+            // waits for its bytes however long a pause: silence would send part of it.
+            let caught_up = match self.size {
+                Some(s) => self.consumed >= s,
+                None => self.last_byte.is_some_and(|t| t.elapsed() >= QUIET),
+            };
             if !caught_up {
                 return;
             }
@@ -705,6 +708,37 @@ mod tests {
     use super::*;
     use crate::transcript::images::ImageSink;
     use std::sync::{Arc, Mutex};
+    /// Polls `cond` for up to ~10 s: fixed 500 ms waits failed under a busy gate (load 154).
+    async fn wait_for(cond: impl Fn() -> bool) {
+        for _ in 0..334 {
+            if cond() {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(30)).await;
+        }
+        panic!("timed out");
+    }
+    fn any_event(got: &Mutex<Vec<ChatEvent>>) -> bool {
+        !got.lock().unwrap().is_empty()
+    }
+    /// Each event as its kind and size, for a failed assertion.
+    fn summary(got: &Mutex<Vec<ChatEvent>>) -> Vec<String> {
+        got.lock()
+            .unwrap()
+            .iter()
+            .map(|e| match e {
+                ChatEvent::Reset { items, total } => format!("Reset {}/{total}", items.len()),
+                ChatEvent::Append { items } => format!("Append {}", items.len()),
+                other => format!("{other:?}").chars().take(40).collect(),
+            })
+            .collect()
+    }
+    fn any_append(got: &Mutex<Vec<ChatEvent>>) -> bool {
+        got.lock()
+            .unwrap()
+            .iter()
+            .any(|e| matches!(e, ChatEvent::Append { .. }))
+    }
     struct Lines;
     impl Parser for Lines {
         fn push_line(&mut self, line: &str, _images: &mut dyn ImageSink) -> ParserOutput {
@@ -843,7 +877,7 @@ mod tests {
             Box::new(Lines),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        wait_for(|| any_event(&got)).await;
         use std::io::Write;
         std::fs::OpenOptions::new()
             .append(true)
@@ -851,7 +885,7 @@ mod tests {
             .unwrap()
             .write_all(b"c\n")
             .unwrap();
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        wait_for(|| any_append(&got)).await;
         let args = std::fs::read_to_string(&log).unwrap();
         assert_eq!(args.trim(), format!("-c +5 -F {}", p.display()));
         let ev = got.lock().unwrap();
@@ -900,7 +934,7 @@ mod tests {
             "the store is locked during the parse"
         );
         release.send(()).unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        wait_for(|| store.lock().unwrap().get("r").is_some()).await;
         assert_eq!(
             store.lock().unwrap().get("r"),
             Some(("image/png".to_string(), vec![1]))
@@ -920,7 +954,7 @@ mod tests {
             Box::new(MetaLines { model: None }),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        wait_for(|| any_event(&got)).await;
         {
             let ev = got.lock().unwrap();
             assert_eq!(ev.len(), 1, "{ev:?}");
@@ -929,9 +963,11 @@ mod tests {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).open(&p).unwrap();
         writeln!(f, "MODEL m1\nb\nIMG r1").unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        let store = h.images();
+        wait_for(|| store.lock().unwrap().get("r1").is_some()).await;
+        let before = got.lock().unwrap().len();
         writeln!(f, "c").unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+        wait_for(|| got.lock().unwrap().len() > before).await;
         let ev = got.lock().unwrap();
         let metas: Vec<_> = ev
             .iter()
@@ -941,7 +977,6 @@ mod tests {
             })
             .collect();
         assert_eq!(metas, vec![Some("m1".to_string())]);
-        let store = h.images();
         assert_eq!(
             store.lock().unwrap().get("r1"),
             Some(("image/png".to_string(), vec![7, 7]))
@@ -964,7 +999,7 @@ mod tests {
             Box::new(MetaLines { model: None }),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        wait_for(|| got.lock().unwrap().len() >= 2).await;
         let ev = got.lock().unwrap();
         assert!(matches!(ev[0], ChatEvent::Reset { .. }));
         assert!(matches!(&ev[1], ChatEvent::Meta { model: Some(m), .. } if m == "m0"));
@@ -983,11 +1018,16 @@ mod tests {
             Box::new(Lines),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        wait_for(|| any_event(&got)).await;
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new().append(true).open(&p).unwrap();
         f.write_all(b"c\nRESET\n").unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+        wait_for(|| {
+            let ev = got.lock().unwrap();
+            ev.len() > 1
+                && matches!(ev.last(), Some(ChatEvent::Reset { items, .. }) if items.len() == 1)
+        })
+        .await;
         let ev = got.lock().unwrap();
         assert!(matches!(&ev[0], ChatEvent::Reset { items, total: 2 } if items.len() == 2));
         assert!(ev.iter().any(|e| matches!(e, ChatEvent::Append { items } if items == &vec![ChatItem::User { ts: None, text: "c".into(), images: vec![], skills: vec![] }])));
@@ -1058,9 +1098,11 @@ mod tests {
             Box::new(Lines),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        wait_for(|| any_event(&got)).await;
         assert!(
-            matches!(&got.lock().unwrap()[0], ChatEvent::Reset { items, total: 3 } if items[0] == ChatItem::User { ts: None, text: "a".into(), images: vec![], skills: vec![] } && items[2] == ChatItem::User { ts: None, text: "b".into(), images: vec![], skills: vec![] })
+            matches!(&got.lock().unwrap()[0], ChatEvent::Reset { items, total: 3 } if items[0] == ChatItem::User { ts: None, text: "a".into(), images: vec![], skills: vec![] } && items[2] == ChatItem::User { ts: None, text: "b".into(), images: vec![], skills: vec![] }),
+            "{:?}",
+            summary(&got)
         );
     }
     #[tokio::test]
@@ -1079,7 +1121,7 @@ mod tests {
                 Box::new(Lines),
                 Arc::new(move |e| g.lock().unwrap().push(e)),
             );
-            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            wait_for(|| any_event(&got)).await;
             assert!(
                 matches!(&got.lock().unwrap()[0], ChatEvent::Reset { items, total: 0 } if items.is_empty()),
                 "{name}"
@@ -1105,8 +1147,7 @@ mod tests {
             Box::new(Lines),
             Arc::new(|_| {}),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-        assert!(tail_running(&path), "tail should be running");
+        wait_for(|| tail_running(&path)).await;
         drop(h);
         for _ in 0..40 {
             if !tail_running(&path) {
@@ -1129,7 +1170,7 @@ mod tests {
             Box::new(Lines),
             Arc::new(move |e| g.lock().unwrap().push(e)),
         );
-        tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+        wait_for(|| any_event(&got)).await;
         assert!(
             matches!(&got.lock().unwrap()[0], ChatEvent::Reset { items, total: 700 } if items.len() == 500 && items[0] == ChatItem::User { ts: None, text: "m200".into(), images: vec![], skills: vec![] })
         );
@@ -1173,15 +1214,15 @@ mod tests {
             unreachable!()
         }
     }
-    /// Prints a junk first line before the command: the size header is unreadable.
-    struct Junk;
+    /// Runs the command through a shell pipeline `filter` that sees its output on stdin.
+    struct Piped(&'static str);
     #[async_trait::async_trait]
-    impl crate::transport::Transport for Junk {
+    impl crate::transport::Transport for Piped {
         fn wrap(&self, argv: &[String], _tty: bool) -> Vec<String> {
             let mut v: Vec<String> = vec![
                 "sh".into(),
                 "-c".into(),
-                "echo ' junk'; exec \"$@\"".into(),
+                format!("\"$@\" | {{ {}; }}", self.0),
                 "sh".into(),
             ];
             v.extend(argv.iter().cloned());
@@ -1350,9 +1391,9 @@ mod tests {
             let p = d.path().join("t.jsonl");
             std::fs::write(&p, (0..2000).map(|i| format!("m{i}\n")).collect::<String>()).unwrap();
             let (_h, got) = open_with(&p, Fetch { cache: None, codec });
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            wait_for(|| any_event(&got)).await;
             append(&p, b"x\n");
-            tokio::time::sleep(Duration::from_millis(1200)).await;
+            wait_for(|| any_append(&got)).await;
             let ev = got.lock().unwrap();
             assert!(
                 matches!(&ev[0], ChatEvent::Reset { total: 2000, items } if user_text(&items[0]) == "m1500"),
@@ -1439,20 +1480,25 @@ mod tests {
             codec: Codec::Zstd,
         };
         let (h, got) = open_with(&p, fetch());
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        assert!(matches!(
-            &got.lock().unwrap()[0],
-            ChatEvent::Reset { total: 1001, .. }
-        ));
+        wait_for(|| any_event(&got)).await;
+        assert!(
+            matches!(
+                &got.lock().unwrap()[0],
+                ChatEvent::Reset { total: 1001, .. }
+            ),
+            "{:?}",
+            summary(&got)
+        );
         drop(h);
-        assert_eq!(slot.load(), first, "the backlog was cached");
+        // The cache is written off the reader, after the Reset may have gone out.
+        wait_for(|| slot.load() == first).await;
         // Mark the cached copy where the Machine does not check it, so items from it show.
         let mut marked = first.clone();
         marked[0] = b'Q';
         slot.store(&marked).unwrap();
         append(&p, b"c\n");
         let (h, got) = open_with(&p, fetch());
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        wait_for(|| any_event(&got)).await;
         assert!(matches!(
             &got.lock().unwrap()[0],
             ChatEvent::Reset { total: 1002, .. }
@@ -1463,7 +1509,8 @@ mod tests {
             "the backlog did not come from the cache"
         );
         assert_eq!(user_text(&h.page(1002, 1)[0]), "c");
-        assert_eq!(slot.load(), [&marked[..], b"c\n"].concat());
+        let cached = [&marked[..], b"c\n"].concat();
+        wait_for(|| slot.load() == cached).await;
     }
 
     #[tokio::test]
@@ -1482,13 +1529,13 @@ mod tests {
                     codec: Codec::Gzip,
                 },
             );
-            tokio::time::sleep(Duration::from_millis(500)).await;
+            wait_for(|| any_event(&got)).await;
             assert!(matches!(
                 &got.lock().unwrap()[0],
                 ChatEvent::Reset { total: 2, .. }
             ));
             assert_eq!(user_text(&h.page(2, 1)[0]), "b");
-            assert_eq!(slot.load(), b"a\nb\n");
+            wait_for(|| slot.load() == b"a\nb\n").await;
         }
     }
 
@@ -1499,7 +1546,7 @@ mod tests {
         std::fs::write(&p, (0..50).map(|i| format!("m{i}\n")).collect::<String>()).unwrap();
         // Slower than QUIET (1 s in tests): the quiet clock must not run before the first byte.
         let (_h, got) = collect(Arc::new(Slow("1.3")), &p);
-        tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+        wait_for(|| any_event(&got)).await;
         let ev = got.lock().unwrap();
         assert!(
             matches!(&ev[0], ChatEvent::Reset { total: 50, .. }),
@@ -1517,11 +1564,12 @@ mod tests {
         let p = d.path().join("t.jsonl");
         std::fs::write(&p, "a\nb").unwrap();
         let (_h, got) = collect(Arc::new(crate::transport::local::LocalTransport), &p);
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        assert!(matches!(
-            &got.lock().unwrap()[0],
-            ChatEvent::Reset { total: 1, .. }
-        ));
+        wait_for(|| any_event(&got)).await;
+        assert!(
+            matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 1, .. }),
+            "{:?}",
+            summary(&got)
+        );
         use std::io::Write;
         std::fs::OpenOptions::new()
             .append(true)
@@ -1529,7 +1577,7 @@ mod tests {
             .unwrap()
             .write_all(b"\n")
             .unwrap();
-        tokio::time::sleep(std::time::Duration::from_millis(1200)).await;
+        wait_for(|| any_append(&got)).await;
         let ev = got.lock().unwrap();
         assert!(
             ev.iter()
@@ -1539,18 +1587,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_pause_after_the_header_still_sends_the_whole_backlog_as_one_reset() {
+        let d = tempfile::tempdir().unwrap();
+        let p = d.path().join("t.jsonl");
+        std::fs::write(&p, "a\nb\nc\n").unwrap();
+        // Longer than QUIET (1 s in tests) between the header and the backlog, as a busy Machine
+        // or a slow decode makes it: the size is known, so silence must not end the backlog.
+        let pause = Piped("IFS= read -r h; printf '%s\\n' \"$h\"; sleep 1.5; exec cat");
+        let (_h, got) = collect(Arc::new(pause), &p);
+        wait_for(|| any_event(&got)).await;
+        assert!(
+            matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 3, .. }),
+            "{:?}",
+            summary(&got)
+        );
+    }
+
+    #[test]
+    fn silence_ends_the_first_backlog_only_when_its_size_is_unknown() {
+        for (size, ends) in [(Some(100), false), (None, true)] {
+            let mut st = state(Box::new(Lines));
+            st.size = size;
+            st.consumed = 10;
+            st.last_byte = Some(Instant::now() - QUIET * 2);
+            st.flush();
+            assert_eq!(st.sent_first, ends, "size {size:?}");
+        }
+    }
+
+    #[tokio::test]
     async fn an_unreadable_header_falls_back_to_quiet() {
         let d = tempfile::tempdir().unwrap();
         let p = d.path().join("t.jsonl");
         std::fs::write(&p, "a\n").unwrap();
-        let (_h, got) = collect(Arc::new(Junk), &p);
+        // A junk first line, so the size header is unreadable. Printed once the script's own
+        // output arrives: a slow start must not count as silence.
+        let junk = Piped("IFS= read -r h; echo ' junk'; printf '%s\\n' \"$h\"; exec cat");
+        let (_h, got) = collect(Arc::new(junk), &p);
         tokio::time::sleep(std::time::Duration::from_millis(600)).await;
         assert!(got.lock().unwrap().is_empty(), "sent before QUIET");
-        tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+        wait_for(|| any_event(&got)).await;
         // The real size line becomes an item: only the quiet rule could have sent this Reset.
-        assert!(matches!(
-            &got.lock().unwrap()[0],
-            ChatEvent::Reset { total: 2, .. }
-        ));
+        assert!(
+            matches!(&got.lock().unwrap()[0], ChatEvent::Reset { total: 2, .. }),
+            "{:?}",
+            summary(&got)
+        );
     }
 }
