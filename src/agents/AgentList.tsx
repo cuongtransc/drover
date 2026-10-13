@@ -12,7 +12,7 @@ import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
 import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ArchiveIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
 import { firstWorkspaceFolder, folderName, suggestFolder, useFolder } from "../workspaces/folder";
-import { saveWorkspaceFolder } from "../workspaces/keptActions";
+import { beginWorkspaceRename, endWorkspaceRename, saveWorkspaceFolder } from "../workspaces/keptActions";
 import { forgetKept, projectKey, renameProjectKey, setKept, useLayout } from "../sidebar/groups";
 import { ClosedSection } from "./ClosedSection";
 import { AgentIcon } from "./AgentIcon";
@@ -363,7 +363,16 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
         })),
         { label: "Browse files", icon: FolderOpenIcon, onSelect: browse },
         { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(machineId, folder ?? suggestFolder(ws), (path) => saveWorkspaceFolder(ref, ws.label, path)) },
-        { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })().then(() => useLayout.getState().update((l) => renameProjectKey(l, projectKey(machineId, session, ws.label), projectKey(machineId, session, label))))) },
+        { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => {
+          const from = projectKey(machineId, session, ws.label);
+          const to = projectKey(machineId, session, label);
+          // Neither key may read as closed or reopen until herdr accepted the rename and the layout moved;
+          // a rejection leaves the layout as it is.
+          beginWorkspaceRename(from, to);
+          return call("workspace.rename", { workspace_id: ws.workspace_id, label })()
+            .then(() => useLayout.getState().update((l) => renameProjectKey(l, from, to)))
+            .finally(() => endWorkspaceRename(from, to));
+        }) },
         {
           label: "Keep when closed",
           icon: ArchiveIcon,

@@ -13,7 +13,7 @@ import { useApp } from "../store/app";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import { EMPTY_LAYOUT, projectKey, setBookmarked, setKept, useLayout } from "../sidebar/groups";
 import { setFolder } from "../workspaces/folder";
-import { resetReopenPending } from "../workspaces/keptActions";
+import { isReopenPending, resetReopenPending } from "../workspaces/keptActions";
 import { AgentList, workspaceGroups } from "./AgentList";
 import { ClosedSection } from "./ClosedSection";
 import { Sidebar } from "../sidebar/Sidebar";
@@ -763,6 +763,50 @@ describe("AgentList", () => {
     await act(async () => done({}));
     expect(useLayout.getState().layout.kept).toEqual({ [keyOf("web-2")]: { folder: "/c/web" } });
     expect(useLayout.getState().layout.bookmarks).toEqual([keyOf("web-2")]);
+  });
+
+  const renameWeb = () => {
+    fireEvent.contextMenu(screen.getAllByRole("group", { name: "web" })[0].querySelector(".ws-head")!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename workspace…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "web-2" } });
+    act(() => fireEvent.click(screen.getByRole("button", { name: "Rename" })));
+  };
+
+  it("does not read the old label as closed, or reopen it, while a snapshot with the new label beats the rename", async () => {
+    useLayout.setState({ layout: setBookmarked(setKept(EMPTY_LAYOUT, keyOf("web"), "/c/web"), keyOf("web"), true) });
+    useApp.setState({ expanded: { "closed:local/default": true } });
+    render(<><AgentList /><Sidebar /></>);
+    let done!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockImplementation(() => new Promise((r) => (done = r)));
+    renameWeb();
+    const renamed = structuredClone(m);
+    renamed.sessions[0].workspaces[1].label = "web-2";
+    act(() => useApp.setState({ machines: { local: renamed } }));
+    expect(screen.queryByRole("region", { name: "Closed" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "web, default, closed" }));
+    expect(vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "workspace.create")).toHaveLength(0);
+    await act(async () => done({}));
+    expect(useLayout.getState().layout.kept).toEqual({ [keyOf("web-2")]: { folder: "/c/web" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([keyOf("web-2")]);
+    expect(isReopenPending(keyOf("web"))).toBe(false);
+    expect(isReopenPending(keyOf("web-2"))).toBe(false);
+  });
+
+  it("leaves the layout untouched, clears the guard and shows the error when the rename is rejected", async () => {
+    const before = setBookmarked(setKept(EMPTY_LAYOUT, keyOf("web"), "/c/web"), keyOf("web"), true);
+    useLayout.setState({ layout: before });
+    render(<AgentList />);
+    vi.mocked(herdrCall).mockRejectedValue({ message: "workspace web-2 already exists" });
+    renameWeb();
+    expect((await screen.findByRole("alert")).textContent).toContain("already exists");
+    expect(useLayout.getState().layout).toBe(before);
+    expect(isReopenPending(keyOf("web"))).toBe(false);
+    expect(isReopenPending(keyOf("web-2"))).toBe(false);
+    // A closed web is reopenable again once the guard is gone.
+    const gone = structuredClone(m);
+    gone.sessions[0].workspaces.splice(1, 1);
+    act(() => useApp.setState({ machines: { local: gone } }));
+    expect(screen.getByRole("region", { name: "Closed" })).toBeTruthy();
   });
 });
 

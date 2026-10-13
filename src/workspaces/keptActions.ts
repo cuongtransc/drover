@@ -25,6 +25,11 @@ interface Settling {
   timer: ReturnType<typeof setTimeout>;
 }
 const settling = new Map<ProjectKey, Settling>();
+// A Workspace rename migrates the kept entry only once herdr accepted it, but a snapshot with the new
+// label can land first. While a rename is in flight neither key reads as closed or reopens (refcounted, as
+// the Session rename is in store/app.ts).
+const renaming = new Map<ProjectKey, number>();
+let renameVersion = 0;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 const subscribe = (l: () => void) => {
@@ -34,7 +39,33 @@ const subscribe = (l: () => void) => {
   };
 };
 
-const isPending = (key: ProjectKey) => pending.has(key) || settling.has(key);
+const isPending = (key: ProjectKey) => pending.has(key) || settling.has(key) || renaming.has(key);
+
+/** True while a rename of a Workspace to or from this key is in flight. */
+export function isRenaming(key: ProjectKey): boolean {
+  return renaming.has(key);
+}
+
+/** Re-renders on every change of what is renaming, for readers that filter a list by `isRenaming`. */
+export function useRenameVersion(): number {
+  return useSyncExternalStore(subscribe, () => renameVersion);
+}
+
+export function beginWorkspaceRename(from: ProjectKey, to: ProjectKey): void {
+  for (const k of [from, to]) renaming.set(k, (renaming.get(k) ?? 0) + 1);
+  renameVersion++;
+  notify();
+}
+
+export function endWorkspaceRename(from: ProjectKey, to: ProjectKey): void {
+  for (const k of [from, to]) {
+    const left = (renaming.get(k) ?? 0) - 1;
+    if (left > 0) renaming.set(k, left);
+    else renaming.delete(k);
+  }
+  renameVersion++;
+  notify();
+}
 
 export function isReopenPending(key: ProjectKey): boolean {
   return isPending(key);
@@ -67,6 +98,8 @@ export function resetReopenPending(): void {
   pending.clear();
   for (const s of settling.values()) clearTimeout(s.timer);
   settling.clear();
+  renaming.clear();
+  renameVersion++;
   notify();
 }
 
