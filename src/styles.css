@@ -302,6 +302,8 @@ kbd {
   color: var(--fg); font: inherit; font-size: var(--fs-s);
 }
 .session-filter-field input::placeholder { color: var(--fg-3); }
+/* The field draws the ring (:focus-within); the global :focus-visible ring on the input would draw a second. */
+.session-filter-field input:focus-visible { box-shadow: none; }
 .session-filter-field input::-webkit-search-cancel-button { display: none; }
 .session-filter-clear {
   flex: none; margin: 0 5px; padding: 0 5px; border: 1px solid var(--line-2); border-radius: 4px; background: none;
