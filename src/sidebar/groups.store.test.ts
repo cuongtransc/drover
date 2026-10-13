@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EMPTY_LAYOUT, LAYOUT_KEY, initLayout, loadLayout, projectKey, resolve, sessionKey, useLayout } from "./groups";
+import { EMPTY_LAYOUT, LAYOUT_KEY, initLayout, loadLayout, projectKey, resolve, sessionKey, setKept, useLayout } from "./groups";
 import type { RNode } from "./groups";
 import type { MachineView, SessionView } from "../lib/types";
 
@@ -103,8 +103,8 @@ describe("layout file", () => {
     await flush();
     expect(f.save).not.toHaveBeenCalled();
   });
-  it("reads kept workspaces, drops malformed entries, and saves unknown fields back", async () => {
-    const f = io({ ...l, kept: { "local/x/app": { folder: "/a" }, "local/x/b": { folder: null }, "local/x/c": { folder: 3 }, bad: "no" }, future: { v: 2 } });
+  it("reads kept workspaces and saves unknown fields back", async () => {
+    const f = io({ ...l, kept: { "local/x/app": { folder: "/a" }, "local/x/b": { folder: null }, bad: "no" }, future: { v: 2 } });
     await initLayout(f);
     expect(useLayout.getState().layout.kept).toEqual({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } });
     useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
@@ -112,6 +112,37 @@ describe("layout file", () => {
     expect(f.save).toHaveBeenCalledWith(
       expect.objectContaining({ future: { v: 2 }, kept: expect.objectContaining({ "local/x/app": { folder: "/a" }, "local/x/b": { folder: null } }) }),
     );
+  });
+  it("writes back kept entries of a shape this build does not understand, and no reader sees them", async () => {
+    const odd = { "local/x/c": { folder: 3 }, "local/x/d": { tint: "blue" }, "local/x/e": "no", "local/x/f": null, "local/x/g": ["/a"] };
+    const f = io({ ...l, kept: { "local/x/app": { folder: "/a" }, ...odd } });
+    await initLayout(f);
+    expect(useLayout.getState().layout.kept).toEqual({ "local/x/app": { folder: "/a" } });
+    useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ kept: { "local/x/app": { folder: "/a" }, ...odd } }));
+  });
+  it("lets this build's own entry replace an unreadable one at the same key", async () => {
+    const f = io({ ...l, kept: { "local/x/c": { folder: 3 } } });
+    await initLayout(f);
+    useLayout.getState().update((x) => setKept(x, "local/x/c", "/n"));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ kept: { "local/x/c": { folder: "/n" } } }));
+  });
+  it.each([["a string", "later"], ["an array", [1]], ["null", null]])("writes back a kept value that is %s while nothing is kept", async (_n, raw) => {
+    const f = io({ ...l, kept: raw });
+    await initLayout(f);
+    expect(useLayout.getState().layout.kept).toEqual({});
+    useLayout.getState().update((x) => ({ ...x, bookmarks: [] }));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ kept: raw }));
+  });
+  it("replaces a kept value that is not an object once this build keeps a Workspace", async () => {
+    const f = io({ ...l, kept: "later" });
+    await initLayout(f);
+    useLayout.getState().update((x) => setKept(x, "local/x/app", "/a"));
+    await flush();
+    expect(f.save).toHaveBeenCalledWith(expect.objectContaining({ kept: { "local/x/app": { folder: "/a" } } }));
   });
   it("drops kept keys with undecodable session or label components on load", async () => {
     await initLayout(io({ ...l, kept: { "local/ct/%": { folder: "/a" }, "local/%/ok": { folder: "/b" } } }));

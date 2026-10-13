@@ -36,6 +36,10 @@ export interface Layout {
   /** Workspaces to remember once they close, by ProjectKey. A build that does not know a field here
    *  still saves it back (ADR 0008). */
   kept?: Record<ProjectKey, KeptEntry>;
+  /** What the file held under `kept` that this build cannot read: the entries of an unknown shape (an
+   *  object by key), or the whole value when it is not an object. No reader looks at it; `fileLayout`
+   *  writes it back (ADR 0008). */
+  keptUnread?: unknown;
 }
 
 export const EMPTY_LAYOUT: Layout = { tree: [], bookmarks: [] };
@@ -394,9 +398,11 @@ export const LAYOUT_KEY = "drover:sidebar-layout";
 
 // Session bookmarks from before ADR 0006 are dropped on read; the next change saves the layout without them.
 // Kept entries naming something that is not a project, or with no folder, are dropped the same way.
-function parseKept(v: unknown): Record<ProjectKey, KeptEntry> | undefined {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+function parseKept(v: unknown): { kept?: Record<ProjectKey, KeptEntry>; unread?: unknown } {
+  if (v === undefined) return {};
+  if (!v || typeof v !== "object" || Array.isArray(v)) return { unread: v };
   const out: Record<ProjectKey, KeptEntry> = {};
+  const unread: Record<string, unknown> = {};
   for (const [k, entry] of Object.entries(v as Record<string, unknown>)) {
     if (!isProjectKey(k)) continue;
     const parts = k.split("/");
@@ -406,26 +412,46 @@ function parseKept(v: unknown): Record<ProjectKey, KeptEntry> | undefined {
     } catch {
       continue;
     }
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-    const { folder } = entry as { folder?: unknown };
-    if (typeof folder !== "string" && folder !== null) continue;
+    const folder = entry && typeof entry === "object" && !Array.isArray(entry) ? (entry as { folder?: unknown }).folder : undefined;
+    if (typeof folder !== "string" && folder !== null) {
+      // A shape this build does not understand is kept aside, not read, and written back as it was.
+      unread[k] = entry;
+      continue;
+    }
     // Copy the entry, so fields this build does not know are written back unchanged (ADR 0008).
     out[k] = { ...(entry as Record<string, unknown>), folder } as KeptEntry;
   }
-  return out;
+  return { kept: out, ...(Object.keys(unread).length ? { unread } : {}) };
+}
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * The layout as the file holds it: `keptUnread` goes back under `kept`. An entry this build now keeps
+ * replaces an unreadable one at the same key, and a `kept` value that is not an object is replaced once
+ * this build keeps a Workspace (it must write an object then); until then it is written back as it was.
+ */
+function fileLayout(l: Layout): Layout {
+  const { keptUnread, ...rest } = l;
+  if (keptUnread === undefined) return l;
+  const kept = l.kept ?? {};
+  if (isPlainObject(keptUnread)) return { ...rest, kept: { ...keptUnread, ...kept } as Record<ProjectKey, KeptEntry> };
+  return Object.keys(kept).length === 0 ? ({ ...rest, kept: keptUnread } as unknown as Layout) : { ...rest, kept };
 }
 
 function parseLayout(v: unknown): Layout | null {
   const p = v as Partial<Layout> | null;
   if (!p || !Array.isArray(p.tree) || !Array.isArray(p.bookmarks)) return null;
   // `rest` keeps fields this build does not know, so the next save writes them back.
-  const { kept: raw, ...rest } = p;
+  const { kept: raw, keptUnread: _ignored, ...rest } = p;
+  const { kept, unread } = parseKept(raw);
   return {
     ...rest,
     tree: p.tree,
     bookmarks: p.bookmarks.filter(isProjectKey),
     // A missing or malformed field reads as `{}` (the spec's rule), never as absent.
-    kept: parseKept(raw) ?? {},
+    kept: kept ?? {},
+    ...(unread !== undefined ? { keptUnread: unread } : {}),
   };
 }
 
@@ -472,7 +498,7 @@ export async function initLayout(io: LayoutIO): Promise<void> {
   // Each write settles to whether it succeeded, so the queue never rejects.
   const write = (l: Layout) =>
     (queue = queue.then(() =>
-      io.save(l).then(
+      io.save(fileLayout(l)).then(
         () => true,
         (e) => {
           console.error("cannot save the sidebar layout", e);

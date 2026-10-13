@@ -4,7 +4,7 @@ import { useActions } from "../sidebar/actions";
 import { forgetKept, setKept, useLayout } from "../sidebar/groups";
 import { closedKept } from "../workspaces/kept";
 import type { ClosedKept } from "../workspaces/kept";
-import { isReopenPending, reopenKept, useReopenPending } from "../workspaces/keptActions";
+import { isReopenPending, isRenaming, reopenKept, useRenameVersion, useReopenPending } from "../workspaces/keptActions";
 import { folderName } from "../workspaces/folder";
 import { ChevronIcon, FolderOpenIcon, TerminalIcon, TrashIcon } from "../ui/icons";
 import type { MenuItem } from "../sidebar/ContextMenu";
@@ -21,8 +21,10 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
   const foldKey = `closed:${machineId}/${session.name}`;
   const open = useApp((s) => s.expanded[foldKey] ?? false);
   const toggle = useApp((s) => s.toggle);
+  useRenameVersion();
   if (!machine) return null;
-  const closed = closedKept(layout, machine, session);
+  // A key whose Workspace is being renamed is not closed: the snapshot may already carry the new label.
+  const closed = closedKept(layout, machine, session).filter((c) => !isRenaming(c.key));
   if (closed.length === 0) return null;
   const reopen = (c: ClosedKept) => {
     if (isReopenPending(c.key)) return;
