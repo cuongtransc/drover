@@ -41,17 +41,20 @@ pub struct ClaudeParser {
     prompts: HashMap<String, usize>,
     /// The `parentUuid` of the user line being parsed.
     line_parent: Option<String>,
+    /// Every call shown as a background task, for the corpus audit.
+    #[cfg(test)]
+    tracked: std::collections::HashSet<String>,
 }
 
 /// Most unfinished calls and ended task ids kept; the oldest are forgotten past it.
 const TRACKED_MAX: usize = 512;
 
-/// The id after `marker` in a start result, up to whitespace, `.`, `,` or `"`.
+/// The id after `marker` in a start result, up to whitespace, `.`, `,`, `"` or `)`.
 fn id_after(output: &str, marker: &str) -> Option<String> {
     let rest = output[output.find(marker)? + marker.len()..].trim_start();
     let id: String = rest
         .chars()
-        .take_while(|c| !c.is_whitespace() && !matches!(c, '.' | ',' | '"'))
+        .take_while(|c| !c.is_whitespace() && !matches!(c, '.' | ',' | '"' | ')'))
         .collect();
     (!id.is_empty()).then_some(id)
 }
@@ -60,9 +63,11 @@ fn id_after(output: &str, marker: &str) -> Option<String> {
 /// a Workflow's summary. `None` when the call ran in the foreground.
 fn background_start(tool: &str, output: &str) -> Option<(Option<String>, Option<String>)> {
     match tool {
-        "Bash" => output
-            .starts_with("Command running in background with ID:")
-            .then(|| (id_after(output, "ID:"), None)),
+        "Bash" => (output.starts_with("Command running in background with ID:")
+            // A foreground command the CLI moved to the background at its timeout.
+            || (output.starts_with("Command did not complete within")
+                && output.contains("moved to the background")))
+        .then(|| (id_after(output, "ID:"), None)),
         "Agent" => output
             .starts_with("Async agent launched")
             .then(|| (id_after(output, "agentId:"), None)),
@@ -89,8 +94,10 @@ fn background_start(tool: &str, output: &str) -> Option<(Option<String>, Option<
                 return Some((Some(id.to_string()), None));
             }
             let message = v.get("message").and_then(Value::as_str)?;
+            // "resumed from transcript in the background with your message", or
+            // "was stopped (completed); resumed it in the background with your message".
             message
-                .contains("resumed from transcript in the background")
+                .contains("in the background with your message")
                 .then(|| (id_after(message, "Agent \""), None))
         }
         _ => None,
@@ -614,6 +621,8 @@ impl ClaudeParser {
                                         }
                                         self.task_ids.insert(call_id.clone(), id);
                                     }
+                                    #[cfg(test)]
+                                    self.tracked.insert(call_id.clone());
                                     self.background.push(BackgroundTask {
                                         call_id: call_id.clone(),
                                         kind,
@@ -1893,6 +1902,32 @@ mod tests {
     }
 
     #[test]
+    fn a_message_to_a_stopped_agent_runs_it_again() {
+        let resumed = serde_json::json!({"success":true,"message":format!("Agent \"{AGENT_ID}\" was stopped (completed); resumed it in the background with your message. You'll be notified when it finishes.")}).to_string();
+        let (_, _, p) = run_with(
+            &[finished_agent(), send_message("s1", AGENT_ID, &resumed)]
+                .concat()
+                .join("\n"),
+        );
+        assert_eq!(p.task_ids.get("s1").map(String::as_str), Some(AGENT_ID));
+    }
+
+    #[test]
+    fn a_command_moved_to_the_background_at_its_timeout_runs_until_its_notification() {
+        let (_, _, mut p) = run_with(
+            &[
+                bash_call("t1", false, Some("Scan transcripts")),
+                tool_result("t1", "Command did not complete within its 120s timeout and was moved to the background (ID: b11v20olc). Output is being written to: /tmp/b11v20olc.output. You will be notified when it completes.", false),
+            ]
+            .join("\n"),
+        );
+        assert_eq!(p.task_ids.get("t1").map(String::as_str), Some("b11v20olc"));
+        assert_eq!(p.meta().background[0].description, "Scan transcripts");
+        push(&mut p, &notification("t1", "completed", None));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
     fn a_message_to_a_running_agent_or_a_teammate_starts_nothing() {
         let queued = serde_json::json!({"success":true,"message":format!("Message queued for delivery to {AGENT_ID} at its next tool round.")}).to_string();
         let inbox =
@@ -2108,7 +2143,9 @@ mod tests {
     }
 
     /// Runs the parser over real transcripts and prints every task still running at
-    /// the end, to find a notification shape it misses. `LIST` names one file per line:
+    /// the end (`LEFT`), to find an end shape it misses, and every call the CLI reports
+    /// on in a notification that was never shown as a task (`UNTRACKED`), to find a
+    /// start it misses: a new tool that runs in the background. `LIST` names one file per line:
     /// `find ~/.claude/projects -name '*.jsonl' -mtime -14 > /tmp/list`, then
     /// `LIST=/tmp/list cargo test --release --lib audit_background -- --ignored --nocapture`.
     /// A task whose session is still open is running for real.
@@ -2126,6 +2163,35 @@ mod tests {
             for t in p.meta().background {
                 let task = p.task_ids.get(&t.call_id).cloned().unwrap_or_default();
                 println!("LEFT\t{file}\t{}\t{task}\t{}", t.call_id, t.description);
+            }
+            let mut tools = HashMap::new();
+            let mut notified = vec![];
+            for line in text.lines() {
+                let Ok(v) = serde_json::from_str::<Value>(line) else {
+                    continue;
+                };
+                if let Some(Value::Array(blocks)) = v.pointer("/message/content") {
+                    for b in blocks {
+                        if let (Some(id), Some(name)) = (
+                            b.get("id").and_then(Value::as_str),
+                            b.get("name").and_then(Value::as_str),
+                        ) {
+                            tools.insert(id.to_string(), name.to_string());
+                        }
+                    }
+                }
+                if line.contains("<task-notification>") {
+                    let text = line.replace("\\n", "\n");
+                    notified.extend(tags(&text, "tool-use-id").into_iter().map(str::to_string));
+                }
+            }
+            notified.sort();
+            notified.dedup();
+            for call in notified {
+                // A call from another transcript (a resumed session) cannot be judged here.
+                if let Some(tool) = tools.get(&call).filter(|_| !p.tracked.contains(&call)) {
+                    println!("UNTRACKED\t{file}\t{call}\t{tool}");
+                }
             }
         }
     }
