@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_LAYOUT, projectKey, setBookmarked, setKept } from "../sidebar/groups";
+import { EMPTY_LAYOUT, LAYOUT_KEY, loadLayout, projectKey, setBookmarked, setKept } from "../sidebar/groups";
 import type { MachineView, SessionView, WorkspaceView } from "../lib/types";
 import { backfillKept, closedKept } from "./kept";
 
@@ -21,6 +21,16 @@ describe("closedKept", () => {
       { key: k("agent"), label: "agent", folder: null },
       { key: k("zeta"), label: "zeta", folder: "/z" },
     ]);
+  });
+  it("ignores kept entries of a shape this build does not understand", () => {
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify({
+      tree: [], bookmarks: [],
+      kept: { [k("agent")]: { folder: "/a" }, [k("odd")]: { folder: 3 }, [k("noFolder")]: { tint: "blue" }, [k("str")]: "no" },
+    }));
+    const loaded = loadLayout();
+    const s = session("ct", true, ws("w1", "infra"));
+    expect(closedKept(loaded, machine("connected", s), s).map((c) => c.label)).toEqual(["agent"]);
+    localStorage.clear();
   });
   it("counts a label two live workspaces share as live", () => {
     const s = session("ct", true, ws("w1", "zeta"), ws("w2", "zeta"), ws("w3", "agent"));
