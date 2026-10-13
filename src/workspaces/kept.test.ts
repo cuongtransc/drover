@@ -32,14 +32,22 @@ describe("closedKept", () => {
     const s = session("ct", true);
     expect(closedKept(layout, machine("probing", s), s)).toEqual([]);
   });
-  it("handles a malformed label defensively even without parsing", () => {
+  it("lists nothing for a running Session whose first view has not arrived (no workspaces yet)", () => {
     const s = session("ct", true);
+    expect(closedKept(layout, machine("connected", s), s)).toEqual([]);
+  });
+  it("lists nothing for a Session with an error", () => {
+    const s = { ...session("ct", true, ws("w1", "infra")), error: { code: "io", message: "boom" } };
+    expect(closedKept(layout, machine("connected", s), s)).toEqual([]);
+  });
+  it("handles a malformed label defensively even without parsing", () => {
+    const s = session("ct", true, ws("w1", "infra"));
     expect(closedKept({ ...EMPTY_LAYOUT, kept: { "local/ct/%": { folder: "/a" } } }, machine("connected", s), s)).toEqual([
       { key: "local/ct/%", label: "%", folder: "/a" },
     ]);
   });
   it("lists nothing without kept workspaces", () => {
-    const s = session("ct", true);
+    const s = session("ct", true, ws("w1", "infra"));
     expect(closedKept(EMPTY_LAYOUT, machine("connected", s), s)).toEqual([]);
   });
 });

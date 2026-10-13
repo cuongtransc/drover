@@ -106,7 +106,11 @@ export function suggestFolder(ws: WorkspaceView): string {
   return "";
 }
 
-function isSnapshot(session: SessionView): boolean {
+/**
+ * A running herdr Session always has at least one Workspace, so an empty list means its
+ * first watcher view has not arrived: only this shape is an authoritative snapshot.
+ */
+export function isSnapshot(session: SessionView): boolean {
   return session.running && !session.error && session.workspaces.length > 0;
 }
 

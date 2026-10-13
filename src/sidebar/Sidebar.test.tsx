@@ -314,6 +314,18 @@ describe("Sidebar", () => {
     release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
     await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
   });
+  it("does not reopen a kept Bookmark whose running Session has no snapshot yet", () => {
+    // machines.rs reports workspaces: [] for a running Session until its first watcher view arrives.
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    const unknown = structuredClone(m);
+    unknown.sessions[0].workspaces = [];
+    useApp.setState({ machines: { box: unknown } });
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" });
+    fireEvent.click(closed);
+    expect(herdrCall).not.toHaveBeenCalled();
+  });
   it("reopens a closed kept Bookmark once when it is double clicked", async () => {
     const key = projectKey("box", "default", "old");
     useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });

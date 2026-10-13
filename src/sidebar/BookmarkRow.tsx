@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import { useApp } from "../store/app";
 import { CheckIcon, StarOffIcon } from "../ui/icons";
+import { isSnapshot } from "../workspaces/folder";
 import { reopenKept, useReopenPending } from "../workspaces/keptActions";
 import { useActions } from "./actions";
 import { useViewOrigin } from "./activeFilter";
@@ -46,7 +47,7 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
   const pending = useReopenPending(b.key);
   const open = () => {
     // A closed Bookmark whose Workspace is kept opens it again in the folder it was kept with (ADR 0008).
-    if (!row && kept && node && node.machine.state === "connected" && node.session.running) {
+    if (!row && kept && node && node.machine.state === "connected" && isSnapshot(node.session)) {
       if (pending) return;
       setOrigin("bookmarks");
       a?.guard(() => reopenKept(node.machine.id, node.session.name, { key: b.key, label: b.label, folder: kept.folder }));

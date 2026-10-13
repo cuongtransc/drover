@@ -1,8 +1,9 @@
 // Pure derivation of the kept Workspaces a Session has closed, and the backfill that
-// keeps a Bookmarked live Workspace. Imports only types and groups.ts: anything that
+// keeps a Bookmarked live Workspace. Imports only types, groups.ts and folder.ts: anything that
 // calls herdr or the store lives in keptActions.ts.
 
 import type { MachineView, SessionView, WorkspaceView } from "../lib/types";
+import { isSnapshot } from "./folder";
 import { projectKey, sessionKey, setKept, type Layout, type ProjectKey } from "../sidebar/groups";
 
 /** A kept Workspace of a Session that no live Workspace carries. */
@@ -24,11 +25,11 @@ const labelOf = (key: ProjectKey): string => {
 
 /**
  * The kept Workspaces of `session` no live Workspace carries, by label. Empty unless
- * both the Machine is connected and the Session is running, so a stale view never
- * reports a live Workspace as closed.
+ * the Machine is connected and the Session is a snapshot (running, no error, at least one
+ * Workspace), so a view that has not arrived yet never reports a live Workspace as closed.
  */
 export function closedKept(layout: Layout, machine: MachineView, session: SessionView): ClosedKept[] {
-  if (machine.state !== "connected" || !session.running) return [];
+  if (machine.state !== "connected" || !isSnapshot(session)) return [];
   const prefix = sessionKey(machine.id, session.name) + "/";
   const live = new Set(session.workspaces.map((w) => w.label));
   const out: ClosedKept[] = [];
