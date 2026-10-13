@@ -8,7 +8,7 @@ import { useApp } from "../store/app";
 import type { MachineView } from "../lib/types";
 
 it("fits a long closed workspace's label and folder beside its Reopen button at the default column width, light and dark", async () => {
-  const session = { name: "ct", running: true, status: "idle" as const, error: null, workspaces: [] };
+  const session = { name: "ct", running: true, status: "idle" as const, error: null, workspaces: [{ workspace_id: "w1", label: "live", number: 1, status: "idle" as const, tabs: [] }] };
   const machine: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [session] };
   useApp.setState({ machines: { local: machine }, order: ["local"], expanded: { "closed:local/ct": true } });
   const label = "ct-smarthomes-and-a-very-long-name";
