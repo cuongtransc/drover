@@ -612,7 +612,7 @@ describe("AgentList", () => {
   });
 
   const keyOf = (label: string) => projectKey("local", "default", label);
-  const closed = () => screen.getByRole("region", { name: "Closed" });
+  const closed = () => screen.getByRole("region", { name: "Closed workspaces" });
   const keep = (...labels: string[]) =>
     useLayout.setState({ layout: labels.reduce((l, x) => setKept(l, keyOf(x), "/c/" + x), EMPTY_LAYOUT) });
 
@@ -621,7 +621,7 @@ describe("AgentList", () => {
     render(<AgentList />);
     const toggle = within(closed()).getByRole("button", { name: /Closed/ });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    expect(toggle.textContent).toBe("Closed2");
+    expect(toggle.textContent).toBe("Closed workspaces2");
     expect(within(closed()).queryByText("agent", { selector: ".closed-label" })).toBeNull();
     expect(screen.getByRole("button", { name: "Active 3" })).toBeTruthy();
     fireEvent.click(toggle);
@@ -635,7 +635,7 @@ describe("AgentList", () => {
   it("shows no Closed section without closed kept workspaces", () => {
     keep("web");
     render(<AgentList />);
-    expect(screen.queryByRole("region", { name: "Closed" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Closed workspaces" })).toBeNull();
   });
 
   it("reopens a closed workspace once, however often it is clicked", async () => {
@@ -782,7 +782,7 @@ describe("AgentList", () => {
     const renamed = structuredClone(m);
     renamed.sessions[0].workspaces[1].label = "web-2";
     act(() => useApp.setState({ machines: { local: renamed } }));
-    expect(screen.queryByRole("region", { name: "Closed" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Closed workspaces" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "web, default, closed" }));
     expect(vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "workspace.create")).toHaveLength(0);
     await act(async () => done({}));
@@ -806,7 +806,7 @@ describe("AgentList", () => {
     const gone = structuredClone(m);
     gone.sessions[0].workspaces.splice(1, 1);
     act(() => useApp.setState({ machines: { local: gone } }));
-    expect(screen.getByRole("region", { name: "Closed" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Closed workspaces" })).toBeTruthy();
   });
 
   it("keeps the kept entry and Bookmark on a label another live workspace still carries", async () => {
