@@ -56,3 +56,10 @@ it("opens a folded Group while the words find a Session in it, and folds it agai
   expect(shown("ca")).toBe(false);
   expect(useApp.getState().expanded["group:g1"]).toBe(false);
 });
+
+it("rings the field once when focused: the input inside draws no ring of its own", async () => {
+  await userEvent.click(field());
+  expect(field().matches(":focus-visible")).toBe(true);
+  expect(getComputedStyle(field()).boxShadow).toBe("none");
+  expect(getComputedStyle(document.querySelector(".session-filter-field")!).boxShadow).not.toBe("none");
+});
