@@ -5,7 +5,7 @@ import { filesKey, useFiles } from "../files/store";
 import { paneKey } from "../lib/types";
 import type { MachineView } from "../lib/types";
 import { getFolder, setFolder } from "../workspaces/folder";
-import { EMPTY_LAYOUT, sessionKey, useLayout } from "../sidebar/groups";
+import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "../sidebar/groups";
 import { useLensSettings } from "../settings/lens";
 
 const machine: MachineView = {
@@ -98,6 +98,21 @@ describe("app store", () => {
     useApp.getState().upsertMachine(machine);
     useApp.getState().select({ machine_id: "local", session: "default", pane_id: "w9:p9" });
     expect(selectedPane(useApp.getState())).toBeNull();
+  });
+  it("keeps a live bookmarked workspace when a snapshot lists it, with its pane cwd fallback", () => {
+    localStorage.clear();
+    const key = projectKey("local", "default", "drover");
+    useLayout.setState({ layout: { ...EMPTY_LAYOUT, bookmarks: [key] } });
+    useApp.getState().upsertMachine(machine);
+    expect(useLayout.getState().layout.kept).toEqual({ [key]: { folder: "/x" } });
+  });
+  it("prefers a stored workspace folder over pane cwd during backfill", () => {
+    localStorage.clear();
+    setFolder({ machine_id: "local", session: "default", workspace_id: "w1" }, "/stored");
+    const key = projectKey("local", "default", "drover");
+    useLayout.setState({ layout: { ...EMPTY_LAYOUT, bookmarks: [key] } });
+    useApp.getState().upsertMachine(machine);
+    expect(useLayout.getState().layout.kept).toEqual({ [key]: { folder: "/stored" } });
   });
 });
 

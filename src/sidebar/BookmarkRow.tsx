@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { useActiveKeptMs, useMinuteClock } from "../agents/paneFilter";
 import { useApp } from "../store/app";
 import { CheckIcon, StarOffIcon } from "../ui/icons";
+import { isSnapshot } from "../workspaces/folder";
+import { reopenKept, useReopenPending } from "../workspaces/keptActions";
 import { useActions } from "./actions";
 import { useViewOrigin } from "./activeFilter";
 import { useDragState } from "./dnd";
@@ -26,6 +28,7 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
     [b, doneSeen, since, now, keptMs],
   );
   const openProject = useApp((s) => s.openProject);
+  const kept = useLayout((s) => s.layout.kept?.[b.key]);
   const setOrigin = useViewOrigin((s) => s.set);
   const clickedHere = useViewOrigin((s) => s.from === "bookmarks");
   // Lit when the selected pane is in this project and the user got there from Bookmarks.
@@ -40,10 +43,19 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
   const dnd = useBookmarkRowDnd(b.key, nextKey);
   const word = row ? WORD[row.state] : undefined;
   const lanes = row && row.state === "working" && row.lanes > 0 ? `${row.lanes} ${row.lanes === 1 ? "lane" : "lanes"}` : null;
+  const node = b.node;
+  const pending = useReopenPending(b.key);
   const open = () => {
-    if (!row?.target || !b.node) return;
+    // A closed Bookmark whose Workspace is kept opens it again in the folder it was kept with (ADR 0008).
+    if (!row && kept && node && node.machine.state === "connected" && isSnapshot(node.session)) {
+      if (pending) return;
+      setOrigin("bookmarks");
+      a?.guard(() => reopenKept(node.machine.id, node.session.name, { key: b.key, label: b.label, folder: kept.folder }));
+      return;
+    }
+    if (!row?.target || !node) return;
     setOrigin("bookmarks");
-    openProject({ machine_id: b.node.machine.id, session: b.node.session.name }, row);
+    openProject({ machine_id: node.machine.id, session: node.session.name }, row);
   };
   const unbookmark = { label: "Unbookmark", icon: StarOffIcon, onSelect: () => useLayout.getState().update((l) => setBookmarked(l, b.key, false)) };
   return (
@@ -54,6 +66,7 @@ export function BookmarkRow({ bookmark: b, nextKey }: { bookmark: RBookmark; nex
         className={"row bm-row " + (row ? row.state : "closed") + (lit ? " active" : "") + indicatorClass(drag, `bookmark:${b.key}`)}
         aria-current={lit ? "true" : undefined}
         aria-label={[b.label, b.sessionName, word?.toLowerCase() ?? lanes ?? (row ? null : "closed")].filter(Boolean).join(", ")}
+        aria-disabled={!row && pending ? true : undefined}
         onClick={open}
         onContextMenu={(e) => a?.menu(e, [unbookmark])}
       >

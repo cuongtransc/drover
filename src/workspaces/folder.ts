@@ -80,6 +80,23 @@ export function moveSessionFolders(machineId: string, from: string, to: string):
   notify();
 }
 
+/** The folder a Workspace was opened in: its stored one, else the first pane cwd it suggests. */
+export function workspaceFolder(machineId: string, session: string, ws: WorkspaceView): string | null {
+  const ref: WorkspaceRef = { machine_id: machineId, session, workspace_id: ws.workspace_id };
+  return getFolder(ref) ?? (suggestFolder(ws) || null);
+}
+
+/** The first live Workspace with this label, and the folder a label-keyed kept entry should store. */
+export function firstWorkspaceFolder(
+  machineId: string,
+  session: string,
+  workspaces: readonly WorkspaceView[],
+  label: string,
+): string | null {
+  const ws = workspaces.find((w) => w.label === label);
+  return ws ? workspaceFolder(machineId, session, ws) : null;
+}
+
 export function suggestFolder(ws: WorkspaceView): string {
   for (const tab of ws.tabs) {
     for (const pane of tab.panes) {
@@ -89,7 +106,11 @@ export function suggestFolder(ws: WorkspaceView): string {
   return "";
 }
 
-function isSnapshot(session: SessionView): boolean {
+/**
+ * A running herdr Session always has at least one Workspace, so an empty list means its
+ * first watcher view has not arrived: only this shape is an authoritative snapshot.
+ */
+export function isSnapshot(session: SessionView): boolean {
   return session.running && !session.error && session.workspaces.length > 0;
 }
 

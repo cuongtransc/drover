@@ -555,6 +555,17 @@ kbd {
 /* The head's + centres over the rows' status marks (21px from the edge). */
 .agents-head .ws-add { margin-right: -7px; }
 .ws-head:hover .ws-add, .ws-head:focus-within .ws-add { opacity: 1; }
+/* CLOSED  the Session's kept Workspaces that closed, at the foot of the PANES list. */
+.closed-ws { margin-top: var(--s-4); border-top: 1px solid var(--line-2); }
+.closed-toggle {
+  display: flex; gap: 6px; align-items: center; width: 100%; height: var(--row-xs); padding: 0 16px; border: 0; background: none; cursor: pointer; text-align: left;
+  color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+}
+.closed-toggle:hover { color: var(--fg-2); }
+.closed-label { color: var(--fg-3); font-weight: 500; }
+.closed-row .ws-label:hover { color: var(--fg-2); }
+.closed-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--fg-3); box-sizing: border-box; flex: none; }
+.closed-row .ws-add { opacity: 1; }
 /* PANES  All | Active N under the column head: the Sessions section's header, not scrolled with the list. */
 .panes-head { flex: none; display: flex; align-items: center; padding: 0 var(--s-2) 0 var(--s-4); }
 .panes-head .active-toggle { margin: var(--s-2) 12px 0 0; }

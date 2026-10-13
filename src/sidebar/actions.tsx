@@ -10,8 +10,6 @@ import type { SessionKey } from "./groups";
 import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
 import { NewSessionDialog } from "./NewSessionDialog";
 import { NewAgentDialog } from "../agents/NewAgentDialog";
-import { setFolder } from "../workspaces/folder";
-import type { WorkspaceRef } from "../workspaces/folder";
 import { AddMachineDialog } from "../machines/AddMachineDialog";
 import { useProtect, type ProtectedPane } from "../agents/protect";
 import type { BusyPane } from "../agents/paneFilter";
@@ -29,7 +27,7 @@ type Dialog =
   | { kind: "session"; machineId?: string; groupId?: string }
   | { kind: "workspace"; machineId: string; session: string; defaultCwd: string }
   | { kind: "agent"; machineId: string; session: string; workspace: WorkspaceView }
-  | { kind: "folder"; ref: WorkspaceRef; initial: string }
+  | { kind: "folder"; machineId: string; initial: string; save: (path: string) => void }
   | { kind: "move"; key: SessionKey }
   | { kind: "add-machine" }
   | { kind: "connect"; machine: MachineView };
@@ -45,7 +43,8 @@ export interface Actions {
   newSession: (machineId?: string, groupId?: string) => void;
   newWorkspace: (machineId: string, session: string) => void;
   newAgent: (machineId: string, session: string, workspace: WorkspaceView) => void;
-  changeFolder: (ref: WorkspaceRef, initial: string) => void;
+  /** `machineId` picks the Machine to browse on; `save` gets the path the user typed. */
+  changeFolder: (machineId: string, initial: string, save: (path: string) => void) => void;
   moveToGroup: (key: SessionKey) => void;
   addMachine: () => void;
   connect: (machine: MachineView) => void;
@@ -93,7 +92,7 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
       confirm: (title, message, confirmLabel, run, protectedPanes = [], opts = {}) =>
         setDialog({ kind: "confirm", title, message, confirmLabel, run, protectedPanes, ...opts }),
       newAgent: (machineId, session, workspace) => setDialog({ kind: "agent", machineId, session, workspace }),
-      changeFolder: (ref, initial) => setDialog({ kind: "folder", ref, initial }),
+      changeFolder: (machineId, initial, save) => setDialog({ kind: "folder", machineId, initial, save }),
       moveToGroup: (key) => setDialog({ kind: "move", key }),
       addMachine: () => setDialog({ kind: "add-machine" }),
       // Batch first (key or agent); the dialog opens only when that needs the user.
@@ -146,8 +145,8 @@ export function ActionsProvider({ children }: { children: ReactNode }) {
     );
   } else if (dialog?.kind === "folder") {
     modal = (
-      <TextDialog title="Workspace folder" initial={dialog.initial} submitLabel="Save" folderOn={dialog.ref.machine_id} onClose={closeDialog}
-        onSubmit={(v) => v.trim() && setFolder(dialog.ref, v)} />
+      <TextDialog title="Workspace folder" initial={dialog.initial} submitLabel="Save" folderOn={dialog.machineId} onClose={closeDialog}
+        onSubmit={(v) => v.trim() && dialog.save(v)} />
     );
   } else if (dialog?.kind === "move") {
     modal = <MoveToGroupDialog sessionKey={dialog.key} onClose={closeDialog} />;

@@ -3,6 +3,7 @@ import { idleLabel, useActiveKeptMs, useMinuteClock } from "../agents/paneFilter
 import type { MachineView, SessionView } from "../lib/types";
 import { useApp } from "../store/app";
 import { CheckIcon, StarIcon, StarOffIcon } from "../ui/icons";
+import { firstWorkspaceFolder } from "../workspaces/folder";
 import { useActions } from "./actions";
 import { projectKey, setBookmarked, useLayout } from "./groups";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
@@ -72,7 +73,13 @@ export function ProjectRows({ machineId, session, rows, current, folded = false,
         const bookmarkItem = {
           label: marked ? "Unbookmark" : "Bookmark",
           icon: marked ? StarOffIcon : StarIcon,
-          onSelect: () => useLayout.getState().update((l) => setBookmarked(l, key, !marked)),
+          onSelect: () =>
+            useLayout.getState().update((l) =>
+              // Resolve duplicates when selected: a snapshot can change the first
+              // Workspace while this menu is open.
+              setBookmarked(l, key, !marked, firstWorkspaceFolder(machineId, session,
+                useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)?.workspaces ?? [], r.label)),
+            ),
         };
         return (
           <li key={r.id}>

@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined) }));
-import { sessionStart, sessionStop } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ sessionStart: vi.fn().mockResolvedValue(undefined), sessionStop: vi.fn().mockResolvedValue(undefined), sessionRename: vi.fn(), herdrCall: vi.fn() }));
+import { herdrCall, sessionRename, sessionStart, sessionStop } from "../lib/ipc";
 import { useProtect } from "../agents/protect";
 import { useApp } from "../store/app";
-import { EMPTY_LAYOUT, projectKey, sessionKey, useLayout } from "./groups";
+import { resetReopenPending } from "../workspaces/keptActions";
+import { EMPTY_LAYOUT, projectKey, sessionKey, setBookmarked, setKept, useLayout } from "./groups";
 import { Sidebar } from "./Sidebar";
 import { useSessionFilter, useViewOrigin } from "./activeFilter";
 import type { MachineView } from "../lib/types";
@@ -24,6 +25,9 @@ const work = { kind: "group" as const, id: "g1", label: "Work", children: [{ kin
 
 describe("Sidebar", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    resetReopenPending();
+    localStorage.clear();
     useApp.setState({ machines: { box: m }, order: ["box"], selected: null, viewed: null, expanded: {} });
     useLayout.setState({ layout: EMPTY_LAYOUT });
     useSessionFilter.setState({ filter: "all" });
@@ -161,6 +165,187 @@ describe("Sidebar", () => {
     expect(closed.className).toContain("closed");
     fireEvent.click(closed);
     expect(useApp.getState().selected).toBeNull();
+  });
+  it("does not reopen a running Session's closed Bookmark that was never kept", () => {
+    // The Session is live and running, so the only thing stopping the reopen is the absent kept entry.
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: { tree: [], bookmarks: [key] } });
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" });
+    fireEvent.click(closed);
+    expect(herdrCall).not.toHaveBeenCalled();
+    expect(useApp.getState().selected).toBeNull();
+  });
+  it("keeps renamed Session entries when its snapshot arrives before the rename resolves", async () => {
+    const oldKey = projectKey("box", "ai-radar", "app");
+    const newKey = projectKey("box", "radar", "app");
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, oldKey, true, "/app") });
+    let resolve!: () => void;
+    vi.mocked(sessionRename).mockReturnValue(new Promise<void>((r) => (resolve = r)));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    act(() => useApp.getState().upsertMachine({ ...m, sessions: m.sessions.map((s) => s.name === "ai-radar" ? { ...s, name: "radar" } : s) }));
+    expect(useLayout.getState().layout.kept).toEqual({ [oldKey]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([oldKey]);
+    await act(async () => resolve());
+    expect(useLayout.getState().layout.kept).toEqual({ [newKey]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([newKey]);
+  });
+  it("keeps the source protected when an overlapping Session rename rejects before the first resolves", async () => {
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, "box/ai-radar/app", true, "/app") });
+    let resolve!: () => void;
+    vi.mocked(sessionRename)
+      .mockReturnValueOnce(new Promise<void>((r) => (resolve = r)))
+      .mockRejectedValueOnce(new Error("second rename failed"));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    try {
+      fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: "other-radar" } });
+      fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+      await waitFor(() => expect(screen.getByText("second rename failed")).toBeTruthy());
+      act(() => useApp.getState().upsertMachine({ ...m, sessions: m.sessions.map((s) => s.name === "ai-radar" ? { ...s, name: "radar" } : s) }));
+      expect(useLayout.getState().layout.kept).toEqual({ "box/ai-radar/app": { folder: "/app" } });
+      expect(useLayout.getState().layout.bookmarks).toEqual(["box/ai-radar/app"]);
+    } finally {
+      await act(async () => resolve());
+    }
+    expect(useLayout.getState().layout.kept).toEqual({ "box/radar/app": { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/radar/app"]);
+  });
+  it("leaves layout keys unchanged if a Session rename fails", async () => {
+    const key = projectKey("box", "ai-radar", "app");
+    useLayout.setState({ layout: setBookmarked(EMPTY_LAYOUT, key, true, "/app") });
+    vi.mocked(sessionRename).mockRejectedValue(new Error("rename failed"));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(screen.getByText("rename failed")).toBeTruthy());
+    expect(useLayout.getState().layout.kept).toEqual({ [key]: { folder: "/app" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual([key]);
+  });
+  it("leaves both Sessions' kept entries and Bookmarks unchanged when renaming into an existing Session fails", async () => {
+    const destination = { ...m.sessions[1], name: "radar" };
+    const machine = { ...m, sessions: [...m.sessions, destination] };
+    useApp.setState({ machines: { box: machine } });
+    const layout = {
+      tree: [],
+      bookmarks: ["box/ai-radar/app", "box/ai-radar/source", "box/radar/app", "box/radar/destination"],
+      kept: {
+        "box/ai-radar/app": { folder: "/source-app" },
+        "box/ai-radar/source": { folder: "/source" },
+        "box/radar/app": { folder: "/destination-app" },
+        "box/radar/destination": { folder: "/destination" },
+      },
+    };
+    useLayout.setState({ layout });
+    let reject!: (e: Error) => void;
+    vi.mocked(sessionRename).mockReturnValue(new Promise<void>((_, r) => (reject = r)));
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "Start ai-radar" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename session…" }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "radar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await act(async () => reject(new Error("destination exists")));
+    expect(screen.getByText("destination exists")).toBeTruthy();
+    expect(useLayout.getState().layout).toEqual(layout);
+    // A subsequent real deletion must not be hidden by a leaked pending marker.
+    act(() => useApp.getState().upsertMachine({ ...machine, sessions: machine.sessions.filter((s) => s.name !== "ai-radar") }));
+    expect(useLayout.getState().layout.kept).toEqual({
+      "box/radar/app": { folder: "/destination-app" },
+      "box/radar/destination": { folder: "/destination" },
+    });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/radar/app", "box/radar/destination"]);
+  });
+  it("bookmarking the second duplicate stores the first workspace's folder", () => {
+    const duplicate = structuredClone(m);
+    const first = duplicate.sessions[0].workspaces[0];
+    const second = structuredClone(first);
+    second.workspace_id = "w2";
+    second.tabs[0].panes[0].cwd = "/second";
+    duplicate.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { box: duplicate } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByRole("button", { name: "drover" })[1]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ "box/default/drover": { folder: "/x" } });
+  });
+  it("bookmarking from an open duplicate menu uses the surviving first workspace's folder", () => {
+    const duplicate = structuredClone(m);
+    const first = duplicate.sessions[0].workspaces[0];
+    const second = structuredClone(first);
+    second.workspace_id = "w2";
+    second.tabs[0].panes[0].cwd = "/second";
+    duplicate.sessions[0].workspaces.push(second);
+    useApp.setState({ machines: { box: duplicate } });
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getAllByRole("button", { name: "drover" })[1]);
+    const snapshot = structuredClone(duplicate);
+    snapshot.sessions[0].workspaces.shift();
+    act(() => useApp.getState().upsertMachine(snapshot));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ "box/default/drover": { folder: "/second" } });
+    expect(useLayout.getState().layout.bookmarks).toEqual(["box/default/drover"]);
+  });
+  it("bookmarking a project keeps its workspace with its folder", () => {
+    render(<Sidebar />);
+    fireEvent.contextMenu(screen.getByRole("button", { name: "drover" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Bookmark" }));
+    expect(useLayout.getState().layout.kept).toEqual({ [projectKey("box", "default", "drover")]: { folder: "/x" } });
+  });
+  it("reopens a closed bookmarked workspace that is kept", async () => {
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    let release!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<Sidebar />);
+    fireEvent.click(within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" }));
+    // Origin and the herdr call happen before workspace.create settles, so moving setOrigin after
+    // the await would fail here.
+    expect(herdrCall).toHaveBeenCalledWith("box", "default", "workspace.create", { cwd: "/c/old", label: "old", focus: false });
+    expect(useViewOrigin.getState().from).toBe("bookmarks");
+    release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+  });
+  it("does not reopen a kept Bookmark whose running Session has no snapshot yet", () => {
+    // machines.rs reports workspaces: [] for a running Session until its first watcher view arrives.
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    const unknown = structuredClone(m);
+    unknown.sessions[0].workspaces = [];
+    useApp.setState({ machines: { box: unknown } });
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" });
+    fireEvent.click(closed);
+    expect(herdrCall).not.toHaveBeenCalled();
+  });
+  it("reopens a closed kept Bookmark once when it is double clicked", async () => {
+    const key = projectKey("box", "default", "old");
+    useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
+    let release!: (v: unknown) => void;
+    vi.mocked(herdrCall).mockReturnValue(new Promise((resolve) => (release = resolve)));
+    render(<Sidebar />);
+    const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" }) as HTMLButtonElement;
+    fireEvent.click(closed);
+    fireEvent.click(closed);
+    expect(herdrCall).toHaveBeenCalledTimes(1);
+    expect(closed.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.contextMenu(closed);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Unbookmark" }));
+    expect(useLayout.getState().layout.bookmarks).toEqual([]);
+    expect(useLayout.getState().layout.kept?.[key]).toEqual({ folder: "/c/old" });
+    release({ workspace: { workspace_id: "w5" }, root_pane: { pane_id: "w5:p1" } });
+    await waitFor(() => expect(useApp.getState().selected).toEqual({ machine_id: "box", session: "default", pane_id: "w5:p1" }));
+    expect(herdrCall).toHaveBeenCalledTimes(1);
   });
   it("views a running session on click", () => {
     render(<Sidebar />);

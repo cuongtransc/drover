@@ -1,5 +1,5 @@
 {
- "captured": "2026-10-12",
+ "captured": "2026-10-13",
  "width": 1440,
  "height": 900,
  "parts": [
@@ -343,6 +343,31 @@
    "badge": {
     "x": 414,
     "y": 120
+   }
+  },
+  {
+   "group": "Agents column",
+   "name": "Closed section",
+   "selector": ".closed-ws",
+   "at": [
+    0,
+    0.5
+   ],
+   "d": [
+    96,
+    0
+   ],
+   "what": "CLOSED and its count: the Session's kept workspaces herdr removed; a click opens one again.",
+   "code": "src/agents/ClosedSection.tsx",
+   "rect": {
+    "x": 249,
+    "y": 231,
+    "w": 278,
+    "h": 25
+   },
+   "badge": {
+    "x": 345,
+    "y": 243.5
    }
   },
   {

@@ -6,8 +6,9 @@ import { activeItem, useApp } from "../store/app";
 import { useHiddenFolders } from "../settings/hiddenFolders";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ChevronIcon, EyeIcon, EyeOffIcon, RefreshIcon } from "../ui/icons";
-import { setFolder, suggestFolder, useFolder } from "../workspaces/folder";
+import { suggestFolder, useFolder } from "../workspaces/folder";
 import type { WorkspaceRef } from "../workspaces/folder";
+import { saveWorkspaceFolder } from "../workspaces/keptActions";
 import { useFilesBus } from "./bus";
 import { FileTree } from "./FileTree";
 import { GoToFile } from "./GoToFile";
@@ -196,7 +197,7 @@ function WorkspacePanel({ wsRef: ref, section }: { wsRef: WorkspaceRef; section:
       </header>
       {!collapsed && root?.source === "pane" && !rootMissing && (
         <div className="files-set-folder-row">
-          <button type="button" className="btn btn-xs files-set-folder" onClick={() => setFolder(ref, root.path)}>
+          <button type="button" className="btn btn-xs files-set-folder" onClick={() => saveWorkspaceFolder(ref, label, root.path)}>
             Set as workspace folder
           </button>
         </div>
@@ -218,7 +219,7 @@ function WorkspacePanel({ wsRef: ref, section }: { wsRef: WorkspaceRef; section:
         !collapsed && (
           <div className="files-empty">
             <p>{root ? "This folder no longer exists." : "This workspace has no folder."}</p>
-            <button type="button" className="btn" onClick={() => actions?.changeFolder(ref, folder ?? (ws ? suggestFolder(ws) : ""))}>
+            <button type="button" className="btn" onClick={() => actions?.changeFolder(ref.machine_id, folder ?? (ws ? suggestFolder(ws) : ""), (path) => saveWorkspaceFolder(ref, label, path))}>
               Change folder…
             </button>
           </div>

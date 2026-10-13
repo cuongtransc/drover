@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceView } from "../lib/types";
 import { PathInput } from "../ui/PathInput";
-import { getFolder, setFolder, suggestFolder } from "../workspaces/folder";
+import { getFolder, suggestFolder } from "../workspaces/folder";
+import { saveWorkspaceFolder } from "../workspaces/keptActions";
 import { AgentIcon } from "./AgentIcon";
 import { AGENTS, openAgentTab, type Agent } from "./openAgentTab";
 
@@ -37,7 +38,7 @@ export function NewAgentDialog({
     if (!cwd) return;
     onClose();
     try {
-      if (stored === null) setFolder(ref, cwd);
+      if (stored === null) saveWorkspaceFolder(ref, workspace.label, cwd);
       await openAgentTab(machineId, session, workspace.workspace_id, agent, cwd, tabName);
     } catch (e) {
       onError((e as { message?: string }).message ?? String(e));

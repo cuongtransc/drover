@@ -10,8 +10,11 @@ import { stepTriage, triageQueue } from "../dashboard/triage";
 import type { MenuEntry, MenuItem } from "../sidebar/ContextMenu";
 import { ActionsProvider, useActions } from "../sidebar/actions";
 import { ActiveToggle } from "../sidebar/ActiveToggle";
-import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
-import { folderName, suggestFolder, useFolder } from "../workspaces/folder";
+import { BookIcon, BotIcon, CheckIcon, CopyIcon, GitBranchIcon, LayersIcon, LockIcon, UnplugIcon, ArchiveIcon, ChevronIcon, CloseIcon, FolderOpenIcon, PencilIcon, PlusIcon, SplitDownIcon, SplitRightIcon, TerminalIcon } from "../ui/icons";
+import { firstWorkspaceFolder, folderName, suggestFolder, useFolder } from "../workspaces/folder";
+import { saveWorkspaceFolder } from "../workspaces/keptActions";
+import { forgetKept, projectKey, renameProjectKey, setKept, useLayout } from "../sidebar/groups";
+import { ClosedSection } from "./ClosedSection";
 import { AgentIcon } from "./AgentIcon";
 import { isProtected, protectedIn, useProtect } from "./protect";
 import { forkBlocked, forkSession } from "./forkSession";
@@ -302,6 +305,10 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
   const a = useActions();
   const ref = { machine_id: machineId, session, workspace_id: ws.workspace_id };
   const folder = useFolder(ref);
+  const layout = useLayout((s) => s.layout);
+  const keptKey = projectKey(machineId, session, ws.label);
+  const kept = keptKey in (layout.kept ?? {});
+  const bookmarked = layout.bookmarks.includes(keptKey);
   const call = (method: string, params: unknown) => () => herdrCall(machineId, session, method, params);
   // The header folds the whole workspace (§7.1); Active leaves out the quiet panes.
   const foldKey = `ws:${machineId}/${session}/${ws.workspace_id}`;
@@ -355,8 +362,30 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
           onSelect: () => a.guard(() => openAgentTab(machineId, session, ws.workspace_id, agent, folder ?? suggestFolder(ws))),
         })),
         { label: "Browse files", icon: FolderOpenIcon, onSelect: browse },
-        { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(ref, folder ?? suggestFolder(ws)) },
-        { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })()) },
+        { label: "Change folder…", icon: FolderOpenIcon, onSelect: () => a.changeFolder(machineId, folder ?? suggestFolder(ws), (path) => saveWorkspaceFolder(ref, ws.label, path)) },
+        { label: "Rename workspace…", icon: PencilIcon, onSelect: () => a.rename("Rename workspace", ws.label, (label) => call("workspace.rename", { workspace_id: ws.workspace_id, label })().then(() => useLayout.getState().update((l) => renameProjectKey(l, projectKey(machineId, session, ws.label), projectKey(machineId, session, label))))) },
+        {
+          label: "Keep when closed",
+          icon: ArchiveIcon,
+          checked: kept,
+          disabled: bookmarked,
+          note: bookmarked ? "Bookmarked" : undefined,
+          onSelect: () =>
+            useLayout.getState().update((l) =>
+              kept
+                ? forgetKept(l, keptKey)
+                : setKept(
+                    l,
+                    keptKey,
+                    firstWorkspaceFolder(
+                      machineId,
+                      session,
+                      useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)?.workspaces ?? [],
+                      ws.label,
+                    ),
+                  ),
+            ),
+        },
         {
           label: "Close workspace",
           icon: CloseIcon,
@@ -560,6 +589,7 @@ function SessionPanes({ machineId, session }: { machineId: string; session: Sess
             <WorkspaceGroup key={g.workspace.workspace_id} machineId={machineId} session={session.name} workspace={g.workspace} rows={g.rows} active={active} />
           ))
         )}
+        {session.running && <ClosedSection machineId={machineId} session={session} />}
       </div>
     </ActionsProvider>
   );
