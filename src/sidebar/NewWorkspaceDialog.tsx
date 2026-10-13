@@ -12,9 +12,17 @@ type Agent = "none" | "claude" | "pi";
 const AGENTS: readonly Agent[] = ["none", "claude", "pi"];
 
 interface WorkspaceCreated {
-  workspace?: { workspace_id: string };
+  workspace?: { workspace_id: string; label?: string };
   root_pane: { pane_id: string };
 }
+
+// A Kept workspace and a Bookmark are keyed by label, so a second live Workspace with one label would share
+// them: it reads as kept, and closing it never shows it under Closed. The first free `label-N` keeps them apart.
+const uniqueLabel = (label: string, taken: Set<string>) => {
+  let n = 2;
+  while (taken.has(`${label}-${n}`)) n += 1;
+  return `${label}-${n}`;
+};
 
 export function NewWorkspaceDialog({
   machineId,
@@ -34,6 +42,10 @@ export function NewWorkspaceDialog({
   const [agent, setAgent] = useState<Agent>("none");
   const create = async () => {
     onClose();
+    // Labels before the call: herdr may list the new Workspace before it replies.
+    const taken = new Set(
+      useApp.getState().machines[machineId]?.sessions.find((x) => x.name === session)?.workspaces.map((w) => w.label) ?? [],
+    );
     try {
       const res = await herdrCall<WorkspaceCreated>(machineId, session, "workspace.create", {
         cwd: cwd.trim() || null,
@@ -41,6 +53,11 @@ export function NewWorkspaceDialog({
         focus: false,
       });
       const workspaceId = res.workspace?.workspace_id;
+      // herdr names an unlabelled Workspace after its folder, so the label is checked as herdr reports it.
+      const created = res.workspace?.label;
+      if (workspaceId && created && taken.has(created)) {
+        await herdrCall(machineId, session, "workspace.rename", { workspace_id: workspaceId, label: uniqueLabel(created, taken) });
+      }
       if (cwd.trim() && workspaceId) {
         setFolder({ machine_id: machineId, session, workspace_id: workspaceId }, cwd);
       }

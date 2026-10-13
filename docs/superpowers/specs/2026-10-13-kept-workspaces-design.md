@@ -69,6 +69,7 @@ the user runs one installed build plus `Drover Dev`, which has its own layout fi
 | Keep when closed (checked) | Removes `kept[key]`, unless the key is bookmarked (then the item is checked and disabled, note "Bookmarked"). |
 | Bookmark | Also adds `kept[key]` when missing. Unbookmark leaves `kept` alone. |
 | Live bookmarked Workspace without `kept` (Bookmarks from before this change) | Added once the Session's snapshot lists it, with its folder. A closed Bookmark with no `kept` entry stays as today: muted, `closed`, a click does nothing. |
+| New workspace whose label (typed, or herdr's folder name) another live Workspace of the Session has | Renamed to the first free `label-N` right after herdr creates it, so it does not share that label's `kept` entry and Bookmark. |
 | Last Pane closes / Close workspace | herdr removes the Workspace; its key becomes closed and its row shows under Closed. The Close workspace confirmation is unchanged. |
 | Click a Closed row, or its `>_` button | `workspace.create { cwd: folder, label, focus: false }`, then select its root Pane (a Terminal). herdr appends it, so it shows last among the live Workspaces. |
 | Closed row menu | **Reopen**, **Change folder…**, **Forget** (removes `kept[key]`; on a bookmarked key it also unbookmarks, since a Bookmark keeps its Workspace). |
