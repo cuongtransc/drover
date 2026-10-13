@@ -147,7 +147,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Agents column** | The middle column, headed by the Session name and PANES (its rows are Panes: agents and shells) | `src/agents/AgentList.tsx` |
 | **Workspace header** | A Workspace's name over its Pane rows; + starts an agent in it | `.ws-head` in `AgentList.tsx` |
 | **Pane row** | A Pane in the Agents column | `AgentCard` |
-| **Closed section** | CLOSED and its count at the end of the Agents column, folded by default: the Session's closed Kept workspaces, a click opens one again | `src/agents/ClosedSection.tsx` |
+| **Closed section** | CLOSED WORKSPACES and its count, docked at the foot of the Agents column above the Files panel, folded by default: the Session's closed Kept workspaces, a click opens one again | `src/agents/ClosedSection.tsx` |
 | **Panes filter** | All \| Active on the PANES header | `usePaneFilter` (`src/agents/paneFilter.ts`), `PanesHeader` |
 | **Queue chip** | "1 blocked · 1 review" atop the Agents column | `SessionQueueChip` |
 | **Fork** | A Claude pane's menu: Fork session / Fork into a new worktree opens a Tab running `claude --resume <id> --fork-session`; its Chat lens says where it came from | `src/agents/forkSession.ts` |

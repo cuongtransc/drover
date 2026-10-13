@@ -10,8 +10,8 @@ import { ChevronIcon, FolderOpenIcon, TerminalIcon, TrashIcon } from "../ui/icon
 import type { MenuItem } from "../sidebar/ContextMenu";
 
 /**
- * The Session's kept Workspaces no live Workspace carries, folded under "Closed" at the
- * foot of the PANES list. A row reopens its Workspace in the folder it was kept with, and
+ * The Session's kept Workspaces no live Workspace carries, folded under "Closed workspaces"
+ * at the foot of the Agents column, right above the Files panel. A row reopens its Workspace in the folder it was kept with, and
  * stays disabled until that settles, so a double click opens one Workspace, not two.
  */
 export function ClosedSection({ machineId, session }: { machineId: string; session: SessionView }) {
@@ -43,13 +43,17 @@ export function ClosedSection({ machineId, session }: { machineId: string; sessi
         ]
       : [];
   return (
-    <section className="closed-ws" aria-label="Closed">
+    <section className="closed-ws" aria-label="Closed workspaces">
       <button className="closed-toggle" aria-expanded={open} onClick={() => toggle(foldKey, open)}>
         <ChevronIcon className={"icon chev" + (open ? " open" : "")} />
-        Closed
+        Closed workspaces
         <span className="project-meta">{closed.length}</span>
       </button>
-      {open && closed.map((c) => <ClosedRow key={c.key} c={c} reopen={reopen} menuFor={menuFor} />)}
+      {open && (
+        <div className="closed-rows">
+          {closed.map((c) => <ClosedRow key={c.key} c={c} reopen={reopen} menuFor={menuFor} />)}
+        </div>
+      )}
     </section>
   );
 }

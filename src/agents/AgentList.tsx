@@ -604,8 +604,9 @@ function SessionPanes({ machineId, session }: { machineId: string; session: Sess
             <WorkspaceGroup key={g.workspace.workspace_id} machineId={machineId} session={session.name} workspace={g.workspace} rows={g.rows} active={active} />
           ))
         )}
-        {session.running && <ClosedSection machineId={machineId} session={session} />}
       </div>
+      {/* Docked above the Files panel, apart from the Pane rows it is not one of. */}
+      {session.running && <ClosedSection machineId={machineId} session={session} />}
     </ActionsProvider>
   );
 }

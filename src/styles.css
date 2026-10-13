@@ -580,8 +580,12 @@ kbd {
 /* The head's + centres over the rows' status marks (21px from the edge). */
 .agents-head .ws-add { margin-right: -7px; }
 .ws-head:hover .ws-add, .ws-head:focus-within .ws-add { opacity: 1; }
-/* CLOSED  the Session's kept Workspaces that closed, at the foot of the PANES list. */
-.closed-ws { margin-top: var(--s-4); border-top: 1px solid var(--line-2); }
+/* CLOSED WORKSPACES  the Session's kept Workspaces that closed, docked at the foot of the Agents
+   column above the Files panel; open, at most 40% of the column, its rows scrolling on their own. */
+.closed-ws { flex: none; max-height: 40%; min-height: 0; box-sizing: border-box; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+/* As tall as the Files panel's head under it. */
+.closed-ws .closed-toggle { flex: none; height: 32px; }
+.closed-rows { min-height: 0; overflow-y: auto; }
 .closed-toggle {
   display: flex; gap: 6px; align-items: center; width: 100%; height: var(--row-xs); padding: 0 16px; border: 0; background: none; cursor: pointer; text-align: left;
   color: var(--fg-3); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
