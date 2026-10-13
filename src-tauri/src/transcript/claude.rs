@@ -526,7 +526,11 @@ impl ClaudeParser {
                             }
                             if let Some((kind, description, started)) = self.calls.remove(&call_id)
                             {
-                                if !is_error && output.starts_with(started_prefix(&kind)) {
+                                // A resumed transcript repeats a start whose end already landed.
+                                if !is_error
+                                    && output.starts_with(started_prefix(&kind))
+                                    && !self.ended.contains(&call_id)
+                                {
                                     if let Some(id) = task_id_of(&kind, &output) {
                                         if self.task_ids.len() >= TRACKED_MAX {
                                             self.task_ids.clear();
@@ -1664,6 +1668,18 @@ mod tests {
             &mut p,
             &monitor_event("[Monitor timed out — re-arm if needed.]"),
         );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_resumed_copy_of_an_ended_task_stays_ended() {
+        let start = [
+            monitor_call("m1"),
+            tool_result("m1", MONITOR_STARTED, false),
+            notification("m1", "completed", Some("Monitor \"wait\" stream ended")),
+        ]
+        .join("\n");
+        let (_, _, p) = run_with(&format!("{start}\n{start}"));
         assert_eq!(p.meta().background, vec![]);
     }
 

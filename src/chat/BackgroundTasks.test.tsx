@@ -45,6 +45,18 @@ it("opens to list each task with its kind and time running, and folds again", ()
   expect(screen.queryByRole("list", { name: "Background tasks" })).toBeNull();
 });
 
+it("counts a Monitor as a shell, as Claude Code does, and names it in the list", () => {
+  const watch = { call_id: "m1", kind: "monitor" as const, description: "Wait for the parallel run", started: "2026-10-10T17:10:00.000Z" };
+  render(<BackgroundTasks tasks={[ci, watch]} onJump={() => {}} />);
+  expect(summary().textContent).toBe("2 shells in background›3m 12s");
+  fireEvent.click(summary());
+  const list = screen.getByRole("list", { name: "Background tasks" });
+  expect([...list.querySelectorAll("button")].map((r) => r.textContent)).toEqual([
+    "ShellRun full dotfiles CI3m 12s",
+    "MonitorWait for the parallel run1m 12s",
+  ]);
+});
+
 it("jumps to the task's tool card", () => {
   const onJump = vi.fn();
   render(<BackgroundTasks tasks={[ci]} onJump={onJump} />);
