@@ -114,6 +114,12 @@ fn finished_output(output: &str) -> Option<(&str, &str)> {
         .then_some((tag(output, "task_id")?, status))
 }
 
+/// An agent's stop while background work of its own still runs: it may resume on its own,
+/// so the notification does not end it.
+fn still_working(text: &str) -> bool {
+    tag(text, "note").is_some_and(|n| n.contains("background work of its own still running"))
+}
+
 /// A Monitor's mid-stream event: it names the task but does not end it. Only its
 /// expiry or timeout notice, or a notification with a `<status>`, does.
 fn monitor_event(text: &str) -> bool {
@@ -329,7 +335,13 @@ impl ClaudeParser {
     /// notice repeats once per orphaned task. The first end carries the summary.
     fn task_notification(&mut self, text: &str, ts: &Option<String>) -> ParserOutput {
         let summary = tag(text, "summary");
-        if monitor_event(text) {
+        if monitor_event(text) || still_working(text) {
+            if still_working(text) {
+                let calls = self.notified_calls(text);
+                for t in &mut self.background {
+                    t.waiting |= calls.contains(&t.call_id);
+                }
+            }
             return match summary {
                 Some(text) => ParserOutput::Append(vec![ChatItem::System {
                     ts: ts.clone(),
@@ -388,23 +400,24 @@ impl ClaudeParser {
             .unwrap_or_else(|| to.to_string())
     }
 
-    /// The calls a notification names: its `<tool-use-id>`, and the call of each `<task-id>`.
+    /// The calls a notification names: its `<tool-use-id>`, and every call of each
+    /// `<task-id>`: an agent woken by a message while it waited runs under both calls.
     fn notified_calls(&self, text: &str) -> Vec<String> {
         let mut calls: Vec<String> = tag(text, "tool-use-id")
             .filter(|id| !id.is_empty())
             .map(str::to_string)
             .into_iter()
             .collect();
+        let named = calls.len();
         for task in tags(text, "task-id") {
-            let call = self
-                .task_ids
-                .iter()
-                .find(|(_, id)| id.as_str() == task)
-                .map(|(call, _)| call.clone());
-            if let Some(call) = call.filter(|c| !calls.contains(c)) {
-                calls.push(call);
+            for (call, id) in &self.task_ids {
+                if id == task && !calls.contains(call) {
+                    calls.push(call.clone());
+                }
             }
         }
+        // The map has no order; the first call shown carries the summary.
+        calls[named..].sort();
         calls
     }
 
@@ -445,9 +458,9 @@ impl ClaudeParser {
             Some("enqueue") => {
                 // A task's end is queued as it happens and may never be delivered (the
                 // session closed first): the task has ended either way.
-                if let Some(text) =
-                    content.filter(|t| t.starts_with("<task-notification>") && !monitor_event(t))
-                {
+                if let Some(text) = content.filter(|t| {
+                    t.starts_with("<task-notification>") && !monitor_event(t) && !still_working(t)
+                }) {
                     let calls = self.notified_calls(text);
                     self.background.retain(|t| !calls.contains(&t.call_id));
                 }
@@ -628,6 +641,7 @@ impl ClaudeParser {
                                         kind,
                                         description: summary.unwrap_or(description),
                                         started,
+                                        waiting: false,
                                     });
                                 }
                             }
@@ -1674,6 +1688,7 @@ mod tests {
                 kind: BackgroundKind::Bash,
                 description: "Run full dotfiles CI in background".into(),
                 started: Some("2026-10-10T17:08:00.000Z".into()),
+                waiting: false,
             }]
         );
         let summary =
@@ -1739,6 +1754,7 @@ mod tests {
                 kind: BackgroundKind::Monitor,
                 description: "Wait for the parallel run's wall time".into(),
                 started: Some("2026-10-13T17:34:15.000Z".into()),
+                waiting: false,
             }]
         );
         let items = push(&mut p, &monitor_event("real 282.93"));
@@ -1867,6 +1883,60 @@ mod tests {
         ]
     }
 
+    fn agent_note(status: &str, note: &str) -> String {
+        format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<tool-use-id>a1</tool-use-id>\n<status>{status}</status>\n<summary>Agent \"Whole-branch review\" finished</summary>\n<note>{note}</note>\n</task-notification>")
+    }
+    const STILL_RUNNING: &str = "This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports.";
+
+    #[test]
+    fn an_agent_waiting_on_its_own_background_work_stays_until_it_ends() {
+        let (_, _, mut p) = run_with(&finished_agent()[..2].join("\n"));
+        let items = push(&mut p, &delivered(&agent_note("completed", STILL_RUNNING)));
+        // Its summary is shown, with no end on the agent's card.
+        assert!(
+            matches!(&items[..], [System { task: None, text, .. }] if text == "Agent \"Whole-branch review\" finished")
+        );
+        let bg = p.meta().background;
+        assert_eq!((bg.len(), bg[0].waiting), (1, true));
+        let items = push(
+            &mut p,
+            &delivered(&agent_note("completed", "A task-notification fires each time this agent stops with no live background children of its own.")),
+        );
+        assert!(
+            matches!(&items[..], [System { task, .. }] if *task == end("a1", "completed", None))
+        );
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn an_agent_woken_while_waiting_ends_every_call_that_ran_it() {
+        let resumed = serde_json::json!({"success":true,"message":"Resuming agent a18a42e","resumedAgentId":AGENT_ID}).to_string();
+        let (_, _, mut p) = run_with(
+            &[
+                finished_agent()[..2].to_vec(),
+                vec![delivered(&agent_note("completed", STILL_RUNNING))],
+                send_message("s1", AGENT_ID, &resumed),
+            ]
+            .concat()
+            .join("\n"),
+        );
+        assert_eq!(p.meta().background.len(), 2);
+        // The end names the agent alone, as a resumed run's notification does.
+        let end_note = format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<status>completed</status>\n</task-notification>");
+        push(&mut p, &delivered(&end_note));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn a_queued_note_of_background_work_still_running_does_not_end_the_agent() {
+        let (_, _, mut p) = run_with(&finished_agent()[..2].join("\n"));
+        push(
+            &mut p,
+            &queue_op("enqueue", Some(&agent_note("completed", STILL_RUNNING))),
+        );
+        assert_eq!(p.meta().background.len(), 1);
+    }
+
     #[test]
     fn a_message_that_resumes_a_finished_agent_runs_it_again() {
         let resumed = serde_json::json!({"success":true,"message":"Resuming agent a18a42e","resumedAgentId":AGENT_ID}).to_string();
@@ -1882,6 +1952,7 @@ mod tests {
                 kind: BackgroundKind::Agent,
                 description: "Whole-branch review".into(),
                 started: Some("2026-10-10T17:30:00.000Z".into()),
+                waiting: false,
             }]
         );
         // An older CLI names the first Agent call; the agent id still finds the resumed run.

@@ -98,7 +98,7 @@ export interface SkillUse { name: string; path: string }
 export interface ModelAlias { name: string; label: string; provider: string | null; fallback: boolean }
 
 /** A background Bash command or Agent the Transcript started and has not yet ended; `started`: ISO 8601, if known. */
-export interface BackgroundTask { call_id: string; kind: "bash" | "agent" | "monitor" | "workflow"; description: string; started: string | null }
+export interface BackgroundTask { call_id: string; kind: "bash" | "agent" | "monitor" | "workflow"; description: string; started: string | null; waiting?: boolean }
 /** How a background task ended, carried on the System item that reports it. */
 export interface TaskEnd { call_id: string; status: string; exit_code?: number }
 

@@ -14,7 +14,14 @@ const tasks: BackgroundTask[] = [
   { call_id: "b", kind: "agent", description: "Review the chat lens", started: "2026-10-11T00:00:00Z" },
 ];
 
-async function render(theme: "light" | "dark") {
+const everyKind: BackgroundTask[] = [
+  ...tasks,
+  { call_id: "c", kind: "monitor", description: "Wait for the gate", started: "2026-10-11T00:00:00Z" },
+  { call_id: "d", kind: "workflow", description: "Code review", started: "2026-10-11T00:00:00Z" },
+  { call_id: "e", kind: "agent", description: "Implement Task 4", started: "2026-10-11T00:00:00Z", waiting: true },
+];
+
+async function render(theme: "light" | "dark", shown: BackgroundTask[] = tasks) {
   document.documentElement.dataset.theme = theme;
   document.body.innerHTML = "";
   document.body.style.margin = "0";
@@ -24,7 +31,7 @@ async function render(theme: "light" | "dark") {
   await act(async () =>
     createRoot(host).render(
       <div className="chat-main">
-        <BackgroundTasks tasks={tasks} onJump={() => {}} />
+        <BackgroundTasks tasks={shown} onJump={() => {}} />
         <WorkingIndicator status="working" start="2026-10-11T00:00:00Z" />
       </div>,
     ),
@@ -64,4 +71,20 @@ it.each(["light", "dark"] as const)("opens into rows on the same columns (%s)", 
   for (const t of times) expect(Math.abs(right(t) - (900 - 28))).toBeLessThanOrEqual(1);
   expect(getComputedStyle(host.querySelector(".chat-background-row")!).fontSize).toBe(getComputedStyle(host.querySelector(".chat-working")!).fontSize);
   await page.screenshot({ path: `../../.vitest/herdr-bg-strip-open-${theme}.png`, element: host });
+});
+
+it.each(["light", "dark"] as const)("keeps every kind label clear of the description (%s)", async (theme) => {
+  const host = await render(theme, everyKind);
+  await act(async () => host.querySelector<HTMLButtonElement>(".chat-background-summary")!.click());
+  const rows = [...host.querySelectorAll(".chat-background-row")];
+  expect(rows).toHaveLength(everyKind.length);
+  const descLeft = left(rows[0].querySelector(".chat-background-desc")!);
+  for (const row of rows) {
+    const kind = row.querySelector(".chat-background-kind")!;
+    // The label fits its column: text overflowing a fixed track keeps the box's edges.
+    expect(kind.scrollWidth, kind.textContent!).toBeLessThanOrEqual(kind.clientWidth);
+    expect(right(kind)).toBeLessThanOrEqual(left(row.querySelector(".chat-background-desc")!));
+    expect(Math.abs(left(row.querySelector(".chat-background-desc")!) - descLeft)).toBeLessThanOrEqual(0.5);
+  }
+  await page.screenshot({ path: `../../.vitest/herdr-bg-strip-kinds-${theme}.png`, element: host });
 });
