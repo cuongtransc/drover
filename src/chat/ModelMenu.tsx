@@ -54,7 +54,7 @@ export function ModelMenu({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <li role="presentation" className="model-menu-heading">Model</li>
-        {CLAUDE_MODELS.map((m) => item(m, !!meta?.model?.includes(m), `/model ${m}`))}
+        {CLAUDE_MODELS.map((m) => item(m, !!meta?.model?.toLowerCase().includes(m), `/model ${m}`))}
         <li role="separator" className="model-menu-sep" />
         <li role="presentation" className="model-menu-heading">Effort</li>
         {CLAUDE_EFFORTS.map((e) => item(e, meta?.effort === e, `/effort ${e}`))}

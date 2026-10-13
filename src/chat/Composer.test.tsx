@@ -815,6 +815,11 @@ describe("Composer model menu", () => {
     expect(screen.getByRole("menuitemradio", { name: "high" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("menuitemradio", { name: "sonnet" }).getAttribute("aria-checked")).toBe("false");
   });
+  it("checks the model the startup banner names, before the first reply", () => {
+    render(<Composer pane={pane} agent="claude" status="idle" meta={{ model: "Opus 5.5", effort: "medium", context_tokens: null }} />);
+    fireEvent.click(screen.getByRole("button", { name: /Opus 5.5 · medium/ }));
+    expect(screen.getByRole("menuitemradio", { name: "opus" }).getAttribute("aria-checked")).toBe("true");
+  });
   it("closes on Escape without sending", () => {
     render(<Composer pane={pane} agent="claude" status="idle" meta={meta} />);
     openMenu();
