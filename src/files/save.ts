@@ -2,21 +2,36 @@ import { filesWrite } from "../lib/ipc";
 import { showToast } from "../ui/Toast";
 import { useDrafts } from "./drafts";
 
-const running = new Map<string, Promise<boolean>>();
+interface Running {
+  id: number;
+  force: boolean;
+  promise: Promise<boolean>;
+}
+const running = new Map<string, Running>();
 
 /**
  * Writes a Draft over its base version (or over whatever is on disk when `force`).
  * Resolves true when written; false when nothing was written.
- * A call while the Draft is already saving returns the running save's promise.
+ * Single-flight per Draft: a call while it is saving waits for that save, then saves again
+ * only if the Draft is still dirty or the call's `force` differs from the running save's.
  */
 export function saveDraft(key: string, opts: { force: boolean }): Promise<boolean> {
   const active = running.get(key);
-  if (active) return active;
-  const p = write(key, opts).finally(() => {
-    if (running.get(key) === p) running.delete(key);
+  const draft = useDrafts.getState().drafts[key];
+  if (active && draft && active.id === draft.id) {
+    return active.promise.then((ok) => {
+      if (!ok) return false;
+      const d = useDrafts.getState().drafts[key];
+      if (!d || d.id !== active.id) return true;
+      return d.dirty || opts.force !== active.force ? saveDraft(key, opts) : true;
+    });
+  }
+  const entry: Running = { id: draft?.id ?? -1, force: opts.force, promise: Promise.resolve(false) };
+  entry.promise = write(key, opts).finally(() => {
+    if (running.get(key) === entry) running.delete(key);
   });
-  running.set(key, p);
-  return p;
+  running.set(key, entry);
+  return entry.promise;
 }
 
 async function write(key: string, opts: { force: boolean }): Promise<boolean> {
