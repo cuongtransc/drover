@@ -1,8 +1,11 @@
 import { memo, useLayoutEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { createPortal } from "react-dom";
+import { closeItemsGuarded } from "../files/closeGuard";
 import { ContextMenu, type MenuItem } from "../sidebar/ContextMenu";
 import { StatusDot } from "../sidebar/StatusDot";
+import { useShallow } from "zustand/react/shallow";
+import { useDrafts } from "../files/drafts";
 import { useApp } from "../store/app";
 import { itemKey, type OpenItem } from "../store/openItems";
 import type { MachineView, PaneView } from "../lib/types";
@@ -60,8 +63,9 @@ export const OpenStrip = memo(function OpenStrip() {
   const { items, preview, active } = useApp((s) => s.openItems);
   const activate = useApp((s) => s.activateItem);
   const pin = useApp((s) => s.pinItem);
-  const closeItems = useApp((s) => s.closeItems);
   const moveItem = useApp((s) => s.moveItem);
+  // Keys of the dirty Drafts: unchanged by keystrokes once a Draft is dirty.
+  const dirty = useDrafts(useShallow((s) => Object.entries(s.drafts).filter(([, d]) => d.dirty).map(([k]) => k)));
   const [menu, setMenu] = useState<{ x: number; y: number; key: string } | null>(null);
   // The tab being dragged, and the tab and side it would land on.
   const [dragging, setDragging] = useState<string | null>(null);
@@ -82,15 +86,15 @@ export const OpenStrip = memo(function OpenStrip() {
   if (tabs.length === 0) return null;
   const twice = (label: string) => tabs.filter((t) => t.label === label).length > 1;
 
-  const close = (key: string) => closeItems(key, "one");
+  const close = (key: string) => void closeItemsGuarded(key, "one");
   // Remove, not Close: an item leaves the strip and its pane keeps running, unlike a sidebar row's
   // Close pane / Close tab. Commands that would remove nothing are left out.
   const menuItems = (key: string): MenuItem[] => {
     const at = tabs.findIndex((e) => e.key === key);
     const list: MenuItem[] = [{ label: "Remove", icon: CloseIcon, onSelect: () => close(key) }];
-    if (tabs.length > 1) list.push({ label: "Remove Others", icon: CloseIcon, onSelect: () => closeItems(key, "others") });
-    if (at < tabs.length - 1) list.push({ label: "Remove to the Right", icon: CloseIcon, onSelect: () => closeItems(key, "right") });
-    list.push({ label: "Remove All", icon: CloseIcon, onSelect: () => closeItems(key, "all") });
+    if (tabs.length > 1) list.push({ label: "Remove Others", icon: CloseIcon, onSelect: () => void closeItemsGuarded(key, "others") });
+    if (at < tabs.length - 1) list.push({ label: "Remove to the Right", icon: CloseIcon, onSelect: () => void closeItemsGuarded(key, "right") });
+    list.push({ label: "Remove All", icon: CloseIcon, onSelect: () => void closeItemsGuarded(key, "all") });
     return list;
   };
 
@@ -109,6 +113,7 @@ export const OpenStrip = memo(function OpenStrip() {
     >
       {tabs.map(({ key, label, title, where, pane }) => {
         const isActive = key === active;
+        const unsaved = dirty.includes(key);
         const state = `${isActive ? " active" : ""}${key === preview ? " preview" : ""}`;
         const drop = over?.key === key ? ` drop-${over.side}` : "";
         const onDragOver = (e: DragEvent) => {
@@ -124,7 +129,7 @@ export const OpenStrip = memo(function OpenStrip() {
             key={key}
             role="none"
             title={title}
-            className={`files-tab-item${state}${dragging === key ? " dragging" : ""}${drop}`}
+            className={`files-tab-item${state}${unsaved ? " dirty" : ""}${dragging === key ? " dragging" : ""}${drop}`}
             draggable
             onDragStart={(e) => {
               // WebKit starts a drag only when it carries data.
@@ -186,7 +191,7 @@ export const OpenStrip = memo(function OpenStrip() {
             <button
               type="button"
               className="files-tab-close"
-              aria-label={`Remove ${label}`}
+              aria-label={`Remove ${label}${unsaved ? " (unsaved)" : ""}`}
               title={pane ? "Remove from Open strip (the pane keeps running)" : "Remove from Open strip"}
               onClick={(e) => {
                 e.stopPropagation();

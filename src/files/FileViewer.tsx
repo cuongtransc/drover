@@ -1,4 +1,5 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useShallow } from "zustand/react/shallow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filesRead } from "../lib/ipc";
 import type { FileChange, FileContent } from "../lib/types";
@@ -7,6 +8,10 @@ import { itemKey, type OpenItem } from "../store/openItems";
 import { CopyIcon, FileCopyIcon, OutlineIcon } from "../ui/icons";
 import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
+import { closeItemsGuarded, settleDrafts } from "./closeGuard";
+import { draftKey, isDirty, useDrafts } from "./drafts";
+import { canEdit, createEditorState, diskVersion, roundTrips } from "./editorSetup";
+import { FileEditor } from "./FileEditor";
 import type { FindStatus } from "./find";
 import { FindBar } from "./FindBar";
 import { FolderView } from "./FolderView";
@@ -16,6 +21,7 @@ import { HIGHLIGHT_LIMIT } from "./limits";
 import { lineOfHash } from "./links";
 import { useOutline } from "./outlineStore";
 import { absPath } from "./root";
+import { saveDraft } from "./save";
 import { filesKey, useFiles } from "./store";
 
 const isMarkdown = (rel: string) => /\.(md|markdown)$/i.test(rel);
@@ -27,7 +33,7 @@ interface Props {
 }
 
 /** Shows one open file: breadcrumbs, render/source, find, and a re-read when the change bus says so. */
-export function FileViewer({ item }: Props) {
+export function FileViewer({ item, online }: Props) {
   const { ws, root, rel } = item;
   const machineId = ws.machine_id;
   const key = filesKey(ws, root);
@@ -52,8 +58,24 @@ export function FileViewer({ item }: Props) {
   const reloads = useFilesBus((s) => s.reloads[key] ?? 0);
   const batch = useFilesBus((s) => s.batches[key]);
 
+  /** A file that is gone: a Draft keeps its text and says so, otherwise the plain banner shows. */
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  const gone = useCallback(
+    (r: string) => {
+      const dk = draftKey(key, r);
+      // A Machine that is not connected fails every read with not_found; that says nothing about the file.
+      if (useDrafts.getState().drafts[dk]) {
+        if (onlineRef.current) useDrafts.getState().setConflict(dk, "removed");
+      } else setRemoved(r);
+    },
+    [key],
+  );
+
   const load = useCallback(
     (r: string) => {
+      const dk = draftKey(key, r);
+      const started = useDrafts.getState().drafts[dk];
       read(machineId, root, r).then(
         (content) => {
           if (content === STALE) return;
@@ -61,18 +83,35 @@ export function FileViewer({ item }: Props) {
           setError(null);
           setRemoved(null);
           setFolder(null);
+          // Read at resolve time: `saving` and `dirty` are as they are now, not as they were when the read began.
+          const { drafts, rebase, setConflict, touch } = useDrafts.getState();
+          const d = drafts[dk];
+          // Our own save, or a read that began before it (or before this Draft), says nothing about the file now.
+          if (!d || d.saving || !started || started.saving || started.id !== d.id || started.gen !== d.gen) return;
+          if (content.cksum === d.base.cksum && content.size === d.base.size) {
+            // Only the mtime moved (a touch, or our save echoing back): keep the editor state and its history.
+            if (content.mtime !== d.base.mtime || d.conflict) touch(dk, content.mtime);
+          } else if (d.dirty) {
+            setConflict(dk, "changed");
+          } else {
+            const base = diskVersion(content);
+            if (base) {
+              rebase(dk, base, createEditorState(base.text));
+              if (d.conflict) setConflict(dk, null);
+            } else setConflict(dk, "changed");
+          }
         },
         (e) => {
           const code = (e as { code?: string } | null)?.code;
           if (code === "is_dir") {
             setFolder(r);
             setFolderReload((n) => n + 1);
-          } else if (code === "not_found") setRemoved(r);
+          } else if (code === "not_found") gone(r);
           else setError({ rel: r, message: errMessage(e) });
         },
       );
     },
-    [read, machineId, root],
+    [read, machineId, root, key, gone],
   );
 
   useEffect(() => {
@@ -88,12 +127,12 @@ export function FileViewer({ item }: Props) {
     // A folder above it changed (e.g. removed or renamed): reading it again finds out.
     const above = (c: FileChange) => c.isDir && (c.path === "" || rel.startsWith(c.path + "/"));
     if (own) {
-      if (own.removed) setRemoved(rel);
+      if (own.removed) gone(rel);
       else load(rel);
     } else if (batch.changes.some(above)) load(rel);
     // A listed folder: a name in it came, went or changed.
     else if (folder === rel && batch.changes.some((c) => c.path.startsWith(rel + "/"))) setFolderReload((n) => n + 1);
-  }, [batch, rel, load, folder]);
+  }, [batch, rel, load, gone, folder]);
 
   // A link's fragment waits on the bus under the key of the file it targets; this viewer takes its own.
   const itemId = itemKey(item);
@@ -130,12 +169,92 @@ export function FileViewer({ item }: Props) {
   const [status, setStatus] = useState<FindStatus>({ count: 0, index: 0 });
   const count = findOpen && searchable && query ? status.count : 0;
 
+  const draftId = itemKey(item);
+  // Only what the toolbar shows, so typing in the editor does not re-render the viewer.
+  const draft = useDrafts(
+    useShallow((s) => {
+      const d = s.drafts[draftId];
+      return d ? { dirty: d.dirty, saving: d.saving, conflict: d.conflict } : null;
+    }),
+  );
+  // Parsing the text is costly, so it is done once per read, not per render.
+  const { editable, mixedEnds } = useMemo(() => {
+    if (!shown) return { editable: false, mixedEnds: false };
+    const editable = canEdit(shown);
+    // Text the editor would not give back as it is (mixed line endings) is offered, but cannot be edited.
+    const mixedEnds = !editable && shown.kind === "text" && shown.editable && shown.cksum !== null && shown.text !== null && !roundTrips(shown.text);
+    return { editable, mixedEnds };
+  }, [shown]);
+  /** The conflict banner pulses for a moment when ⌘S is pressed while it is up. */
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<number>(undefined);
+  useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+
+  const edit = () => {
+    const base = shown && diskVersion(shown);
+    // `open` replaces a Draft unconditionally; a dirty one is never replaced.
+    if (!base || isDirty(draftId)) return;
+    // A preview item is replaced by the next file opened; a Draft's item must stay until it is settled.
+    // Pinned first, so the Draft is never dirty while its item can still be replaced.
+    useApp.getState().pinItem(draftId);
+    useDrafts.getState().open({ fk: key, machineId, root, rel }, base, createEditorState(base.text));
+  };
+  const done = () => void settleDrafts([draftId]);
+  const save = () => {
+    if (useDrafts.getState().drafts[draftId]?.conflict) {
+      setFlash(true);
+      window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => setFlash(false), 600);
+    } else void saveDraft(draftId, { force: false });
+  };
+
+  /** Drops the edits and takes what is on disk. */
+  const reload = () => {
+    const before = useDrafts.getState().drafts[draftId];
+    filesRead(machineId, root, rel).then(
+      (content) => {
+        // Edits typed while the read was under way are not the ones the user chose to drop.
+        const now = useDrafts.getState().drafts[draftId];
+        if (!now) return;
+        if (now.id !== before?.id || now.state !== before.state) {
+          showToast(`Not reloaded: ${rel.split("/").pop()} was edited meanwhile`);
+          return;
+        }
+        const base = diskVersion(content);
+        if (base) useDrafts.getState().open({ fk: key, machineId, root, rel }, base, createEditorState(base.text));
+        else useDrafts.getState().drop(draftId);
+        setDoc({ rel, content });
+      },
+      (e) => showToast(`Cannot reload ${rel.split("/").pop()}: ${errMessage(e)}`),
+    );
+  };
+  const overwrite = () => void saveDraft(draftId, { force: true });
+  // The Draft is dirty here, so closing asks first.
+  const close = () => void closeItemsGuarded(draftId, "one");
+
   const keys = (e: KeyboardEvent) => {
-    if (!e.metaKey || e.altKey || e.ctrlKey) return;
-    // A dialog over the file (Change folder…) keeps its keys.
+    // A dialog over the file (Change folder…, Unsaved Changes) keeps its keys.
     if (document.querySelector(".overlay")) return;
+    if (e.key === "Escape" && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+      if (e.repeat || e.isComposing) return;
+      // The editor's search panel takes the Esc that closes it (it prevents the default); one still open keeps it too.
+      if (draft && !e.defaultPrevented && !document.querySelector(".files-editor .cm-search")) done();
+      return;
+    }
+    if (!e.metaKey || e.altKey || e.ctrlKey) return;
     const k = e.key.toLowerCase();
-    if (!e.shiftKey && k === "f") {
+    if (k === "s" && !e.shiftKey && draft) {
+      e.preventDefault();
+      save();
+    } else if (k === "e" && e.shiftKey) {
+      e.preventDefault();
+      if (e.repeat) return;
+      if (!draft && editable) edit();
+      else if (draft) done();
+    } else if (draft && (k === "f" || k === "g")) {
+      // The editor's own search takes them.
+      return;
+    } else if (!e.shiftKey && k === "f") {
       e.preventDefault();
       if (!searchable) return;
       setFindOpen(true);
@@ -187,7 +306,7 @@ export function FileViewer({ item }: Props) {
             <FileCopyIcon />
           </button>
         )}
-        {md && mode === "render" && hasOutline && (
+        {md && !draft && mode === "render" && hasOutline && (
           <button
             type="button"
             className="icon-btn files-outline-btn"
@@ -199,7 +318,7 @@ export function FileViewer({ item }: Props) {
             <OutlineIcon />
           </button>
         )}
-        {md && shown?.kind === "text" && (
+        {md && !draft && shown?.kind === "text" && (
           <div className="files-mode" role="group" aria-label="Markdown view">
             {(["render", "source"] as const).map((m) => (
               <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
@@ -208,14 +327,46 @@ export function FileViewer({ item }: Props) {
             ))}
           </div>
         )}
+        {(draft || editable || mixedEnds) && (
+        <div className="files-mode files-edit" role="group" aria-label="Edit">
+          {draft ? (
+            <>
+              <button type="button" disabled={!draft.dirty} onClick={save}>
+                Save{draft.saving ? "…" : ""}
+              </button>
+              <button type="button" onClick={done}>Done</button>
+            </>
+          ) : editable ? (
+            <button type="button" aria-label="Edit" onClick={edit}>Edit</button>
+          ) : (
+            <button type="button" aria-label="Edit" disabled title="Mixed line endings">Edit</button>
+          )}
+        </div>
+        )}
       </div>
+      {draft?.conflict && (
+        <div className={`files-banner files-banner-conflict${flash ? " flash" : ""}`} role="alert">
+          <span>{draft.conflict === "changed" ? "File changed on disk" : "File was deleted"}</span>
+          {draft.conflict === "changed" ? (
+            <>
+              <button type="button" onClick={reload}>Reload</button>
+              <button type="button" onClick={overwrite}>Overwrite</button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={overwrite}>Save again</button>
+              <button type="button" onClick={close}>Close</button>
+            </>
+          )}
+        </div>
+      )}
       {removed === rel && <div className="files-banner files-banner-removed">File removed</div>}
       {shown && error && error.rel === rel && (
         <div className="files-banner files-banner-error" role="alert">
           Could not reload: {error.message}
         </div>
       )}
-      {findOpen && searchable && (
+      {!draft && findOpen && searchable && (
         <FindBar
           count={count}
           index={status.index}
@@ -236,7 +387,9 @@ export function FileViewer({ item }: Props) {
         />
       )}
       <div className="files-view">
-        {shown ? (
+        {draft ? (
+          <FileEditor draftKey={draftId} />
+        ) : shown ? (
           <FileView
             machineId={machineId}
             root={root}

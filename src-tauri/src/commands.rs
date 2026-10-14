@@ -6,9 +6,10 @@ use crate::{
     files::{
         all::{self, FileList},
         changed::{self, Changed},
+        edit,
         list::{self, Entry},
         paths::{check_rel, resolve_root},
-        read::{self, FileContent},
+        read::{self, FileContent, FileVersion},
         transfer,
         watch::{watch_refusal, WatchEvent},
         watch_manager::{FilesWatch, WatchSink},
@@ -843,6 +844,20 @@ pub async fn files_read(
     read::read_file(&*t, &root, &rel).await
 }
 
+#[tauri::command]
+pub async fn files_write(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+    text: String,
+    expected: Option<FileVersion>,
+) -> Result<FileVersion, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    edit::write(&*t, &root, &rel, &text, expected).await
+}
+
 /// Who owns each lane, from `ctc lane list --json` on the Machine; `None` when its ctc reports no owner.
 #[tauri::command]
 pub async fn lanes_list(
@@ -963,4 +978,11 @@ pub async fn files_download(
             .await
             .map_err(|e| AppError::new("io", e.to_string()))??;
     Ok(saved.to_string_lossy().into_owned())
+}
+
+/// Quits the app; the frontend calls it once unsaved Drafts are settled. `exit` still ends in
+/// `RunEvent::Exit`, where the ssh masters are torn down.
+#[tauri::command]
+pub fn app_quit(app: tauri::AppHandle) {
+    app.exit(0)
 }

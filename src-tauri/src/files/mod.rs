@@ -1,8 +1,11 @@
-//! File browsing on a Machine: scripts run over the transport. The only write is Upload
-//! (`transfer`), which never overwrites (ADR-0005).
+//! File browsing on a Machine: scripts run over the transport. Upload never overwrites
+//! (`transfer`, ADR-0005); Write replaces a file's content only after a version check
+//! (`edit`, ADR-0009).
 
 pub mod all;
 pub mod changed;
+pub mod cksum;
+pub mod edit;
 pub mod list;
 pub mod paths;
 pub mod read;

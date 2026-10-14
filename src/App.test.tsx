@@ -343,7 +343,7 @@ describe("App shell", () => {
       localStorage.clear();
       const { invoke } = await import("@tauri-apps/api/core");
       (invoke as any).mockImplementation((cmd: string) =>
-        Promise.resolve(cmd === "files_list_all" ? { paths: [], capped: false, refused: false } : cmd === "files_read" ? { kind: "text", text: "x", truncated: false, size: 1, mtime: 1 } : cmd === "files_watch" ? 1 : []),
+        Promise.resolve(cmd === "files_list_all" ? { paths: [], capped: false, refused: false } : cmd === "files_read" ? { kind: "text", text: "x", truncated: false, size: 1, mtime: 1, cksum: null, editable: false } : cmd === "files_watch" ? 1 : []),
       );
       useApp.setState({
         machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [

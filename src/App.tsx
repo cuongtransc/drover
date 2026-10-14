@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, sessionStart } from "./lib/ipc";
+import { appQuit, destroyWindow, machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
@@ -23,6 +23,9 @@ import { AgentList } from "./agents/AgentList";
 import { watchProtectPrune } from "./agents/protect";
 import { watchForkPrune } from "./agents/forkSession";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
+import { closeItemsGuarded, settleDrafts } from "./files/closeGuard";
+import { useDrafts } from "./files/drafts";
+import { UnsavedDialog } from "./files/unsaved";
 import { FilesPanel } from "./files/FilesPanel";
 import { useFilesPanel } from "./files/panelStore";
 import { openNewTabHere } from "./agents/newTabShortcut";
@@ -196,6 +199,39 @@ export default function App() {
     };
   }, []);
 
+  // Closing the window or quitting asks about unsaved Drafts first. If asking itself fails, the
+  // app is kept open once and the next request goes through: a broken guard never traps the app.
+  useEffect(() => {
+    const drafts = () => useDrafts.getState().drafts;
+    // After a failed check the next request goes through unasked: never trapped, nothing lost silently.
+    let skipAsk = false;
+    const settle = async (): Promise<boolean> => {
+      if (skipAsk) {
+        skipAsk = false;
+        return true;
+      }
+      try {
+        return await settleDrafts(Object.keys(drafts()));
+      } catch (err) {
+        console.error("settling Drafts failed; keeping the app open", err);
+        skipAsk = true;
+        showToast("Could not check unsaved edits; close again to discard");
+        return false;
+      }
+    };
+    const unlisten = [
+      onWindowCloseRequested(async (e) => {
+        if (!Object.values(drafts()).some((d) => d.dirty)) return;
+        e.preventDefault();
+        if (await settle()) await destroyWindow();
+      }),
+      onQuitRequested(async () => {
+        if (await settle()) await appQuit();
+      }),
+    ];
+    return () => unlisten.forEach((u) => void u.then((f) => f()).catch(() => {}));
+  }, []);
+
   useEffect(() => {
     const zoom = (z: FontZoom) => {
       const s = useApp.getState();
@@ -237,7 +273,7 @@ export default function App() {
       },
       "item.remove": () => {
         const active = useApp.getState().openItems.active;
-        if (active) useApp.getState().closeItems(active, "one");
+        if (active) void closeItemsGuarded(active, "one");
       },
       "item.prev": () => useApp.getState().cycleItems(-1),
       "item.next": () => useApp.getState().cycleItems(1),
@@ -324,6 +360,7 @@ export default function App() {
       {dashboardOpen && <AgentDashboard />}
       <TriageHud />
       <Toasts />
+      <UnsavedDialog />
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
     </div>
   );

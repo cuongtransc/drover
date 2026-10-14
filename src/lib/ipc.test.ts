@@ -6,7 +6,7 @@ vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/Toast";
-import { completeFiles, filesImage, filesListAll, filesListDir, filesRead, filesWatch, herdrCall } from "./ipc";
+import { completeFiles, filesImage, filesListAll, filesListDir, filesRead, filesWatch, filesWrite, herdrCall } from "./ipc";
 
 describe("herdrCall", () => {
   it("toasts on timeout and rethrows", async () => {
@@ -24,9 +24,17 @@ describe("herdrCall", () => {
 
 describe("files ipc", () => {
   it("passes camelCase args", async () => {
-    (invoke as any).mockResolvedValueOnce({ kind: "text", text: "x", truncated: false, size: 1, mtime: 2 });
+    (invoke as any).mockResolvedValueOnce({ kind: "text", text: "x", truncated: false, size: 1, mtime: 2, cksum: null, editable: false });
     await filesRead("devtuf", "~/app", "src/a.ts");
     expect(invoke).toHaveBeenLastCalledWith("files_read", { machineId: "devtuf", root: "~/app", rel: "src/a.ts" });
+  });
+  it("passes the expected version to files_write", async () => {
+    (invoke as any).mockResolvedValueOnce({ size: 1, mtime: 2, cksum: 3 });
+    const expected = { size: 1, mtime: 2, cksum: 3 };
+    await filesWrite("devtuf", "~/app", "a.ts", "x", expected);
+    expect(invoke).toHaveBeenLastCalledWith("files_write", { machineId: "devtuf", root: "~/app", rel: "a.ts", text: "x", expected });
+    await filesWrite("devtuf", "~/app", "a.ts", "x", null);
+    expect(invoke).toHaveBeenLastCalledWith("files_write", { machineId: "devtuf", root: "~/app", rel: "a.ts", text: "x", expected: null });
   });
   it("passes camelCase args to the other files commands", async () => {
     (invoke as any).mockResolvedValue(null);

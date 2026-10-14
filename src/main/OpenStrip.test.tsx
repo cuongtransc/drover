@@ -1,9 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApp } from "../store/app";
+import { draftKey, useDrafts } from "../files/drafts";
+import { filesKey } from "../files/store";
 import { OpenStrip } from "./OpenStrip";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import type { MachineView, PaneView } from "../lib/types";
+import { createEditorState } from "../files/editorSetup";
 
 const pane = (id: string, title: string, status: PaneView["status"]): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title, cwd: "/x", agent: "claude", status,
@@ -35,6 +38,7 @@ const openPinned = (...ids: string[]) => {
 describe("OpenStrip", () => {
   beforeEach(() => {
     useApp.setState({ machines: {}, order: [], selected: null, openItems: NO_ITEMS });
+    useDrafts.setState(useDrafts.getInitialState(), true);
     useApp.getState().upsertMachine(m);
   });
 
@@ -71,7 +75,7 @@ describe("OpenStrip", () => {
     expect(screen.getByRole("tab", { name: /Chat tabs/ }).className).not.toContain("preview");
   });
 
-  it("selects on click; removes on the remove button and on middle click", () => {
+  it("selects on click; removes on the remove button and on middle click", async () => {
     openPinned("p1", "p2", "p3");
     render(<OpenStrip />);
     fireEvent.click(screen.getByRole("tab", { name: /Mermaid diagram/ }));
@@ -79,19 +83,19 @@ describe("OpenStrip", () => {
     // Removing an item leaves its pane running: the button says so, unlike a sidebar row's Close.
     expect(screen.getByRole("button", { name: "Remove Chat tabs" }).title).toBe("Remove from Open strip (the pane keeps running)");
     fireEvent.click(screen.getByRole("button", { name: "Remove Chat tabs" }));
-    expect(open()).toEqual(["p1", "p3"]);
+    await waitFor(() => expect(open()).toEqual(["p1", "p3"]));
     expect(useApp.getState().selected).toEqual(ref("p1"));
     fireEvent(screen.getByRole("tab", { name: /Bug button/ }), new MouseEvent("auxclick", { bubbles: true, button: 1 }));
-    expect(open()).toEqual(["p1"]);
+    await waitFor(() => expect(open()).toEqual(["p1"]));
   });
 
-  it("right click offers the remove commands that would remove something", () => {
+  it("right click offers the remove commands that would remove something", async () => {
     openPinned("p1", "p2");
     render(<OpenStrip />);
     fireEvent.contextMenu(screen.getByRole("tab", { name: /Chat tabs/ }));
     expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["Remove", "Remove Others", "Remove All"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove Others" }));
-    expect(open()).toEqual(["p2"]);
+    await waitFor(() => expect(open()).toEqual(["p2"]));
   });
 
   it("names where two tabs of the same name live, and leaves a unique name bare", () => {
@@ -141,5 +145,21 @@ describe("OpenStrip", () => {
     fireEvent.drop(item(/Mermaid diagram/), { dataTransfer });
     expect(open()).toEqual(["p1", "p3", "p2"]);
     expect(item(/Mermaid diagram/).className).not.toMatch(/drop-/);
+  });
+
+  it("marks a file with unsaved changes and labels its close button, a clean Draft neither", () => {
+    const ws = { machine_id: "local", session: "default", workspace_id: "w2" };
+    const fk = filesKey(ws, "/r");
+    useApp.getState().openFile(ws, "/r", "a.md", { pin: true });
+    useApp.getState().openFile(ws, "/r", "b.md", { pin: true });
+    for (const rel of ["a.md", "b.md"]) useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 }, createEditorState("t"));
+    const s = useDrafts.getState().drafts[draftKey(fk, "a.md")].state;
+    useDrafts.getState().update(draftKey(fk, "a.md"), s.update({ changes: { from: 0, insert: "!" } }).state);
+    render(<OpenStrip />);
+    const item = (name: string) => screen.getByRole("tab", { name }).closest(".files-tab-item") as HTMLElement;
+    expect(item("a.md").classList.contains("dirty")).toBe(true);
+    expect(screen.getByRole("button", { name: "Remove a.md (unsaved)" })).toBeTruthy();
+    expect(item("b.md").classList.contains("dirty")).toBe(false);
+    expect(screen.getByRole("button", { name: "Remove b.md" })).toBeTruthy();
   });
 });

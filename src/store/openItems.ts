@@ -1,4 +1,5 @@
 import { paneKey, type MachineView, type PaneRef } from "../lib/types";
+import { draftKey } from "../files/drafts";
 import { filesKey } from "../files/store";
 import type { WorkspaceRef } from "../workspaces/folder";
 
@@ -19,7 +20,7 @@ export interface OpenItems {
 export const NO_ITEMS: OpenItems = { items: [], preview: null, active: null };
 
 export function itemKey(item: OpenItem): string {
-  return item.kind === "agent" ? "agent:" + paneKey(item.ref) : "file:" + filesKey(item.ws, item.root) + "|" + item.rel;
+  return item.kind === "agent" ? "agent:" + paneKey(item.ref) : draftKey(filesKey(item.ws, item.root), item.rel);
 }
 
 export function findItem(s: OpenItems, key: string): OpenItem | undefined {
@@ -50,12 +51,20 @@ export function setActive(s: OpenItems, key: string | null): OpenItems {
   return { ...s, active: key };
 }
 
+/** The keys `closeItems(s, scope, key)` removes, in strip order. Unknown key → []. */
+export function closingKeys(s: OpenItems, scope: "one" | CloseScope, key: string): string[] {
+  const at = indexOfKey(s.items, key);
+  if (at < 0) return [];
+  const gone =
+    scope === "one" ? [s.items[at]] : scope === "others" ? s.items.filter((_, i) => i !== at) : scope === "right" ? s.items.slice(at + 1) : s.items;
+  return gone.map(itemKey);
+}
+
 /** Closes relative to `key`; a closed active item hands over to `key` if it survives, else the item now at its index, else the one before, else null. Unknown key → s. */
 export function closeItems(s: OpenItems, scope: "one" | CloseScope, key: string): OpenItems {
-  const at = indexOfKey(s.items, key);
-  if (at < 0) return s;
-  const items =
-    scope === "one" ? s.items.filter((_, i) => i !== at) : scope === "others" ? [s.items[at]] : scope === "right" ? s.items.slice(0, at + 1) : [];
+  const gone = new Set(closingKeys(s, scope, key));
+  if (gone.size === 0) return s;
+  const items = s.items.filter((i) => !gone.has(itemKey(i)));
   return { items, preview: keepKey(items, s.preview), active: nextActive(s, items, key) };
 }
 

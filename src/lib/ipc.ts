@@ -3,7 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showToast } from "../ui/Toast";
 import type { LaneRecord } from "../agents/roles";
-import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
+import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, FileVersion, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
 
 export const machinesList = () => invoke<MachineView[]>("machines_list");
 export const machineConnect = (id: string) => invoke<void>("machine_connect", { id });
@@ -57,6 +57,30 @@ export const openLocalFile = (path: string) => invoke<"opened" | "revealed">("op
 export const imageSaveTemp = (machineId: string, bytes: Uint8Array, ext: string) =>
   invoke<string>("image_save_temp", bytes, { headers: { "x-machine-id": machineId, "x-image-ext": ext } });
 
+/** Quits the app; the caller has settled unsaved Drafts first. */
+export const appQuit = () => invoke<void>("app_quit");
+/** Fires when the app menu's Quit (⌘Q) is chosen; the app quits only through `appQuit`. */
+export const onQuitRequested = (fn: () => void): Promise<UnlistenFn> =>
+  listen("app://quit-requested", fn).catch((err) => {
+    console.error("registering the quit listener failed", err);
+    return () => {};
+  });
+/** Runs `cb` when the window is asked to close (red button); `cb` calls `e.preventDefault()` to keep it open.
+ *  Without a window (tests, a plain browser) nothing is registered and the close is never held back. */
+export const onWindowCloseRequested = (cb: (e: { preventDefault: () => void }) => Promise<void> | void): Promise<UnlistenFn> => {
+  try {
+    return getCurrentWindow()
+      .onCloseRequested(cb)
+      .catch((err) => {
+        console.error("registering the close guard failed", err);
+        return () => {};
+      });
+  } catch {
+    return Promise.resolve(() => {});
+  }
+};
+/** Closes the window without asking again (needs `core:window:allow-destroy`). */
+export const destroyWindow = () => getCurrentWindow().destroy();
 export const onMachine = (cb: (m: MachineView) => void): Promise<UnlistenFn> =>
   listen<MachineView>("sidebar://machine", (e) => cb(e.payload));
 export const onPaneStatus = (cb: (e: PaneStatusEvent) => void): Promise<UnlistenFn> =>
@@ -139,6 +163,8 @@ export const filesListAll = (machineId: string, root: string, hidden: string[]) 
   invoke<FileList>("files_list_all", { machineId, root, hidden });
 export const filesRead = (machineId: string, root: string, rel: string) =>
   invoke<FileContent>("files_read", { machineId, root, rel });
+export const filesWrite = (machineId: string, root: string, rel: string, text: string, expected: FileVersion | null) =>
+  invoke<FileVersion>("files_write", { machineId, root, rel, text, expected });
 export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
 export const filesImage = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_image", { machineId, root, rel });

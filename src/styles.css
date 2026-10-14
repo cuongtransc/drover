@@ -1799,6 +1799,11 @@ button.composer-model:disabled { cursor: default; }
 .files-set-folder { flex: none; }
 .files-banner { flex: none; padding: 6px 20px; font-size: 12px; color: var(--amber-text); background: color-mix(in srgb, var(--amber) 10%, transparent); border-bottom: 1px solid var(--line); }
 .files-banner-removed, .files-banner-error { color: var(--err); background: color-mix(in srgb, var(--err) 10%, transparent); }
+.files-mode + .files-edit { margin-left: 8px; }
+.files-banner-conflict { display: flex; align-items: center; gap: 10px; }
+.files-banner-conflict button { height: 22px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-1); color: var(--fg); font-size: 12px; cursor: pointer; }
+/* The flash is a ring, not a stronger tint, so the banner text keeps its contrast. */
+.files-banner-conflict.flash { box-shadow: inset 0 0 0 2px var(--amber); }
 .files-side-scroll { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; display: flex; flex-direction: column; }
 .files-view { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface-code); }
 .files-empty { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--fg-3); font-size: 13px; }
@@ -1872,6 +1877,11 @@ button.composer-model:disabled { cursor: default; }
 .files-tab-close { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--fg-3); cursor: pointer; }
 .files-tab-close svg { width: 12px; height: 12px; }
 .files-tab-close:hover { background: var(--active); color: var(--fg); }
+/* An unsaved file shows a dot in place of the x (same 18px box, so nothing shifts) until the tab or the button is hovered or focused. */
+.files-tab-item.dirty .files-tab-close svg { display: none; }
+.files-tab-item.dirty .files-tab-close::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-2); }
+.files-tab-item.dirty:hover .files-tab-close svg, .files-tab-item.dirty .files-tab-close:focus-visible svg { display: block; }
+.files-tab-item.dirty:hover .files-tab-close::before, .files-tab-item.dirty .files-tab-close:focus-visible::before { display: none; }
 
 /* The agent panes opened in the Session, styled like the open files. */
 .agent-tabs .files-tab-item { gap: 8px; padding-left: 10px; }
@@ -1883,6 +1893,7 @@ button.composer-model:disabled { cursor: default; }
 .files-outline-btn + .files-mode { margin-left: 0; }
 .files-mode { margin-left: auto; display: flex; padding: 2px; border-radius: var(--r-sm); background: var(--seg-track); }
 .files-mode button { height: 22px; padding: 0 10px; border: 0; border-radius: 4px; background: none; color: var(--fg-3); font-size: 12px; cursor: pointer; }
+.files-mode button:disabled { cursor: default; box-shadow: inset 0 0 0 1px var(--line); border-style: dashed; }
 .files-mode button[aria-pressed="true"] { background: var(--seg-thumb); color: var(--fg); }
 
 .files-find { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px; background: var(--surface-1); border-bottom: 1px solid var(--line); }
@@ -1957,3 +1968,31 @@ button.composer-model:disabled { cursor: default; }
 .chat-tool-badge.good { color: var(--green-text); }
 .chat-tool-badge.neutral { color: var(--fg-3); }
 .chat-tool-badge.bad { color: var(--err-fg); }
+
+/* File editor */
+.files-editor { flex: 1; min-height: 0; display: flex; }
+.files-editor .cm-editor { flex: 1; min-width: 0; height: 100%; background: var(--surface-code); color: var(--hl-fg); font: 12.5px/var(--files-line-h) var(--mono); }
+.files-editor .cm-editor.cm-focused { outline: none; }
+.files-editor .cm-scroller { font-family: inherit; line-height: var(--files-line-h); }
+.files-editor .cm-content { caret-color: var(--hl-fg); cursor: text; }
+.files-editor .cm-gutters { background: var(--surface-code); border: 0; color: var(--fg-3); user-select: none; -webkit-user-select: none; }
+.files-editor .cm-lineNumbers .cm-gutterElement { padding: 0 12px 0 14px; }
+.files-editor .cm-activeLine { background: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.files-editor .cm-activeLineGutter { background: transparent; color: var(--fg-2); }
+.files-editor .cm-searchMatch { border-radius: 2px; background: color-mix(in srgb, var(--amber) 32%, transparent); }
+.files-editor .cm-searchMatch.cm-searchMatch-selected { background: var(--amber); color: #1a1206; }
+.files-editor .cm-panels { background: var(--surface-1); color: var(--fg); border-color: var(--line); }
+.files-editor .cm-panels-top { border-bottom: 1px solid var(--line); }
+.files-editor .cm-panel.cm-search { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 6px 16px; font-size: 12.5px; }
+.files-editor .cm-panel.cm-search br { display: none; }
+.files-editor .cm-panel.cm-search input.cm-textfield {
+  width: 200px; height: 26px; margin: 0; padding: 0 8px; box-sizing: border-box; border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--surface-0); color: var(--fg); font-size: 12.5px;
+}
+.files-editor .cm-panel.cm-search input.cm-textfield:focus { border-color: var(--accent); box-shadow: var(--ring); outline: none; }
+.files-editor .cm-panel.cm-search button.cm-button {
+  height: 26px; padding: 0 8px; border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  background: var(--surface-0) none; color: var(--fg-2); font-size: 12px; cursor: pointer;
+}
+.files-editor .cm-panel.cm-search label { color: var(--fg-3); font-size: 12px; }
+.files-editor .cm-panel.cm-search [name="close"] { color: var(--fg-3); background: none; border: 0; }

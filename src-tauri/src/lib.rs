@@ -53,6 +53,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::app_quit,
             commands::machines_list,
             commands::machine_connect,
             commands::machine_disconnect,
@@ -96,6 +97,7 @@ pub fn run() {
             commands::files_list_dir,
             commands::files_list_all,
             commands::files_read,
+            commands::files_write,
             commands::files_image,
             commands::files_changed,
             commands::files_watch,
@@ -161,17 +163,28 @@ pub fn run() {
         });
 }
 
+const QUIT_MENU_ID: &str = "quit";
 const SETTINGS_MENU_ID: &str = "settings";
 const SETTINGS_MENU_TEXT: &str = "Settings…";
 const SETTINGS_ACCELERATOR: &str = "CmdOrCtrl+,";
 
 /// The webview event a click on our own menu item sends, if it is one.
 fn menu_event(id: &str) -> Option<&'static str> {
-    (id == SETTINGS_MENU_ID).then_some("menu://settings")
+    match id {
+        SETTINGS_MENU_ID => Some("menu://settings"),
+        QUIT_MENU_ID => Some("app://quit-requested"),
+        _ => None,
+    }
+}
+
+/// The Quit menu item's text, named after the app as it is installed.
+fn quit_label(app_name: &str) -> String {
+    format!("Quit {app_name}")
 }
 
 /// The default menu with "Settings… ⌘," where macOS apps keep it (the app menu, after About and
-/// its separator), and minus "Close Window": with a single window its Cmd+W quit the app.
+/// its separator), and minus "Close Window": with a single window its Cmd+W quit the app. Quit is
+/// our own item, routed through the frontend so unsaved Drafts are asked about first.
 fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app)?;
     for (i, item) in menu.items()?.into_iter().enumerate() {
@@ -191,8 +204,24 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<
         }
         for entry in sub.items()? {
             if let MenuItemKind::Predefined(p) = &entry {
-                if p.text()? == "Close Window" {
+                let text = p.text()?;
+                if text == "Close Window" {
                     sub.remove(p)?;
+                } else if text.starts_with("Quit") {
+                    let at = sub
+                        .items()?
+                        .iter()
+                        .position(|i| i.id() == p.id())
+                        .unwrap_or(0);
+                    sub.remove(p)?;
+                    let quit = MenuItem::with_id(
+                        app,
+                        QUIT_MENU_ID,
+                        quit_label(&app.package_info().name),
+                        true,
+                        Some("CmdOrCtrl+Q"),
+                    )?;
+                    sub.insert(&quit, at)?;
                 }
             }
         }
@@ -227,7 +256,13 @@ mod tests {
     #[test]
     fn settings_menu_item_opens_settings_in_the_webview() {
         assert_eq!(menu_event(SETTINGS_MENU_ID), Some("menu://settings"));
-        assert_eq!(menu_event("quit"), None);
+        assert_eq!(menu_event("quit"), Some("app://quit-requested"));
+        assert_eq!(menu_event("other"), None);
+    }
+
+    #[test]
+    fn quit_item_is_named_after_the_app() {
+        assert_eq!(quit_label("Drover"), "Quit Drover");
     }
 
     #[test]
