@@ -1,7 +1,7 @@
 # File viewer Edit mode
 
 Date: 2026-10-14
-Status: approved design, not implemented
+Status: implemented
 
 ## Purpose
 
