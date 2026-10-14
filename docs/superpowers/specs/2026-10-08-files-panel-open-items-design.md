@@ -47,7 +47,8 @@ interface OpenItems {
 
 - `itemKey`: `agent:<paneKey>` or `file:<filesKey(ws, root)>|<rel>`.
 - One preview slot for both kinds. Opening an agent unpinned replaces a file preview and the
-  other way round. Pinning, closing (one, others, to the right, all) and the preview rules
+  other way round, except a file link clicked in an agent's Chat: that agent's preview is
+  pinned first, so the Chat stays beside the file (2026-10-14). Pinning, closing (one, others, to the right, all) and the preview rules
   are those of `src/agents/openAgents.ts` today, generalised to `OpenItem` in a new
   `src/store/openItems.ts` (pure functions, unit tested). `openAgents.ts` is removed.
 - Selecting a Pane (`select`) keeps its current rules for opening the agent's item and makes
