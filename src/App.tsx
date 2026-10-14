@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { appQuit, destroyWindow, machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
+import { appQuit, appSetUnsaved, destroyWindow, machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
+import { syncUnsaved } from "./files/unsavedSync";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, type FontZoom, useSettings, zoomFont } from "./settings/store";
@@ -199,7 +200,10 @@ export default function App() {
     };
   }, []);
 
-  // Closing the window or quitting asks about unsaved Drafts first. If asking itself fails, the
+  // The app process answers Dock Quit and logout itself, so it is told whether a Draft is dirty.
+  useEffect(() => syncUnsaved((unsaved) => void appSetUnsaved(unsaved).catch((err) => console.error("app_set_unsaved failed", err))), []);
+
+  // Closing the window or quitting (⌘Q, Dock Quit, logout) asks about unsaved Drafts first. If asking itself fails, the
   // app is kept open once and the next request goes through: a broken guard never traps the app.
   useEffect(() => {
     const drafts = () => useDrafts.getState().drafts;

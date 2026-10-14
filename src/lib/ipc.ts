@@ -59,6 +59,8 @@ export const imageSaveTemp = (machineId: string, bytes: Uint8Array, ext: string)
 
 /** Quits the app; the caller has settled unsaved Drafts first. */
 export const appQuit = () => invoke<void>("app_quit");
+/** Tells the app process whether some Draft is dirty, so Dock Quit and logout ask first. */
+export const appSetUnsaved = (unsaved: boolean) => invoke<void>("app_set_unsaved", { unsaved });
 /** Fires when the app menu's Quit (⌘Q) is chosen; the app quits only through `appQuit`. */
 export const onQuitRequested = (fn: () => void): Promise<UnlistenFn> =>
   listen("app://quit-requested", fn).catch((err) => {

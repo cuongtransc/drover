@@ -11,6 +11,7 @@ pub mod layout;
 pub mod machines;
 pub mod notify;
 pub mod open_file;
+pub mod quit_guard;
 pub mod quota;
 pub mod sshconfig;
 pub mod transcript;
@@ -54,6 +55,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::app_quit,
+            commands::app_set_unsaved,
             commands::machines_list,
             commands::machine_connect,
             commands::machine_disconnect,
@@ -121,6 +123,7 @@ pub fn run() {
                 transcript::cache::prune(&chat_cache, transcript::cache::BUDGET)
             });
             notify::init(app.handle());
+            quit_guard::install(app.handle());
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             app.manage(Arc::new(layout::LayoutStore::new(
@@ -172,7 +175,7 @@ const SETTINGS_ACCELERATOR: &str = "CmdOrCtrl+,";
 fn menu_event(id: &str) -> Option<&'static str> {
     match id {
         SETTINGS_MENU_ID => Some("menu://settings"),
-        QUIT_MENU_ID => Some("app://quit-requested"),
+        QUIT_MENU_ID => Some(quit_guard::QUIT_REQUESTED),
         _ => None,
     }
 }

@@ -984,5 +984,12 @@ pub async fn files_download(
 /// `RunEvent::Exit`, where the ssh masters are torn down.
 #[tauri::command]
 pub fn app_quit(app: tauri::AppHandle) {
+    crate::quit_guard::set_quitting();
     app.exit(0)
+}
+
+/// Whether some Draft is dirty, so a quit from the Dock or a logout asks first (`quit_guard`).
+#[tauri::command]
+pub fn app_set_unsaved(unsaved: bool) {
+    crate::quit_guard::set_unsaved(unsaved)
 }
