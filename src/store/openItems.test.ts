@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MachineView, PaneRef } from "../lib/types";
-import { closeItems, cycleItem, dropItems, itemKey, moveItem, NO_ITEMS, openItem, pinItem, pruneItems, setActive, type OpenItem, type OpenItems } from "./openItems";
+import { closeItems, closingKeys, cycleItem, dropItems, itemKey, moveItem, NO_ITEMS, openItem, pinItem, pruneItems, setActive, type OpenItem, type OpenItems } from "./openItems";
 
 const ws = (workspace_id = "w1", session = "s", machine_id = "local") => ({ machine_id, session, workspace_id });
 const a = (pane_id: string, session = "s", machine_id = "local"): OpenItem => ({ kind: "agent", ref: { machine_id, session, pane_id } as PaneRef });
@@ -80,5 +80,15 @@ describe("open items", () => {
     const s = of([a("p1"), f("x")]);
     expect(dropItems(s, () => false)).toBe(s);
     expect(dropItems(s, (i) => i.kind === "file")).toEqual(of([a("p1")]));
+  });
+
+  it("closingKeys lists what closeItems would remove", () => {
+    const s = [f("a"), f("b"), f("c")].reduce((acc, i) => openItem(acc, i, pin), NO_ITEMS);
+    const ks = s.items.map(itemKey);
+    expect(closingKeys(s, "one", ks[1])).toEqual([ks[1]]);
+    expect(closingKeys(s, "others", ks[1])).toEqual([ks[0], ks[2]]);
+    expect(closingKeys(s, "right", ks[0])).toEqual([ks[1], ks[2]]);
+    expect(closingKeys(s, "all", ks[1])).toEqual(ks);
+    expect(closingKeys(s, "one", "nope")).toEqual([]);
   });
 });

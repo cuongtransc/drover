@@ -23,6 +23,8 @@ import { AgentList } from "./agents/AgentList";
 import { watchProtectPrune } from "./agents/protect";
 import { watchForkPrune } from "./agents/forkSession";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
+import { closeItemsGuarded } from "./files/closeGuard";
+import { UnsavedDialog } from "./files/unsaved";
 import { FilesPanel } from "./files/FilesPanel";
 import { useFilesPanel } from "./files/panelStore";
 import { openNewTabHere } from "./agents/newTabShortcut";
@@ -237,7 +239,7 @@ export default function App() {
       },
       "item.remove": () => {
         const active = useApp.getState().openItems.active;
-        if (active) useApp.getState().closeItems(active, "one");
+        if (active) void closeItemsGuarded(active, "one");
       },
       "item.prev": () => useApp.getState().cycleItems(-1),
       "item.next": () => useApp.getState().cycleItems(1),
@@ -324,6 +326,7 @@ export default function App() {
       {dashboardOpen && <AgentDashboard />}
       <TriageHud />
       <Toasts />
+      <UnsavedDialog />
       {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
     </div>
   );

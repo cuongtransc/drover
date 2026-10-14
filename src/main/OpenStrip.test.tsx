@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApp } from "../store/app";
 import { OpenStrip } from "./OpenStrip";
@@ -71,7 +71,7 @@ describe("OpenStrip", () => {
     expect(screen.getByRole("tab", { name: /Chat tabs/ }).className).not.toContain("preview");
   });
 
-  it("selects on click; removes on the remove button and on middle click", () => {
+  it("selects on click; removes on the remove button and on middle click", async () => {
     openPinned("p1", "p2", "p3");
     render(<OpenStrip />);
     fireEvent.click(screen.getByRole("tab", { name: /Mermaid diagram/ }));
@@ -79,19 +79,19 @@ describe("OpenStrip", () => {
     // Removing an item leaves its pane running: the button says so, unlike a sidebar row's Close.
     expect(screen.getByRole("button", { name: "Remove Chat tabs" }).title).toBe("Remove from Open strip (the pane keeps running)");
     fireEvent.click(screen.getByRole("button", { name: "Remove Chat tabs" }));
-    expect(open()).toEqual(["p1", "p3"]);
+    await waitFor(() => expect(open()).toEqual(["p1", "p3"]));
     expect(useApp.getState().selected).toEqual(ref("p1"));
     fireEvent(screen.getByRole("tab", { name: /Bug button/ }), new MouseEvent("auxclick", { bubbles: true, button: 1 }));
-    expect(open()).toEqual(["p1"]);
+    await waitFor(() => expect(open()).toEqual(["p1"]));
   });
 
-  it("right click offers the remove commands that would remove something", () => {
+  it("right click offers the remove commands that would remove something", async () => {
     openPinned("p1", "p2");
     render(<OpenStrip />);
     fireEvent.contextMenu(screen.getByRole("tab", { name: /Chat tabs/ }));
     expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["Remove", "Remove Others", "Remove All"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Remove Others" }));
-    expect(open()).toEqual(["p2"]);
+    await waitFor(() => expect(open()).toEqual(["p2"]));
   });
 
   it("names where two tabs of the same name live, and leaves a unique name bare", () => {

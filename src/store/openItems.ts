@@ -51,6 +51,15 @@ export function setActive(s: OpenItems, key: string | null): OpenItems {
   return { ...s, active: key };
 }
 
+/** The keys `closeItems(s, scope, key)` would remove, in strip order. Unknown key → []. */
+export function closingKeys(s: OpenItems, scope: "one" | CloseScope, key: string): string[] {
+  const at = indexOfKey(s.items, key);
+  if (at < 0) return [];
+  const gone =
+    scope === "one" ? [s.items[at]] : scope === "others" ? s.items.filter((_, i) => i !== at) : scope === "right" ? s.items.slice(at + 1) : s.items;
+  return gone.map(itemKey);
+}
+
 /** Closes relative to `key`; a closed active item hands over to `key` if it survives, else the item now at its index, else the one before, else null. Unknown key → s. */
 export function closeItems(s: OpenItems, scope: "one" | CloseScope, key: string): OpenItems {
   const at = indexOfKey(s.items, key);
