@@ -247,16 +247,22 @@ describe("AgentList", () => {
   });
 
   it("shows a header per workspace with its folder, empty workspaces included", () => {
-    setFolder({ machine_id: "local", session: "default", workspace_id: "w1" }, "/Users/me/checkout-api/");
+    setFolder({ machine_id: "local", session: "default", workspace_id: "w1" }, "/Users/me/checkout-svc/");
     render(<AgentList />);
     const w1 = screen.getByRole("group", { name: "checkout-api" });
-    expect(within(w1).getByText("checkout-api", { selector: ".ws-folder" })).toBeTruthy();
+    expect(within(w1).getByText("checkout-svc", { selector: ".ws-folder" })).toBeTruthy();
     expect(within(w1).getByText("Idempotent payments")).toBeTruthy();
     expect(within(screen.getByRole("group", { name: "web" })).getAllByRole("listitem")).toHaveLength(2);
     // An absent folder is not labelled.
     expect(screen.queryByText("no folder")).toBeNull();
     expect(screen.getByRole("group", { name: "empty" }).querySelector(".ws-folder")).toBeNull();
     expect(screen.getByRole("button", { name: "New agent in empty" })).toBeTruthy();
+  });
+
+  it("leaves out a folder name that only repeats the workspace label", () => {
+    setFolder({ machine_id: "local", session: "default", workspace_id: "w1" }, "/Users/me/checkout-api/");
+    render(<AgentList />);
+    expect(screen.getByRole("group", { name: "checkout-api" }).querySelector(".ws-folder")).toBeNull();
   });
 
   it("keeps the panes of a multi-pane tab together, leaving single-pane tabs bare", () => {
@@ -300,9 +306,9 @@ describe("AgentList", () => {
     fireEvent.contextMenu(screen.getByText("web", { selector: ".ws-label" }));
     expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["New claude", "New pi", "New shell", "Browse files", "Change folder…", "Rename workspace…", "Close workspace"]);
     fireEvent.click(screen.getByRole("menuitem", { name: "Change folder…" }));
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "/srv/web" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "/srv/web-app" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(within(screen.getByRole("group", { name: "web" })).getByText("web", { selector: ".ws-folder" })).toBeTruthy();
+    expect(within(screen.getByRole("group", { name: "web" })).getByText("web-app", { selector: ".ws-folder" })).toBeTruthy();
   });
 
   it("Browse files selects a pane of the workspace and focuses the file tree", () => {
@@ -627,7 +633,10 @@ describe("AgentList", () => {
     fireEvent.click(toggle);
     expect(useApp.getState().expanded["closed:local/default"]).toBe(true);
     expect([...closed().querySelectorAll(".closed-label")].map((b) => b.textContent)).toEqual(["agent", "smarthomes"]);
-    expect([...closed().querySelectorAll(".ws-folder")].map((b) => b.textContent)).toEqual(["agent", "smarthomes"]);
+    // A folder named like its workspace adds nothing; one named otherwise shows.
+    expect([...closed().querySelectorAll(".ws-folder")].map((b) => b.textContent)).toEqual(["", ""]);
+    act(() => useLayout.getState().update((l) => setKept(l, keyOf("agent"), "/c/agent-old")));
+    expect([...closed().querySelectorAll(".ws-folder")].map((b) => b.textContent)).toEqual(["agent-old", ""]);
     act(() => usePaneFilter.setState({ filter: "all" }));
     expect(within(closed()).getByText("agent", { selector: ".closed-label" })).toBeTruthy();
   });
