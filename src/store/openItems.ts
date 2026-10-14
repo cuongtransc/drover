@@ -1,4 +1,5 @@
 import { paneKey, type MachineView, type PaneRef } from "../lib/types";
+import { draftKey } from "../files/drafts";
 import { filesKey } from "../files/store";
 import type { WorkspaceRef } from "../workspaces/folder";
 
@@ -19,7 +20,7 @@ export interface OpenItems {
 export const NO_ITEMS: OpenItems = { items: [], preview: null, active: null };
 
 export function itemKey(item: OpenItem): string {
-  return item.kind === "agent" ? "agent:" + paneKey(item.ref) : "file:" + filesKey(item.ws, item.root) + "|" + item.rel;
+  return item.kind === "agent" ? "agent:" + paneKey(item.ref) : draftKey(filesKey(item.ws, item.root), item.rel);
 }
 
 export function findItem(s: OpenItems, key: string): OpenItem | undefined {
