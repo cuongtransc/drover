@@ -4,12 +4,9 @@ export interface PathRef {
   line: number | null;
 }
 
-/** Where a click on a path goes: a file tab (inside the workspace folder), this Mac, or a file tab
- *  read from another machine outside the folder (`remote`). */
-export type PathTarget =
-  | { kind: "files"; abs: string; line: number | null }
-  | { kind: "file"; abs: string }
-  | { kind: "remote"; abs: string; line: number | null };
+/** Where a click on a path goes: a file tab rooted at the workspace folder it is inside (`files`),
+ *  or at its own folder when it is outside (`outside`), on whichever machine the pane runs. */
+export type PathTarget = { kind: "files" | "outside"; abs: string; line: number | null };
 
 const MAX_LEN = 512;
 /** A relative path must end in a file name with an extension, so `and/or` or `src/files` stay code. */
@@ -43,10 +40,9 @@ function normalize(path: string): string {
 
 /**
  * Where `ref` leads for a pane whose workspace folder is `root` on a machine whose home is `home`.
- * Files opens anything inside the folder, on any machine; a path outside it opens on this Mac
- * (`local`), or is read from the other machine into a file tab.
+ * Files opens it on any machine, inside the folder or outside it.
  */
-export function pathTarget(ref: PathRef, ctx: { root: string | null; home: string | null; local: boolean }): PathTarget | null {
+export function pathTarget(ref: PathRef, ctx: { root: string | null; home: string | null }): PathTarget | null {
   let abs: string;
   if (ref.path.startsWith("~/")) {
     if (!ctx.home) return null;
@@ -59,6 +55,5 @@ export function pathTarget(ref: PathRef, ctx: { root: string | null; home: strin
   }
   const root = ctx.root ? normalize(ctx.root) : null;
   if (root && (root === "/" || abs === root || abs.startsWith(root + "/"))) return { kind: "files", abs, line: ref.line };
-  if (ctx.local) return { kind: "file", abs };
-  return abs === "/" ? null : { kind: "remote", abs, line: ref.line };
+  return abs === "/" ? null : { kind: "outside", abs, line: ref.line };
 }
