@@ -419,13 +419,14 @@ function WorkspaceGroup({ machineId, session, workspace: ws, rows: all, active }
       <div className="ws-head" onContextMenu={(e) => a?.menu(e, items)}>
         <button
           className="ws-label"
+          title={folder ?? undefined}
           aria-expanded={open}
           aria-label={!open && need ? `${ws.label}, ${need} ${need === 1 ? "needs" : "need"} you` : undefined}
           onClick={() => toggle(foldKey, open)}
         >
           {ws.label}
         </button>
-        {folder && <span className="ws-folder" title={folder}>{folderName(folder)}</span>}
+        {folder && folderName(folder) !== ws.label && <span className="ws-folder" title={folder}>{folderName(folder)}</span>}
         {!open && need > 0 && <span className="need" aria-hidden="true">{need}</span>}
         <button className="ws-add" aria-label={`New agent in ${ws.label}`} onClick={() => a?.newAgent(machineId, session, ws)}>
           <PlusIcon />

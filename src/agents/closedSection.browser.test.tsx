@@ -2,6 +2,7 @@ import "../styles.css";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
 import { ClosedSection } from "./ClosedSection";
 import { EMPTY_LAYOUT, projectKey, setKept, useLayout } from "../sidebar/groups";
 import { useApp } from "../store/app";
@@ -33,4 +34,12 @@ it("fits a long closed workspace's label and folder beside its Reopen button at 
     expect(btn.right).toBeLessThanOrEqual(row.right + 0.5);
     expect(list.scrollWidth).toBe(list.clientWidth);
   }
+});
+
+it("shows a closed row's Reopen button on hover only, like a live workspace's +", async () => {
+  const opacity = () => getComputedStyle(document.querySelector(".closed-row .ws-add")!).opacity;
+  document.documentElement.dataset.theme = "light";
+  await expect.poll(opacity).toBe("0");
+  await userEvent.hover(document.querySelector(".closed-row .closed-label")!);
+  await expect.poll(opacity).toBe("1");
 });

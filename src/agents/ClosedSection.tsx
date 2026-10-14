@@ -75,7 +75,7 @@ function ClosedRow({
       <button className="ws-label closed-label" title={c.folder ?? undefined} disabled={pending} onClick={() => reopen(c)}>
         {c.label}
       </button>
-      <span className="ws-folder">{c.folder ? folderName(c.folder) : ""}</span>
+      <span className="ws-folder">{c.folder && folderName(c.folder) !== c.label ? folderName(c.folder) : ""}</span>
       <button className="ws-add" aria-label={`Reopen ${c.label}`} disabled={pending} onClick={() => reopen(c)}>
         <TerminalIcon />
       </button>
