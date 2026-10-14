@@ -895,9 +895,10 @@ mod tests {
         });
         assert!(matches!(rx.recv().await, Some(WatchEvent::Resync)));
         let target = dir.path().join("notes.md");
-        // FSEvents needs a moment to start; keep writing until an event arrives.
+        // FSEvents needs a moment to start, and it silently drops events while another folder
+        // churns (a build running beside the tests): keep writing until an event arrives.
         let mut seen = Vec::new();
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
         while !seen
             .iter()
             .any(|c: &Change| c.path == "notes.md" && !c.removed)
@@ -916,7 +917,31 @@ mod tests {
         std::fs::create_dir(dir.path().join("node_modules")).unwrap();
         std::fs::write(dir.path().join("node_modules/x.js"), "").unwrap();
         std::fs::remove_file(&target).unwrap();
-        let seen = until(&mut rx, |c| c.path == "notes.md" && c.removed).await;
+        // A dropped remove is lost for good, so a quiet spell removes a fresh file: the watch
+        // must report removals, not FSEvents never drop one.
+        let mut seen = Vec::new();
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+        let mut retries = 0;
+        while !seen
+            .iter()
+            .any(|c: &Change| c.removed && c.path != "node_modules")
+        {
+            match tokio::time::timeout(Duration::from_secs(5), rx.recv()).await {
+                Ok(Some(WatchEvent::Changes { changes })) => seen.extend(changes),
+                Ok(Some(_)) => {}
+                Ok(None) => panic!("watch ended, saw {seen:?}"),
+                Err(_) => {
+                    retries += 1;
+                    let fresh = dir.path().join(format!("gone-{retries}.md"));
+                    std::fs::write(&fresh, "x").unwrap();
+                    std::fs::remove_file(&fresh).unwrap();
+                }
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no remove event, saw {seen:?}"
+            );
+        }
         assert!(
             seen.iter().all(|c| !c.path.starts_with("node_modules/")),
             "{seen:?}"

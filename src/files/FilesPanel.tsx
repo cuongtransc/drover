@@ -10,6 +10,7 @@ import { suggestFolder, useFolder } from "../workspaces/folder";
 import type { WorkspaceRef } from "../workspaces/folder";
 import { saveWorkspaceFolder } from "../workspaces/keptActions";
 import { useFilesBus } from "./bus";
+import { useStaleResync } from "./staleResync";
 import { FileTree } from "./FileTree";
 import { GoToFile } from "./GoToFile";
 import { useFilesPanel } from "./panelStore";
@@ -250,6 +251,7 @@ function PanelBody({ wsRef, root, online, showHeavy, hidden, gotoRef, onMissing 
   const reloadKey = useFilesBus((s) => s.reloads[key] ?? 0);
   const [watchError, setWatchError] = useState<string | null>(null);
   const reload = useCallback(() => useFilesBus.getState().reload(key), [key]);
+  useStaleResync(wsRef, reload);
   const { changed, touched } = useChanged(machineId, root, reloadKey);
   // The open file of this root, marked in the CHANGED group.
   const activeRel = useApp((s) => {
