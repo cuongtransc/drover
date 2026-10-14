@@ -60,12 +60,21 @@ export const imageSaveTemp = (machineId: string, bytes: Uint8Array, ext: string)
 /** Quits the app; the caller has settled unsaved Drafts first. */
 export const appQuit = () => invoke<void>("app_quit");
 /** Fires when the app menu's Quit (⌘Q) is chosen; the app quits only through `appQuit`. */
-export const onQuitRequested = (fn: () => void): Promise<UnlistenFn> => listen("app://quit-requested", fn);
+export const onQuitRequested = (fn: () => void): Promise<UnlistenFn> =>
+  listen("app://quit-requested", fn).catch((err) => {
+    console.error("registering the quit listener failed", err);
+    return () => {};
+  });
 /** Runs `cb` when the window is asked to close (red button); `cb` calls `e.preventDefault()` to keep it open.
  *  Without a window (tests, a plain browser) nothing is registered and the close is never held back. */
 export const onWindowCloseRequested = (cb: (e: { preventDefault: () => void }) => Promise<void> | void): Promise<UnlistenFn> => {
   try {
-    return getCurrentWindow().onCloseRequested(cb);
+    return getCurrentWindow()
+      .onCloseRequested(cb)
+      .catch((err) => {
+        console.error("registering the close guard failed", err);
+        return () => {};
+      });
   } catch {
     return Promise.resolve(() => {});
   }

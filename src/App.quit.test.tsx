@@ -16,6 +16,8 @@ vi.mock("@tauri-apps/api/window", () => ({
     destroy: win.destroy,
   }),
 }));
+const save = vi.hoisted(() => ({ saveDraft: vi.fn(async (_k: string, _o?: unknown): Promise<boolean> => true) }));
+vi.mock("./files/save", () => save);
 vi.mock("./terminal/TerminalLens", () => ({ TerminalLens: () => null }));
 
 import App from "./App";
@@ -47,6 +49,7 @@ describe("quitting and closing the window with unsaved Drafts", () => {
     useDrafts.setState(useDrafts.getInitialState(), true);
     win.closeHandler = null;
     win.destroy.mockClear();
+    save.saveDraft.mockReset().mockResolvedValue(true);
     const { invoke } = await import("@tauri-apps/api/core");
     const { listen } = await import("@tauri-apps/api/event");
     vi.mocked(invoke).mockClear();
@@ -82,6 +85,8 @@ describe("quitting and closing the window with unsaved Drafts", () => {
     act(() => void fire());
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
     expect(await quitCalls()).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("window close: untouched when clean, asks when dirty, destroys on Discard", async () => {
@@ -90,6 +95,7 @@ describe("quitting and closing the window with unsaved Drafts", () => {
     const clean = { preventDefault: vi.fn() };
     await act(async () => void (await win.closeHandler!(clean)));
     expect(clean.preventDefault).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     openDraft("a.txt", true);
     const dirty = { preventDefault: vi.fn() };
@@ -104,5 +110,39 @@ describe("quitting and closing the window with unsaved Drafts", () => {
     await screen.findByText("Save changes to a.txt?");
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     await waitFor(() => expect(win.destroy).toHaveBeenCalledTimes(1));
+  });
+
+  it("Save that fails (conflict) keeps the app open: no app_quit, no destroy", async () => {
+    save.saveDraft.mockResolvedValue(false);
+    openDraft("a.txt", true);
+    useDrafts.getState().setConflict(draftKey(fk, "a.txt"), "changed");
+    render(<App />);
+    const fire = await quitRequested();
+    await waitFor(() => expect(win.closeHandler).toBeTruthy());
+    act(() => void fire());
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() => expect(save.saveDraft).toHaveBeenCalled());
+    act(() => void win.closeHandler!({ preventDefault: vi.fn() }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    await waitFor(() => expect(save.saveDraft).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(await quitCalls()).toBe(0);
+    expect(win.destroy).not.toHaveBeenCalled();
+    expect(useDrafts.getState().drafts[draftKey(fk, "a.txt")]).toBeTruthy();
+  });
+
+  it("a failing check keeps the app open with a toast, and the next request goes through", async () => {
+    save.saveDraft.mockRejectedValue(new Error("boom"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    openDraft("a.txt", true);
+    render(<App />);
+    const fire = await quitRequested();
+    act(() => void fire());
+    fireEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Could not check unsaved edits; close again to discard")).toBeTruthy();
+    expect(await quitCalls()).toBe(0);
+    act(() => void fire());
+    await waitFor(async () => expect(await quitCalls()).toBe(1));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

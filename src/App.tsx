@@ -200,15 +200,23 @@ export default function App() {
   }, []);
 
   // Closing the window or quitting asks about unsaved Drafts first. If asking itself fails, the
-  // window must still close: a broken guard never traps the app.
+  // app is kept open once and the next request goes through: a broken guard never traps the app.
   useEffect(() => {
     const drafts = () => useDrafts.getState().drafts;
+    // After a failed check the next request goes through unasked: never trapped, nothing lost silently.
+    let skipAsk = false;
     const settle = async (): Promise<boolean> => {
+      if (skipAsk) {
+        skipAsk = false;
+        return true;
+      }
       try {
         return await settleDrafts(Object.keys(drafts()));
       } catch (err) {
-        console.error("settling Drafts failed; closing anyway", err);
-        return true;
+        console.error("settling Drafts failed; keeping the app open", err);
+        skipAsk = true;
+        showToast("Could not check unsaved edits; close again to discard");
+        return false;
       }
     };
     const unlisten = [
