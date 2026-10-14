@@ -1802,7 +1802,8 @@ button.composer-model:disabled { cursor: default; }
 .files-mode + .files-edit { margin-left: 8px; }
 .files-banner-conflict { display: flex; align-items: center; gap: 10px; }
 .files-banner-conflict button { height: 22px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-1); color: var(--fg); font-size: 12px; cursor: pointer; }
-.files-banner-conflict.flash { background: color-mix(in srgb, var(--amber) 28%, transparent); }
+/* The flash is a ring, not a stronger tint, so the banner text keeps its contrast. */
+.files-banner-conflict.flash { box-shadow: inset 0 0 0 2px var(--amber); }
 .files-side-scroll { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; display: flex; flex-direction: column; }
 .files-view { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface-code); }
 .files-empty { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--fg-3); font-size: 13px; }
@@ -1887,6 +1888,7 @@ button.composer-model:disabled { cursor: default; }
 .files-outline-btn + .files-mode { margin-left: 0; }
 .files-mode { margin-left: auto; display: flex; padding: 2px; border-radius: var(--r-sm); background: var(--seg-track); }
 .files-mode button { height: 22px; padding: 0 10px; border: 0; border-radius: 4px; background: none; color: var(--fg-3); font-size: 12px; cursor: pointer; }
+.files-mode button:disabled { cursor: default; box-shadow: inset 0 0 0 1px var(--line); border-style: dashed; }
 .files-mode button[aria-pressed="true"] { background: var(--seg-thumb); color: var(--fg); }
 
 .files-find { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 16px; background: var(--surface-1); border-bottom: 1px solid var(--line); }

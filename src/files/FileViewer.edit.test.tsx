@@ -13,6 +13,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn(async () => {}) }));
 vi.mock("../ui/Toast", () => ({ showToast: vi.fn(), showProgressToast: vi.fn(() => 1), updateToast: vi.fn() }));
+import { showToast } from "../ui/Toast";
 import { useApp } from "../store/app";
 import { itemKey } from "../store/openItems";
 import { useFilesBus } from "./bus";
@@ -99,8 +100,38 @@ describe("FileViewer edit mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.queryByRole("button", { name: "Source" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Outline" })).toBeNull();
+    // ⌘F belongs to the editor's own search; the viewer's find bar must not open behind it.
     press("f", { metaKey: true });
-    expect(screen.queryByRole("textbox", { name: /find/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(document.querySelector(".cm-editor")).toBeNull());
+    expect(screen.queryByRole("checkbox", { name: "Match case" }) ?? screen.queryByLabelText("Match case")).toBeNull();
+  });
+
+  it("no Edit group for an image", async () => {
+    Object.assign(disk, { kind: "image", editable: false });
+    render(<FileViewer item={{ ...item, rel: "a.png" }} online />);
+    await waitFor(() => expect(vi.mocked(invoke).mock.calls.some((x) => x[0] === "files_read")).toBe(true));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 10))));
+    expect(screen.queryByRole("group", { name: "Edit" })).toBeNull();
+  });
+
+  it("Esc that repeats or comes from an IME composition does not leave Edit mode", async () => {
+    await startEditing();
+    press("Escape", { repeat: true });
+    press("Escape", { isComposing: true });
+    expect(document.querySelector(".cm-editor")).toBeTruthy();
+  });
+
+  it("Save without edits on a CRLF file writes the same bytes", async () => {
+    Object.assign(disk, { text: "x\r\ny\r\n" });
+    await startEditing();
+    typeAtEnd("z");
+    act(() => view().dispatch({ changes: { from: view().state.doc.length - 1, to: view().state.doc.length, insert: "" } }));
+    // Back to the original text: not dirty, so the Draft's text is the file's text.
+    expect(useDrafts.getState().drafts[key].state.sliceDoc()).toBe("x\r\ny\r\n");
+    await act(async () => void (await import("./save")).saveDraft(key, { force: true }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0][1]).toMatchObject({ text: "x\r\ny\r\n" });
   });
 
   it("Edit pins the Open item before the Draft can be dirty, so another file keeps it", async () => {
@@ -201,6 +232,7 @@ describe("FileViewer edit mode", () => {
     typeAtEnd("more");
     await act(async () => land({ kind: "text", text: "agent\n", truncated: false, size: 6, mtime: 3, cksum: 22, editable: true }));
     expect(document.querySelector(".cm-content")?.textContent).toContain("onemine" + "more");
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining("Not reloaded"));
     expect(useDrafts.getState().drafts[key].dirty).toBe(true);
   });
 

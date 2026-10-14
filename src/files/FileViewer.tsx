@@ -182,7 +182,11 @@ export function FileViewer({ item }: Props) {
       (content) => {
         // Edits typed while the read was under way are not the ones the user chose to drop.
         const now = useDrafts.getState().drafts[draftId];
-        if (!now || now.id !== before?.id || now.state !== before.state) return;
+        if (!now) return;
+        if (now.id !== before?.id || now.state !== before.state) {
+          showToast(`Not reloaded: ${rel.split("/").pop()} was edited meanwhile`);
+          return;
+        }
         const base = diskVersion(content);
         if (base) useDrafts.getState().open({ fk: key, machineId, root, rel }, base);
         else useDrafts.getState().drop(draftId);
@@ -201,6 +205,7 @@ export function FileViewer({ item }: Props) {
     // A dialog over the file (Change folder…, Unsaved Changes) keeps its keys.
     if (document.querySelector(".overlay")) return;
     if (e.key === "Escape" && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey) {
+      if (e.repeat || e.isComposing) return;
       // The editor's search panel takes the Esc that closes it (it prevents the default); one still open keeps it too.
       if (draft && !e.defaultPrevented && !document.querySelector(".files-editor .cm-search")) done();
       return;
@@ -291,6 +296,7 @@ export function FileViewer({ item }: Props) {
             ))}
           </div>
         )}
+        {(draft || editable || mixedEnds) && (
         <div className="files-mode files-edit" role="group" aria-label="Edit">
           {draft ? (
             <>
@@ -301,10 +307,11 @@ export function FileViewer({ item }: Props) {
             </>
           ) : editable ? (
             <button type="button" aria-label="Edit" onClick={edit}>Edit</button>
-          ) : mixedEnds ? (
+          ) : (
             <button type="button" aria-label="Edit" disabled title="Mixed line endings">Edit</button>
-          ) : null}
+          )}
         </div>
+        )}
       </div>
       {draft?.conflict && (
         <div className={`files-banner files-banner-conflict${flash ? " flash" : ""}`} role="alert">
