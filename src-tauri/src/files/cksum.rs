@@ -1,4 +1,4 @@
-//! POSIX `cksum` CRC (ADR-0007): the version check of a save compares it with the `cksum` binary's output on the Machine.
+//! POSIX `cksum` CRC (ADR-0009): the version check of a save compares it with the `cksum` binary's output on the Machine.
 
 const TABLE: [u32; 256] = build_table();
 
@@ -64,7 +64,14 @@ mod tests {
     #[test]
     fn matches_the_cksum_binary() {
         let long: Vec<u8> = (0..70_000u32).map(|i| (i * 31 % 251) as u8).collect();
-        for sample in [&b"a"[..], b"a\r\nb\n", "héllo wörld\n".as_bytes(), &long] {
+        for sample in [
+            &b""[..],
+            b"a",
+            &[0u8, 255, 13, 10][..],
+            b"a\r\nb\n",
+            "héllo wörld\n".as_bytes(),
+            &long,
+        ] {
             assert_eq!(cksum(sample), system(sample), "{} bytes", sample.len());
         }
     }

@@ -2,6 +2,7 @@
 //!
 //! A cached copy is the file's first bytes. The Machine checks it still is by comparing the
 //! `cksum` of the copy's last `WINDOW` bytes with its own bytes at the same place.
+use crate::files::cksum::cksum;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -56,31 +57,6 @@ impl Slot {
 pub fn window_cksum(bytes: &[u8]) -> String {
     let w = &bytes[bytes.len().saturating_sub(WINDOW)..];
     format!("{} {}", cksum(w), w.len())
-}
-
-/// POSIX `cksum`: CRC-32 (polynomial 0x04C11DB7, MSB first) over the bytes, then the length.
-pub fn cksum(bytes: &[u8]) -> u32 {
-    fn feed(mut crc: u32, b: u8) -> u32 {
-        crc ^= (b as u32) << 24;
-        for _ in 0..8 {
-            crc = if crc & 0x8000_0000 != 0 {
-                (crc << 1) ^ 0x04C1_1DB7
-            } else {
-                crc << 1
-            };
-        }
-        crc
-    }
-    let mut crc = 0u32;
-    for &b in bytes {
-        crc = feed(crc, b);
-    }
-    let mut len = bytes.len();
-    while len > 0 {
-        crc = feed(crc, (len & 0xff) as u8);
-        len >>= 8;
-    }
-    !crc
 }
 
 /// Removes the least recently written copies until the rest fit in `budget` bytes.
