@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { draftKey, useDrafts } from "./drafts";
 import { FileEditor } from "./FileEditor";
+import { createEditorState } from "./editorSetup";
 
 const key = draftKey("fk", "a.ts");
 const text = "const a = 1;\nlet b = 2;\n";
@@ -37,7 +38,7 @@ describe.each(["light", "dark"])("FileEditor colours in the %s theme", (theme) =
   beforeEach(() => {
     document.documentElement.dataset.theme = theme;
     useDrafts.setState(useDrafts.getInitialState(), true);
-    useDrafts.getState().open({ fk: "fk", machineId: "m", root: "/r", rel: "a.ts" }, { text, size: text.length, mtime: 1, cksum: 1 });
+    useDrafts.getState().open({ fk: "fk", machineId: "m", root: "/r", rel: "a.ts" }, { text, size: text.length, mtime: 1, cksum: 1 }, createEditorState(text));
   });
 
   it("keeps every text colour at 4.5:1 or more against the editor background", async () => {

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { itemKey } from "../store/openItems";
 import { draftKey, isDirty, useDrafts, type DiskVersion } from "./drafts";
 import { filesKey } from "./store";
+import { createEditorState } from "./editorSetup";
 
 const ws = { machine_id: "local", session: "default", workspace_id: "w1" };
 const fk = filesKey(ws, "/r");
@@ -32,7 +33,7 @@ describe("drafts", () => {
   });
 
   it("is dirty after typing and clean again after undoing back to the base", () => {
-    useDrafts.getState().open(target("a.txt"), base("one\n"));
+    useDrafts.getState().open(target("a.txt"), base("one\n"), createEditorState("one\n"));
     expect(d("a.txt").dirty).toBe(false);
     type("a.txt", "two");
     expect(isDirty(draftKey(fk, "a.txt"))).toBe(true);
@@ -41,18 +42,18 @@ describe("drafts", () => {
   });
 
   it("rebases a clean draft onto newer disk content but never a dirty one", () => {
-    useDrafts.getState().open(target("a.txt"), base("one\n"));
-    useDrafts.getState().rebase(draftKey(fk, "a.txt"), base("agent\n", 2));
+    useDrafts.getState().open(target("a.txt"), base("one\n"), createEditorState("one\n"));
+    useDrafts.getState().rebase(draftKey(fk, "a.txt"), base("agent\n", 2), createEditorState("agent\n"));
     expect(d("a.txt").state.sliceDoc()).toBe("agent\n");
     expect(d("a.txt").base.cksum).toBe(2);
     type("a.txt", "mine");
-    useDrafts.getState().rebase(draftKey(fk, "a.txt"), base("agent again\n", 3));
+    useDrafts.getState().rebase(draftKey(fk, "a.txt"), base("agent again\n", 3), createEditorState("agent again\n"));
     expect(d("a.txt").state.sliceDoc()).toBe("agent\nmine");
     expect(d("a.txt").base.cksum).toBe(2);
   });
 
   it("after a save stays dirty only for text typed since", () => {
-    useDrafts.getState().open(target("a.txt"), base("one\n"));
+    useDrafts.getState().open(target("a.txt"), base("one\n"), createEditorState("one\n"));
     type("a.txt", "x");
     useDrafts.getState().setSaving(draftKey(fk, "a.txt"), true);
     useDrafts.getState().saved(draftKey(fk, "a.txt"), base("one\nx", 5));
@@ -67,7 +68,7 @@ describe("drafts", () => {
 
   it("touch refreshes the base mtime and clears a conflict without replacing the state", () => {
     const k = draftKey(fk, "a.txt");
-    useDrafts.getState().open(target("a.txt"), base("one\n"));
+    useDrafts.getState().open(target("a.txt"), base("one\n"), createEditorState("one\n"));
     type("a.txt", "mine");
     useDrafts.getState().setConflict(k, "removed");
     const before = d("a.txt").state;
@@ -78,7 +79,7 @@ describe("drafts", () => {
 
   it("counts the saves that landed", () => {
     const k = draftKey(fk, "a.txt");
-    useDrafts.getState().open(target("a.txt"), base("one\n"));
+    useDrafts.getState().open(target("a.txt"), base("one\n"), createEditorState("one\n"));
     useDrafts.getState().saved(k, base("one\n", 2));
     expect(d("a.txt").gen).toBe(1);
   });

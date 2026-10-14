@@ -10,11 +10,12 @@ import { saveDraft } from "./save";
 import { filesKey } from "./store";
 import { UnsavedDialog } from "./unsaved";
 import { showToast } from "../ui/Toast";
+import { createEditorState } from "./editorSetup";
 
 const ws = { machine_id: "local", session: "default", workspace_id: "w1" };
 const fk = filesKey(ws, "/r");
 const openDraft = (rel: string, dirty: boolean) => {
-  useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 });
+  useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 }, createEditorState("t"));
   if (dirty) {
     const s = useDrafts.getState().drafts[draftKey(fk, rel)].state;
     useDrafts.getState().update(draftKey(fk, rel), s.update({ changes: { from: 0, insert: "!" } }).state);

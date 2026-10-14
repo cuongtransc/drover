@@ -1,7 +1,7 @@
 # File viewer Edit mode
 
 Date: 2026-10-14
-Status: implemented
+Status: implemented; GUI walk and real-ssh run pending
 
 ## Purpose
 

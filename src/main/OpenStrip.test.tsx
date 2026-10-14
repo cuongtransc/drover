@@ -6,6 +6,7 @@ import { filesKey } from "../files/store";
 import { OpenStrip } from "./OpenStrip";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import type { MachineView, PaneView } from "../lib/types";
+import { createEditorState } from "../files/editorSetup";
 
 const pane = (id: string, title: string, status: PaneView["status"]): PaneView => ({
   pane_id: id, terminal_id: "t" + id, title, cwd: "/x", agent: "claude", status,
@@ -151,7 +152,7 @@ describe("OpenStrip", () => {
     const fk = filesKey(ws, "/r");
     useApp.getState().openFile(ws, "/r", "a.md", { pin: true });
     useApp.getState().openFile(ws, "/r", "b.md", { pin: true });
-    for (const rel of ["a.md", "b.md"]) useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 });
+    for (const rel of ["a.md", "b.md"]) useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 }, createEditorState("t"));
     const s = useDrafts.getState().drafts[draftKey(fk, "a.md")].state;
     useDrafts.getState().update(draftKey(fk, "a.md"), s.update({ changes: { from: 0, insert: "!" } }).state);
     render(<OpenStrip />);

@@ -23,10 +23,11 @@ vi.mock("./terminal/TerminalLens", () => ({ TerminalLens: () => null }));
 import App from "./App";
 import { draftKey, useDrafts } from "./files/drafts";
 import { filesKey } from "./files/store";
+import { createEditorState } from "./files/editorSetup";
 
 const fk = filesKey({ machine_id: "local", session: "default", workspace_id: "w1" }, "/r");
 const openDraft = (rel: string, dirty: boolean) => {
-  useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 });
+  useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 }, createEditorState("t"));
   if (dirty) {
     const s = useDrafts.getState().drafts[draftKey(fk, rel)].state;
     useDrafts.getState().update(draftKey(fk, rel), s.update({ changes: { from: 0, insert: "!" } }).state);

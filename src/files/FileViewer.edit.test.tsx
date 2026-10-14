@@ -353,30 +353,40 @@ describe("FileViewer edit mode", () => {
     await waitFor(() => expect(screen.queryByText("File changed on disk")).toBeNull());
   });
 
-  it("the app's own save echoing back raises nothing", async () => {
+  it("a read landing while the app's own save is in flight raises nothing, before or after the save", async () => {
     await startEditing();
     typeAtEnd("two\n");
     let finish!: (v: unknown) => void;
     vi.mocked(invoke).mockImplementationOnce(() => new Promise((r) => (finish = r)));
     press("s", { metaKey: true });
+    await waitFor(() => expect(useDrafts.getState().drafts[key].saving).toBe(true));
+    // The disk already has the saved text; the watch echo reads it while the write has not returned.
     Object.assign(disk, { text: "one\ntwo\n", cksum: 10, mtime: 2 });
     publish([own]);
     await waitFor(() => expect(reads()).toBe(2));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    // Still saving: nothing may have been raised yet.
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ saving: true, conflict: null });
+    expect(screen.queryByText("File changed on disk")).toBeNull();
     await act(async () => finish({ size: 8, mtime: 2, cksum: 10 }));
     expect(screen.queryByText("File changed on disk")).toBeNull();
     expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, conflict: null });
   });
 
-  it("an echo arriving after the save leaves the editor state alone", async () => {
+  it("a read that began before the save and lands after it is ignored, even with a different mtime", async () => {
     await startEditing();
     typeAtEnd("two\n");
+    let land!: (v: unknown) => void;
+    vi.mocked(invoke).mockImplementationOnce(() => new Promise((r) => (land = r)));
+    publish([own]);
+    await waitFor(() => expect(land).toBeDefined());
     press("s", { metaKey: true });
     await waitFor(() => expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, saving: false, gen: 1 }));
     const state = useDrafts.getState().drafts[key].state;
-    Object.assign(disk, { text: "one\ntwo\n", cksum: 10, mtime: 2 });
-    publish([own]);
-    await waitFor(() => expect(reads()).toBe(2));
-    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    expect(useDrafts.getState().drafts[key].base.mtime).toBe(2);
+    // Same bytes as the saved text, a later mtime: without the gen guard this would refresh the base.
+    await act(async () => land({ kind: "text", text: "one\ntwo\n", truncated: false, size: 8, mtime: 3, cksum: 10, editable: true }));
+    expect(useDrafts.getState().drafts[key].base.mtime).toBe(2);
     expect(useDrafts.getState().drafts[key].state).toBe(state);
     expect(useDrafts.getState().drafts[key].conflict).toBeNull();
   });

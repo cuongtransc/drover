@@ -1,7 +1,8 @@
 import type { EditorState, Text } from "@codemirror/state";
 import { create } from "zustand";
-import type { FileContent, FileVersion } from "../lib/types";
-import { canEdit, createEditorState } from "./editorSetup";
+import type { FileVersion } from "../lib/types";
+
+// Types only: this module is in the eager bundle (Open items, strip, quit guard); CodeMirror loads with the viewer.
 
 /** What a file looked like on disk when a Draft last matched it. */
 export interface DiskVersion extends FileVersion {
@@ -32,18 +33,13 @@ export interface Draft extends DraftTarget {
 /** A Draft's key is its file Open item's key. */
 export const draftKey = (fk: string, rel: string): string => "file:" + fk + "|" + rel;
 
-export function diskVersion(c: FileContent): DiskVersion | null {
-  if (!canEdit(c) || c.text === null || c.cksum === null) return null;
-  return { text: c.text, size: c.size, mtime: c.mtime, cksum: c.cksum };
-}
-
 interface DraftsState {
   drafts: Record<string, Draft>;
-  /** (Re)creates a clean Draft. */
-  open(target: DraftTarget, base: DiskVersion): void;
+  /** (Re)creates a clean Draft over `state`, built from `base.text` by the caller (createEditorState). */
+  open(target: DraftTarget, base: DiskVersion, state: EditorState): void;
   update(key: string, state: EditorState): void;
   /** A clean Draft takes the new disk content; a dirty or saving one is left alone. */
-  rebase(key: string, base: DiskVersion): void;
+  rebase(key: string, base: DiskVersion, state: EditorState): void;
   saved(key: string, base: DiskVersion): void;
   /** The disk file has the same size and checksum as the base (only its mtime moved): keeps the state and history. */
   touch(key: string, mtime: number): void;
@@ -65,16 +61,14 @@ export const useDrafts = create<DraftsState>()((set) => {
 
   return {
     drafts: {},
-    open: (target, base) => {
-      const state = createEditorState(base.text);
+    open: (target, base, state) => {
       const draft: Draft = { ...target, id: nextId++, state, base, baseDoc: state.doc, dirty: false, conflict: null, saving: false, gen: 0 };
       set((s) => ({ drafts: { ...s.drafts, [draftKey(target.fk, target.rel)]: draft } }));
     },
     update: (key, state) => patch(key, (d) => ({ state, dirty: !state.doc.eq(d.baseDoc) })),
-    rebase: (key, base) =>
+    rebase: (key, base, state) =>
       patch(key, (d) => {
         if (d.dirty || d.saving) return {};
-        const state = createEditorState(base.text);
         return { state, base, baseDoc: state.doc };
       }),
     saved: (key, base) =>

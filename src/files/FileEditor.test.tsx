@@ -5,10 +5,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { languageSlot } from "./editorSetup";
 import { draftKey, useDrafts } from "./drafts";
 import { FileEditor } from "./FileEditor";
+import { createEditorState } from "./editorSetup";
 
 const key = draftKey("fk", "a.ts");
 const open = (text: string) =>
-  useDrafts.getState().open({ fk: "fk", machineId: "m", root: "/r", rel: "a.ts" }, { text, size: text.length, mtime: 1, cksum: 1 });
+  useDrafts.getState().open({ fk: "fk", machineId: "m", root: "/r", rel: "a.ts" }, { text, size: text.length, mtime: 1, cksum: 1 }, createEditorState(text));
 const viewOf = (c: HTMLElement) => EditorView.findFromDOM(c.querySelector(".cm-editor") as HTMLElement)!;
 const hasLanguage = (v: EditorView) => {
   const ext = languageSlot.get(v.state);

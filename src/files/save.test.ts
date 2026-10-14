@@ -5,11 +5,12 @@ vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 import { showToast } from "../ui/Toast";
 import { draftKey, useDrafts } from "./drafts";
 import { saveDraft } from "./save";
+import { createEditorState } from "./editorSetup";
 
 const fk = "fk";
 const key = draftKey(fk, "src/a.txt");
 const open = (text = "one\n") =>
-  useDrafts.getState().open({ fk, machineId: "m1", root: "/r", rel: "src/a.txt" }, { text, size: text.length, mtime: 10, cksum: 99 });
+  useDrafts.getState().open({ fk, machineId: "m1", root: "/r", rel: "src/a.txt" }, { text, size: text.length, mtime: 10, cksum: 99 }, createEditorState(text));
 const typeEnd = (s: string) => {
   const st = useDrafts.getState().drafts[key].state;
   useDrafts.getState().update(key, st.update({ changes: { from: st.doc.length, insert: s } }).state);
@@ -85,7 +86,7 @@ describe("saveDraft", () => {
     let done!: (v: unknown) => void;
     vi.mocked(invoke).mockReturnValueOnce(new Promise((res) => (done = res)));
     const p = saveDraft(key, { force: true });
-    useDrafts.getState().rebase(key, { text: "other\n", size: 6, mtime: 20, cksum: 1 });
+    useDrafts.getState().rebase(key, { text: "other\n", size: 6, mtime: 20, cksum: 1 }, createEditorState("other\n"));
     done({ size: 4, mtime: 11, cksum: 5 });
     expect(await p).toBe(true);
     expect(useDrafts.getState().drafts[key]).toMatchObject({ saving: false, base: { text: "one\n", cksum: 5 } });

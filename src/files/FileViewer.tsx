@@ -9,8 +9,8 @@ import { CopyIcon, FileCopyIcon, OutlineIcon } from "../ui/icons";
 import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
 import { closeItemsGuarded, settleDrafts } from "./closeGuard";
-import { diskVersion, draftKey, isDirty, useDrafts } from "./drafts";
-import { canEdit, roundTrips } from "./editorSetup";
+import { draftKey, isDirty, useDrafts } from "./drafts";
+import { canEdit, createEditorState, diskVersion, roundTrips } from "./editorSetup";
 import { FileEditor } from "./FileEditor";
 import type { FindStatus } from "./find";
 import { FindBar } from "./FindBar";
@@ -96,7 +96,7 @@ export function FileViewer({ item, online }: Props) {
           } else {
             const base = diskVersion(content);
             if (base) {
-              rebase(dk, base);
+              rebase(dk, base, createEditorState(base.text));
               if (d.conflict) setConflict(dk, null);
             } else setConflict(dk, "changed");
           }
@@ -197,7 +197,7 @@ export function FileViewer({ item, online }: Props) {
     // A preview item is replaced by the next file opened; a Draft's item must stay until it is settled.
     // Pinned first, so the Draft is never dirty while its item can still be replaced.
     useApp.getState().pinItem(draftId);
-    useDrafts.getState().open({ fk: key, machineId, root, rel }, base);
+    useDrafts.getState().open({ fk: key, machineId, root, rel }, base, createEditorState(base.text));
   };
   const done = () => void settleDrafts([draftId]);
   const save = () => {
@@ -221,7 +221,7 @@ export function FileViewer({ item, online }: Props) {
           return;
         }
         const base = diskVersion(content);
-        if (base) useDrafts.getState().open({ fk: key, machineId, root, rel }, base);
+        if (base) useDrafts.getState().open({ fk: key, machineId, root, rel }, base, createEditorState(base.text));
         else useDrafts.getState().drop(draftId);
         setDoc({ rel, content });
       },

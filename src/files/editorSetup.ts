@@ -12,6 +12,7 @@ import { ChangeSet, Compartment, EditorSelection, EditorState, type Extension, t
 import { tags as t } from "@lezer/highlight";
 import { highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
 import type { FileContent } from "../lib/types";
+import type { DiskVersion } from "./drafts";
 
 /** FileEditor fills this once the file's language has loaded. */
 export const languageSlot = new Compartment();
@@ -119,3 +120,9 @@ export async function languageFor(rel: string): Promise<LanguageSupport | null> 
   const description = LanguageDescription.matchFilename(languages, rel.slice(rel.lastIndexOf("/") + 1));
   return description ? description.load() : null;
 }
+
+export function diskVersion(c: FileContent): DiskVersion | null {
+  if (!canEdit(c) || c.text === null || c.cksum === null) return null;
+  return { text: c.text, size: c.size, mtime: c.mtime, cksum: c.cksum };
+}
+

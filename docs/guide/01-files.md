@@ -24,7 +24,9 @@ The File viewer opens in view mode. To change a file's content:
 | Start editing | **Edit** on the viewer header, or ⌘⇧E |
 | Save | ⌘S. An item with unsaved changes shows a dot (●) on its Open strip entry |
 | Stop editing | **Done**, ⌘⇧E again, or Esc (Esc does nothing while a dialog or the editor's find panel is open) |
-| Close or quit with unsaved changes | ⌘W, the red window button and ⌘Q ask **Save** / **Discard** / **Cancel** first |
+| Close or quit with unsaved changes | ⌘W, the red window button, ⌘Q and the Open strip's **Remove**, **Remove Others**, **Remove to the Right** and **Remove All** ask **Save** / **Discard** / **Cancel** first |
+
+Dock → Quit and logging out do not ask yet, so save before using them.
 
 A save never silently overwrites a file that changed after you opened it. If an Agent or a
 pane changed the file, a banner says **File changed on disk** with **Reload** (drop your edits, take
