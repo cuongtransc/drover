@@ -1176,6 +1176,8 @@ kbd {
 .chat-assistant a.chat-path { color: inherit; border-bottom: 0; cursor: pointer; }
 .chat-assistant a.chat-path code { text-decoration: underline dotted currentColor; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
 .chat-assistant a.chat-path:hover code { color: var(--link); text-decoration-style: solid; }
+.chat-assistant a.chat-path-plain { text-decoration: underline dotted currentColor; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.chat-assistant a.chat-path-plain:hover { color: var(--link); text-decoration-style: solid; }
 .chat-thinking summary { cursor: pointer; color: var(--fg-3); font-size: 12px; font-style: italic; list-style: none; }
 .chat-thinking summary::-webkit-details-marker { display: none; }
 .chat-thinking summary { display: inline-flex; align-items: center; gap: 6px; }

@@ -14,9 +14,9 @@ const message = (e: unknown) => String((e as { message?: string } | null)?.messa
  * Inline code in a chat message. A file path becomes a link that opens in Files at its `:line`,
  * rooted at the pane's workspace folder, or at the file's own folder when it is outside. Cmd+click
  * on this Mac hands it to macOS instead. Anything else, or a path this app cannot reach, renders as
- * plain code.
+ * plain code. `plain` is a path written in prose: its link holds the text as it was, not code.
  */
-export function PathCode({ text, children }: { text: string; children?: ReactNode }) {
+export function PathCode({ text, children, plain }: { text: string; children?: ReactNode; plain?: boolean }) {
   const pane = useContext(ChatPaneContext);
   const ref = useMemo(() => parsePathRef(text), [text]);
   const machine = useApp((s) => (pane && ref ? s.machines[pane.machine_id] : undefined));
@@ -31,7 +31,7 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
     return target && { wsRef, root, target };
   }, [pane, ref, machine]);
 
-  if (!place) return <code>{children}</code>;
+  if (!place) return plain ? <>{children}</> : <code>{children}</code>;
   const { wsRef, root, target } = place;
   const local = machine?.kind === "local";
   const open = (mac: boolean) => {
@@ -50,7 +50,7 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
   };
   return (
     <a
-      className="chat-path"
+      className={plain ? "chat-path chat-path-plain" : "chat-path"}
       href={target.abs}
       title={local ? "Open in Files · ⌘-click: open on this Mac" : `Open in Files, from ${machine?.label ?? pane?.machine_id}`}
       onClick={(e) => {
@@ -58,7 +58,7 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
         open(local && e.metaKey);
       }}
     >
-      <code>{children}</code>
+      {plain ? children : <code>{children}</code>}
     </a>
   );
 }

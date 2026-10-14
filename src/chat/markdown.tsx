@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { CopyButton } from "./CopyButton";
 import { MermaidBlock } from "./MermaidBlock";
 import { PathCode } from "./PathCode";
+import { remarkBarePaths } from "./remarkPaths";
 
 /** The fenced block's language, from the `language-x` class rehype-highlight leaves on `<code>`. */
 function codeLanguage(node: unknown): string | null {
@@ -70,6 +71,8 @@ export const mdComponents: Components = {
     if (inPre || inLink || className) return <code className={className}>{children}</code>;
     return <PathCode text={nodeText(node)}>{children}</PathCode>;
   },
+  // A file path written in prose without backticks (`remarkBarePaths`) links the same way.
+  ...({ "path-ref": ({ node, children }: { node?: unknown; children?: ReactNode }) => <PathCode text={nodeText(node)} plain>{children}</PathCode> } as Components),
   table({ children }) {
     return (
       <div className="chat-table">
@@ -98,5 +101,5 @@ export const mdComponents: Components = {
     return <span className="chat-image-link">{text}</span>;
   },
 };
-export const remarkPlugins = [remarkGfm];
+export const remarkPlugins = [remarkGfm, remarkBarePaths];
 export const rehypePlugins = [[rehypeHighlight, { detect: false }]] as never;

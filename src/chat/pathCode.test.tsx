@@ -79,6 +79,21 @@ describe("paths in chat", () => {
     expect(openLocalFile).not.toHaveBeenCalled();
   });
 
+  it("links a bare path in prose the same way, keeping the text around it", () => {
+    show("- /Users/me/other/notes/a.md: why not teams");
+    const link = screen.getByRole("link", { name: "/Users/me/other/notes/a.md" });
+    expect(link.querySelector("code")).toBeNull();
+    expect(link.parentElement?.textContent).toBe("/Users/me/other/notes/a.md: why not teams");
+    fireEvent.click(link);
+    const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+    expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/other/notes", rel: "a.md" }]);
+  });
+
+  it("never links a bare path inside a markdown link", () => {
+    show("[the note /Users/me/a.md](https://example.com)");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
   it("leaves code that is not a path as code", () => {
     show("`mise run ci`");
     expect(screen.queryByRole("link")).toBeNull();
