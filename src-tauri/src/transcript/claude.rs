@@ -2241,6 +2241,21 @@ mod tests {
         assert_eq!(left, vec!["t3".to_string()]);
     }
 
+    /// The transcripts an audit reads from `LIST`. A subagent's own transcript
+    /// (`<session>/subagents/*.jsonl`) is left out: Drover never opens one, and every record
+    /// in it is `isSidechain`, which the parser skips, so its calls would all read as missed.
+    fn audit_files(list: &str) -> Vec<&str> {
+        list.lines()
+            .filter(|f| !f.contains("/subagents/"))
+            .collect()
+    }
+
+    #[test]
+    fn an_audit_leaves_subagent_transcripts_out() {
+        let list = "/p/-x/s1.jsonl\n/p/-x/s1/subagents/agent-a1.jsonl\n/p/-y/s2.jsonl";
+        assert_eq!(audit_files(list), vec!["/p/-x/s1.jsonl", "/p/-y/s2.jsonl"]);
+    }
+
     /// Runs the parser over real transcripts and prints every task still running at
     /// the end (`LEFT`), to find an end shape it misses, and every call the CLI reports
     /// on in a notification that was never shown as a task (`UNTRACKED`), to find a
@@ -2254,7 +2269,7 @@ mod tests {
         let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
             return;
         };
-        for file in list.unwrap_or_default().lines() {
+        for file in audit_files(&list.unwrap_or_default()) {
             let Ok(text) = std::fs::read_to_string(file) else {
                 continue;
             };
@@ -2439,7 +2454,7 @@ mod tests {
         let Ok(list) = std::env::var("LIST").map(std::fs::read_to_string) else {
             return;
         };
-        for file in list.unwrap_or_default().lines() {
+        for file in audit_files(&list.unwrap_or_default()) {
             let Ok(text) = std::fs::read_to_string(file) else {
                 continue;
             };
@@ -2479,7 +2494,7 @@ mod tests {
         let wrapped =
             |text: &str| text.contains("<pasted_content") || text.contains("</pasted_content");
         let head = |text: &str| text.chars().take(80).collect::<String>();
-        for file in list.unwrap_or_default().lines() {
+        for file in audit_files(&list.unwrap_or_default()) {
             let Ok(text) = std::fs::read_to_string(file) else {
                 continue;
             };
@@ -2515,7 +2530,7 @@ mod tests {
                 .collect::<String>()
                 .replace('\n', "⏎")
         };
-        for file in list.unwrap_or_default().lines() {
+        for file in audit_files(&list.unwrap_or_default()) {
             let Ok(text) = std::fs::read_to_string(file) else {
                 continue;
             };
