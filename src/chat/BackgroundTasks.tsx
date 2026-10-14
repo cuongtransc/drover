@@ -49,10 +49,7 @@ function Strip({ tasks, onJump }: { tasks: BackgroundTask[]; onJump: (callId: st
                 <span aria-hidden="true" />
                 <span className="chat-background-kind">{KIND[t.kind]}</span>
                 <span className="chat-background-desc">{t.description}</span>
-                <span className="chat-background-time">
-                  {t.waiting ? "waiting · " : ""}
-                  {formatWorkDuration(t.started, now)}
-                </span>
+                <span className="chat-background-time">{formatWorkDuration(t.started, now)}</span>
               </button>
             </li>
           ))}

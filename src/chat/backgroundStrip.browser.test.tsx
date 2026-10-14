@@ -18,7 +18,6 @@ const everyKind: BackgroundTask[] = [
   ...tasks,
   { call_id: "c", kind: "monitor", description: "Wait for the gate", started: "2026-10-11T00:00:00Z" },
   { call_id: "d", kind: "workflow", description: "Code review", started: "2026-10-11T00:00:00Z" },
-  { call_id: "e", kind: "agent", description: "Implement Task 4", started: "2026-10-11T00:00:00Z", waiting: true },
 ];
 
 async function render(theme: "light" | "dark", shown: BackgroundTask[] = tasks) {

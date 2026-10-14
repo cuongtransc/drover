@@ -223,11 +223,14 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   // of the original transcript must not claim the original's tasks. The value keeps its identity
   // while its content is unchanged, so an append does not re-render every tool card.
   const bgRef = useRef<BackgroundState>({ running: new Set(), ends: new Map() });
+  // An agent waiting on its own background work is done as Claude Code shows it (◯): only its
+  // shell runs, and the transcript may never report that shell ending.
+  const runningTasks = useMemo(() => state.background.filter((t) => !t.waiting), [state.background]);
   const background = useMemo(() => {
-    const running = new Set(view.agent && !preview ? state.background.map((t) => t.call_id) : []);
+    const running = new Set(view.agent && !preview ? runningTasks.map((t) => t.call_id) : []);
     bgRef.current = stableBackground(bgRef.current, { running, ends: taskEnds(items) });
     return bgRef.current;
-  }, [state.background, items, view.agent, preview]);
+  }, [runningTasks, items, view.agent, preview]);
   const sessionPrompts = useMemo(
     () => items.flatMap((i) => (i.kind === "user" && i.text.trim() ? [i.text] : [])),
     [items],
@@ -486,7 +489,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
           <ArrowDownIcon /> New messages
         </button>
       )}
-      {view.agent && <BackgroundTasks tasks={state.background} onJump={jumpToCall} />}
+      {view.agent && <BackgroundTasks tasks={runningTasks} onJump={jumpToCall} />}
       <QueuedMessages texts={state.queued} />
       <EditPanel pane={pane} />
       <WorkingIndicator status={view.status} start={start} />

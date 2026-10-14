@@ -438,6 +438,21 @@ describe("ChatLens", () => {
       expect(screen.queryByText("background · running")).toBeNull();
     });
 
+    // Claude Code shows such an agent as done (◯): only its own shell runs, which the
+    // transcript may never report ending.
+    it("neither badges nor lists an agent waiting on its own background work", async () => {
+      await load();
+      act(() =>
+        channels[channels.length - 1].onmessage({
+          type: "meta", model: null, effort: null, context_tokens: null, queued: [],
+          background: [{ call_id: "bg1", kind: "agent", description: "Review", started: null, waiting: true }],
+        }),
+      );
+      expect(screen.queryByRole("button", { name: /in background/ })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
+      expect(screen.queryByText("background · running")).toBeNull();
+    });
+
     it("shows a neutral `ended` for a task end with no status", async () => {
       await load([{ kind: "system", text: "", task: { call_id: "bg1", status: "" } }]);
       fireEvent.click(screen.getByRole("button", { name: /^Worked/ }));
