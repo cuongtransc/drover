@@ -6,9 +6,10 @@ use crate::{
     files::{
         all::{self, FileList},
         changed::{self, Changed},
+        edit,
         list::{self, Entry},
         paths::{check_rel, resolve_root},
-        read::{self, FileContent},
+        read::{self, FileContent, FileVersion},
         transfer,
         watch::{watch_refusal, WatchEvent},
         watch_manager::{FilesWatch, WatchSink},
@@ -841,6 +842,20 @@ pub async fn files_read(
     let root = files_root(&mgr, &machine_id, &root)?;
     let t = mgr.transport(&machine_id)?;
     read::read_file(&*t, &root, &rel).await
+}
+
+#[tauri::command]
+pub async fn files_write(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+    text: String,
+    expected: Option<FileVersion>,
+) -> Result<FileVersion, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    edit::write(&*t, &root, &rel, &text, expected).await
 }
 
 /// Who owns each lane, from `ctc lane list --json` on the Machine; `None` when its ctc reports no owner.

@@ -3,7 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showToast } from "../ui/Toast";
 import type { LaneRecord } from "../agents/roles";
-import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
+import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, FileVersion, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
 
 export const machinesList = () => invoke<MachineView[]>("machines_list");
 export const machineConnect = (id: string) => invoke<void>("machine_connect", { id });
@@ -139,6 +139,8 @@ export const filesListAll = (machineId: string, root: string, hidden: string[]) 
   invoke<FileList>("files_list_all", { machineId, root, hidden });
 export const filesRead = (machineId: string, root: string, rel: string) =>
   invoke<FileContent>("files_read", { machineId, root, rel });
+export const filesWrite = (machineId: string, root: string, rel: string, text: string, expected: FileVersion | null) =>
+  invoke<FileVersion>("files_write", { machineId, root, rel, text, expected });
 export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
 export const filesImage = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_image", { machineId, root, rel });
