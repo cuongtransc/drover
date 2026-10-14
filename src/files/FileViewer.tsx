@@ -8,8 +8,8 @@ import { itemKey, type OpenItem } from "../store/openItems";
 import { CopyIcon, FileCopyIcon, OutlineIcon } from "../ui/icons";
 import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
-import { settleDrafts } from "./closeGuard";
-import { diskVersion, isDirty, useDrafts } from "./drafts";
+import { closeItemsGuarded, settleDrafts } from "./closeGuard";
+import { diskVersion, draftKey, isDirty, useDrafts } from "./drafts";
 import { canEdit, roundTrips } from "./editorSetup";
 import { FileEditor } from "./FileEditor";
 import type { FindStatus } from "./find";
@@ -33,7 +33,7 @@ interface Props {
 }
 
 /** Shows one open file: breadcrumbs, render/source, find, and a re-read when the change bus says so. */
-export function FileViewer({ item }: Props) {
+export function FileViewer({ item, online }: Props) {
   const { ws, root, rel } = item;
   const machineId = ws.machine_id;
   const key = filesKey(ws, root);
@@ -58,8 +58,24 @@ export function FileViewer({ item }: Props) {
   const reloads = useFilesBus((s) => s.reloads[key] ?? 0);
   const batch = useFilesBus((s) => s.batches[key]);
 
+  /** A file that is gone: a Draft keeps its text and says so, otherwise the plain banner shows. */
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
+  const gone = useCallback(
+    (r: string) => {
+      const dk = draftKey(key, r);
+      // A Machine that is not connected fails every read with not_found; that says nothing about the file.
+      if (useDrafts.getState().drafts[dk]) {
+        if (onlineRef.current) useDrafts.getState().setConflict(dk, "removed");
+      } else setRemoved(r);
+    },
+    [key],
+  );
+
   const load = useCallback(
     (r: string) => {
+      const dk = draftKey(key, r);
+      const started = useDrafts.getState().drafts[dk];
       read(machineId, root, r).then(
         (content) => {
           if (content === STALE) return;
@@ -67,18 +83,35 @@ export function FileViewer({ item }: Props) {
           setError(null);
           setRemoved(null);
           setFolder(null);
+          // Read at resolve time: `saving` and `dirty` are as they are now, not as they were when the read began.
+          const { drafts, rebase, setConflict, touch } = useDrafts.getState();
+          const d = drafts[dk];
+          // Our own save, or a read that began before it (or before this Draft), says nothing about the file now.
+          if (!d || d.saving || !started || started.saving || started.id !== d.id || started.gen !== d.gen) return;
+          if (content.cksum === d.base.cksum && content.size === d.base.size) {
+            // Only the mtime moved (a touch, or our save echoing back): keep the editor state and its history.
+            if (content.mtime !== d.base.mtime || d.conflict) touch(dk, content.mtime);
+          } else if (d.dirty) {
+            setConflict(dk, "changed");
+          } else {
+            const base = diskVersion(content);
+            if (base) {
+              rebase(dk, base);
+              if (d.conflict) setConflict(dk, null);
+            } else setConflict(dk, "changed");
+          }
         },
         (e) => {
           const code = (e as { code?: string } | null)?.code;
           if (code === "is_dir") {
             setFolder(r);
             setFolderReload((n) => n + 1);
-          } else if (code === "not_found") setRemoved(r);
+          } else if (code === "not_found") gone(r);
           else setError({ rel: r, message: errMessage(e) });
         },
       );
     },
-    [read, machineId, root],
+    [read, machineId, root, key, gone],
   );
 
   useEffect(() => {
@@ -94,12 +127,12 @@ export function FileViewer({ item }: Props) {
     // A folder above it changed (e.g. removed or renamed): reading it again finds out.
     const above = (c: FileChange) => c.isDir && (c.path === "" || rel.startsWith(c.path + "/"));
     if (own) {
-      if (own.removed) setRemoved(rel);
+      if (own.removed) gone(rel);
       else load(rel);
     } else if (batch.changes.some(above)) load(rel);
     // A listed folder: a name in it came, went or changed.
     else if (folder === rel && batch.changes.some((c) => c.path.startsWith(rel + "/"))) setFolderReload((n) => n + 1);
-  }, [batch, rel, load, folder]);
+  }, [batch, rel, load, gone, folder]);
 
   // A link's fragment waits on the bus under the key of the file it targets; this viewer takes its own.
   const itemId = itemKey(item);
@@ -196,10 +229,8 @@ export function FileViewer({ item }: Props) {
     );
   };
   const overwrite = () => void saveDraft(draftId, { force: true });
-  const close = () => {
-    useDrafts.getState().drop(draftId);
-    useApp.getState().closeItems(draftId, "one");
-  };
+  // The Draft is dirty here, so closing asks first.
+  const close = () => void closeItemsGuarded(draftId, "one");
 
   const keys = (e: KeyboardEvent) => {
     // A dialog over the file (Change folder…, Unsaved Changes) keeps its keys.

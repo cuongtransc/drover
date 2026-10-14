@@ -1,3 +1,4 @@
+import { undo } from "@codemirror/commands";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -19,7 +20,7 @@ import { itemKey } from "../store/openItems";
 import { useFilesBus } from "./bus";
 import { useDrafts } from "./drafts";
 import { FileViewer } from "./FileViewer";
-import { useFiles } from "./store";
+import { filesKey, useFiles } from "./store";
 import { UnsavedDialog } from "./unsaved";
 
 const ws = { machine_id: "local", session: "default", workspace_id: "w1" };
@@ -266,5 +267,185 @@ describe("FileViewer edit mode", () => {
     expect(await screen.findByText("File was deleted")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Save again" }));
     await waitFor(() => expect(writes()[0][1]).toMatchObject({ expected: null }));
+  });
+
+  const publish = (changes: { path: string; isDir: boolean; removed: boolean }[]) =>
+    act(() => useFilesBus.getState().publish(filesKey(ws, "/r"), changes));
+  const own = { path: "a.txt", isDir: false, removed: false };
+  const reads = () => vi.mocked(invoke).mock.calls.filter((c) => c[0] === "files_read").length;
+  const text = () => document.querySelector(".cm-content")?.textContent;
+
+  it("a clean Draft follows the agent's write", async () => {
+    await startEditing();
+    Object.assign(disk, { text: "agent\n", cksum: 20, mtime: 5 });
+    publish([own]);
+    await waitFor(() => expect(text()).toContain("agent"));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a dirty Draft keeps text and undo after a new cksum; same cksum with a new mtime raises nothing", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    disk.mtime = 7;
+    publish([own]);
+    await waitFor(() => expect(reads()).toBe(2));
+    expect(screen.queryByText("File changed on disk")).toBeNull();
+    await waitFor(() => expect(useDrafts.getState().drafts[key].base.mtime).toBe(7));
+    const state = useDrafts.getState().drafts[key].state;
+    Object.assign(disk, { text: "agent\n", cksum: 21 });
+    publish([own]);
+    expect(await screen.findByText("File changed on disk")).toBeTruthy();
+    expect(text()).toContain("one" + "mine");
+    expect(useDrafts.getState().drafts[key].state).toBe(state);
+    expect(undo(view())).toBe(true);
+    expect(text()).toBe("one");
+  });
+
+  it("a touch refreshes the mtime, so the next save is not a false conflict", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    disk.mtime = 7;
+    publish([own]);
+    await waitFor(() => expect(useDrafts.getState().drafts[key].base.mtime).toBe(7));
+    press("s", { metaKey: true });
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0][1]).toMatchObject({ expected: { size: 4, mtime: 7, cksum: 9 } });
+  });
+
+  it("⌘R and switching away and back never replace a dirty Draft", async () => {
+    const first = render(<FileViewer key="1" item={item} online />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    typeAtEnd("mine");
+    const state = useDrafts.getState().drafts[key].state;
+    Object.assign(disk, { text: "agent\n", cksum: 31 });
+    press("r", { metaKey: true });
+    expect(await screen.findByText("File changed on disk")).toBeTruthy();
+    first.unmount();
+    render(<FileViewer key="2" item={item} online />);
+    await waitFor(() => expect(reads()).toBe(3));
+    expect(await screen.findByText("File changed on disk")).toBeTruthy();
+    expect(text()).toContain("onemine");
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: true });
+    expect(useDrafts.getState().drafts[key].state).toBe(state);
+  });
+
+  it("Reload takes the disk version after a batch", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    Object.assign(disk, { text: "agent\n", cksum: 22 });
+    publish([own]);
+    fireEvent.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(text()).toBe("agent"));
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, conflict: null, base: { cksum: 22 } });
+  });
+
+  it("⌘S while the banner is up does not write; Overwrite writes with expected null", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    Object.assign(disk, { text: "agent\n", cksum: 21 });
+    publish([own]);
+    await screen.findByText("File changed on disk");
+    press("s", { metaKey: true });
+    expect(writes()).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Overwrite" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0][1]).toMatchObject({ expected: null, text: "one\nmine" });
+    await waitFor(() => expect(screen.queryByText("File changed on disk")).toBeNull());
+  });
+
+  it("the app's own save echoing back raises nothing", async () => {
+    await startEditing();
+    typeAtEnd("two\n");
+    let finish!: (v: unknown) => void;
+    vi.mocked(invoke).mockImplementationOnce(() => new Promise((r) => (finish = r)));
+    press("s", { metaKey: true });
+    Object.assign(disk, { text: "one\ntwo\n", cksum: 10, mtime: 2 });
+    publish([own]);
+    await waitFor(() => expect(reads()).toBe(2));
+    await act(async () => finish({ size: 8, mtime: 2, cksum: 10 }));
+    expect(screen.queryByText("File changed on disk")).toBeNull();
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, conflict: null });
+  });
+
+  it("an echo arriving after the save leaves the editor state alone", async () => {
+    await startEditing();
+    typeAtEnd("two\n");
+    press("s", { metaKey: true });
+    await waitFor(() => expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, saving: false, gen: 1 }));
+    const state = useDrafts.getState().drafts[key].state;
+    Object.assign(disk, { text: "one\ntwo\n", cksum: 10, mtime: 2 });
+    publish([own]);
+    await waitFor(() => expect(reads()).toBe(2));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    expect(useDrafts.getState().drafts[key].state).toBe(state);
+    expect(useDrafts.getState().drafts[key].conflict).toBeNull();
+  });
+
+  it("a deleted file under a dirty Draft says so; Save again recreates it", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    publish([{ ...own, removed: true }]);
+    expect(await screen.findByText("File was deleted")).toBeTruthy();
+    expect(screen.queryByText("File removed")).toBeNull();
+    expect(text()).toContain("onemine");
+    fireEvent.click(screen.getByRole("button", { name: "Save again" }));
+    await waitFor(() => expect(writes()[0][1]).toMatchObject({ expected: null, text: "one\nmine" }));
+  });
+
+  it("Close on a deleted file asks first (the Draft is dirty); Discard closes the item", async () => {
+    useApp.getState().openFile(ws, "/r", "a.txt", { pin: true });
+    await startEditing();
+    typeAtEnd("mine");
+    publish([{ ...own, removed: true }]);
+    await screen.findByText("File was deleted");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(useApp.getState().openItems.items.map(itemKey)).toEqual([key]);
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(useApp.getState().openItems.items).toHaveLength(0));
+    expect(useDrafts.getState().drafts[key]).toBeUndefined();
+  });
+
+  it("Close on a deleted file then Cancel keeps the Draft and the item", async () => {
+    useApp.getState().openFile(ws, "/r", "a.txt", { pin: true });
+    await startEditing();
+    typeAtEnd("mine");
+    publish([{ ...own, removed: true }]);
+    await screen.findByText("File was deleted");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: true, conflict: "removed" });
+    expect(useApp.getState().openItems.items).toHaveLength(1);
+  });
+
+  it("a failed read while the machine is offline is not a deletion", async () => {
+    render(<FileViewer item={item} online={false} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    typeAtEnd("mine");
+    vi.mocked(invoke).mockImplementationOnce(async () => {
+      throw { code: "not_found", message: "machine local is not connected" };
+    });
+    publish([own]);
+    await waitFor(() => expect(reads()).toBe(2));
+    await act(async () => void (await new Promise((r) => setTimeout(r, 20))));
+    expect(screen.queryByText("File was deleted")).toBeNull();
+    expect(useDrafts.getState().drafts[key].conflict).toBeNull();
+  });
+
+  it("a read that began before a save and lands after it is ignored", async () => {
+    await startEditing();
+    typeAtEnd("mine");
+    let land!: (v: unknown) => void;
+    vi.mocked(invoke).mockImplementationOnce(() => new Promise((r) => (land = r)));
+    publish([own]);
+    await waitFor(() => expect(land).toBeDefined());
+    press("s", { metaKey: true });
+    await waitFor(() => expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false, saving: false }));
+    const state = useDrafts.getState().drafts[key].state;
+    await act(async () => land({ kind: "text", text: "one\n", truncated: false, size: 4, mtime: 1, cksum: 9, editable: true }));
+    expect(screen.queryByText("File changed on disk")).toBeNull();
+    expect(useDrafts.getState().drafts[key].state).toBe(state);
+    expect(useDrafts.getState().drafts[key].base.cksum).toBe(10);
   });
 });
