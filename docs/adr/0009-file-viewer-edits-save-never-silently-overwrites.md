@@ -38,6 +38,14 @@ a same-second, same-size rewrite would otherwise pass.
 - Each save reads the file once more on the Machine for its `cksum` (at most 2 MB).
 - ⌘Q goes through the page so unsaved Drafts are asked about; Quit from the Dock is not guarded.
 
+## Update 2026-10-14: Dock Quit and logout ask too
+
+tao (under Tauri 2.12) has no `applicationShouldTerminate:`, so Dock Quit, logout and restart
+ended the app without `RunEvent::ExitRequested`. Drover adds that method to tao's delegate class
+at startup (`quit_guard.rs`): with a dirty Draft it cancels the terminate and asks the page,
+which quits through `app_quit`. Cancel during logout makes macOS report that Drover cancelled
+it. If a later tao answers that selector itself, Drover leaves tao's answer and logs a warning.
+
 ## Alternatives considered
 
 | Alternative | Why not chosen |
