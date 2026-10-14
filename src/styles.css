@@ -1799,6 +1799,10 @@ button.composer-model:disabled { cursor: default; }
 .files-set-folder { flex: none; }
 .files-banner { flex: none; padding: 6px 20px; font-size: 12px; color: var(--amber-text); background: color-mix(in srgb, var(--amber) 10%, transparent); border-bottom: 1px solid var(--line); }
 .files-banner-removed, .files-banner-error { color: var(--err); background: color-mix(in srgb, var(--err) 10%, transparent); }
+.files-mode + .files-edit { margin-left: 8px; }
+.files-banner-conflict { display: flex; align-items: center; gap: 10px; }
+.files-banner-conflict button { height: 22px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-1); color: var(--fg); font-size: 12px; cursor: pointer; }
+.files-banner-conflict.flash { background: color-mix(in srgb, var(--amber) 28%, transparent); }
 .files-side-scroll { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; display: flex; flex-direction: column; }
 .files-view { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--surface-code); }
 .files-empty { flex: 1; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--fg-3); font-size: 13px; }
