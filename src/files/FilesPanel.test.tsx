@@ -10,7 +10,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "files_watch") return 1;
     if (cmd === "files_changed") return changedReply.value;
     if (cmd === "files_read") {
-      return { kind: "text", text: "x", truncated: false, size: 1, mtime: 1 };
+      return { kind: "text", text: "x", truncated: false, size: 1, mtime: 1, cksum: null, editable: false };
     }
     return [];
   }),

@@ -202,6 +202,16 @@ export interface FileContent {
   truncated: boolean;
   size: number;
   mtime: number;
+  /** Some only for text that was read whole. */
+  cksum: number | null;
+  /** Text, read whole, and valid UTF-8: the only content the editor can save back. */
+  editable: boolean;
+}
+/** What a file looked like on disk when it was read; `files_write` checks it before saving. */
+export interface FileVersion {
+  size: number;
+  mtime: number;
+  cksum: number;
 }
 export interface FileList {
   paths: string[];

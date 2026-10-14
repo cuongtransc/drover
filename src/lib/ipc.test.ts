@@ -24,7 +24,7 @@ describe("herdrCall", () => {
 
 describe("files ipc", () => {
   it("passes camelCase args", async () => {
-    (invoke as any).mockResolvedValueOnce({ kind: "text", text: "x", truncated: false, size: 1, mtime: 2 });
+    (invoke as any).mockResolvedValueOnce({ kind: "text", text: "x", truncated: false, size: 1, mtime: 2, cksum: null, editable: false });
     await filesRead("devtuf", "~/app", "src/a.ts");
     expect(invoke).toHaveBeenLastCalledWith("files_read", { machineId: "devtuf", root: "~/app", rel: "src/a.ts" });
   });

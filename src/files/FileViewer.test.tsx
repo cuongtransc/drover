@@ -9,7 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string, args?: { rel?: string }) => {
     if (cmd === "files_read") {
       const text = texts[args?.rel ?? ""] ?? "x";
-      return { kind: "text", text, truncated: truncated.has(args?.rel ?? ""), size: text.length, mtime: 1 };
+      return { kind: "text", text, truncated: truncated.has(args?.rel ?? ""), size: text.length, mtime: 1, cksum: null, editable: false };
     }
     return [];
   }),
