@@ -1,4 +1,4 @@
-//! Opening, on this Mac, a file a chat message names outside the workspace folder.
+//! Opening, on this Mac, a file a chat message names, on Cmd+click (a plain click opens it in Files).
 //!
 //! The path comes from an agent's transcript, so a click must never run anything: only kinds that
 //! open in a viewer or an editor go to the default app; anything else (`.command`, `.app`, a

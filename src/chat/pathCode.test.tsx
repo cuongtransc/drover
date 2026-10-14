@@ -44,11 +44,29 @@ describe("paths in chat", () => {
     expect(openLocalFile).not.toHaveBeenCalled();
   });
 
-  it("opens a path outside the folder on this Mac", () => {
-    show("Saved to `/private/tmp/shots/a.png`.");
-    fireEvent.click(screen.getByRole("link", { name: "/private/tmp/shots/a.png" }));
-    expect(openLocalFile).toHaveBeenCalledWith("/private/tmp/shots/a.png");
+  it("opens a path outside the folder on this Mac in Files, from its own folder, at its line", () => {
+    show("Edit `/Users/me/other/src/main.rs:12`.");
+    fireEvent.click(screen.getByRole("link", { name: "/Users/me/other/src/main.rs:12" }));
+    const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+    expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/other/src", rel: "main.rs" }]);
+    expect(useFilesBus.getState().jump?.hash).toBe("L12");
+    expect(openLocalFile).not.toHaveBeenCalled();
+  });
+
+  it("hands a path to macOS on Cmd+click, inside the folder or not", () => {
+    show("Saved to `/private/tmp/shots/a.png`, from `src/a.ts`.");
+    fireEvent.click(screen.getByRole("link", { name: "/private/tmp/shots/a.png" }), { metaKey: true });
+    fireEvent.click(screen.getByRole("link", { name: "src/a.ts" }), { metaKey: true });
+    expect(vi.mocked(openLocalFile).mock.calls).toEqual([["/private/tmp/shots/a.png"], ["/Users/me/app/src/a.ts"]]);
     expect(useApp.getState().openItems.items).toEqual([]);
+  });
+
+  it("opens in Files on Cmd+click on another machine, whose files this Mac cannot open", () => {
+    useApp.setState({ machines: { m1: machine("ssh") } });
+    show("`/tmp/x/a.md`");
+    fireEvent.click(screen.getByRole("link", { name: "/tmp/x/a.md" }), { metaKey: true });
+    expect(openLocalFile).not.toHaveBeenCalled();
+    expect(useApp.getState().openItems.items).toHaveLength(1);
   });
 
   it("opens a path outside the folder on another machine in Files, from its own folder", () => {

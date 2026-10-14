@@ -11,9 +11,10 @@ import { parsePathRef, pathTarget } from "./pathLinks";
 const message = (e: unknown) => String((e as { message?: string } | null)?.message ?? e);
 
 /**
- * Inline code in a chat message. A file path becomes a link: inside the pane's workspace folder it
- * opens in Files (at its `:line`), outside it opens on this Mac, or on another machine in a file tab
- * rooted at its own folder. Anything else, or a path this app cannot reach, renders as plain code.
+ * Inline code in a chat message. A file path becomes a link that opens in Files at its `:line`,
+ * rooted at the pane's workspace folder, or at the file's own folder when it is outside. Cmd+click
+ * on this Mac hands it to macOS instead. Anything else, or a path this app cannot reach, renders as
+ * plain code.
  */
 export function PathCode({ text, children }: { text: string; children?: ReactNode }) {
   const pane = useContext(ChatPaneContext);
@@ -26,20 +27,18 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
     const wsRef: WorkspaceRef = { machine_id: pane.machine_id, session: pane.session, workspace_id: ws.workspace_id };
     const cwd = ws.tabs.flatMap((t) => t.panes).find((p) => p.pane_id === pane.pane_id)?.cwd ?? null;
     const root = resolveRoot(wsRef, ws, cwd)?.path ?? null;
-    const target = pathTarget(ref, { root, home: machine.home ?? null, local: machine.kind === "local" });
+    const target = pathTarget(ref, { root, home: machine.home ?? null });
     return target && { wsRef, root, target };
   }, [pane, ref, machine]);
 
   if (!place) return <code>{children}</code>;
   const { wsRef, root, target } = place;
-  const open = () => {
-    // A "files" target is inside `root`, so it is set.
-    if (target.kind === "files" && root) {
-      openInFiles(wsRef, root, target.abs, target.line, pane ?? undefined);
-      return;
-    }
-    if (target.kind === "remote") {
-      openInFiles(wsRef, target.abs.slice(0, target.abs.lastIndexOf("/")) || "/", target.abs, target.line, pane ?? undefined);
+  const local = machine?.kind === "local";
+  const open = (mac: boolean) => {
+    if (!mac) {
+      // A "files" target is inside `root`, so it is set.
+      const base = target.kind === "files" && root ? root : target.abs.slice(0, target.abs.lastIndexOf("/")) || "/";
+      openInFiles(wsRef, base, target.abs, target.line, pane ?? undefined);
       return;
     }
     openLocalFile(target.abs).then(
@@ -53,10 +52,10 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
     <a
       className="chat-path"
       href={target.abs}
-      title={target.kind === "files" ? "Open in Files" : target.kind === "remote" ? `Open from ${machine?.label ?? pane?.machine_id}` : "Open on this Mac"}
+      title={local ? "Open in Files · ⌘-click: open on this Mac" : `Open in Files, from ${machine?.label ?? pane?.machine_id}`}
       onClick={(e) => {
         e.preventDefault();
-        open();
+        open(local && e.metaKey);
       }}
     >
       <code>{children}</code>
