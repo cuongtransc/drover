@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, sessionStart } from "./lib/ipc";
+import { appQuit, destroyWindow, machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
@@ -23,7 +23,8 @@ import { AgentList } from "./agents/AgentList";
 import { watchProtectPrune } from "./agents/protect";
 import { watchForkPrune } from "./agents/forkSession";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
-import { closeItemsGuarded } from "./files/closeGuard";
+import { closeItemsGuarded, settleDrafts } from "./files/closeGuard";
+import { useDrafts } from "./files/drafts";
 import { UnsavedDialog } from "./files/unsaved";
 import { FilesPanel } from "./files/FilesPanel";
 import { useFilesPanel } from "./files/panelStore";
@@ -196,6 +197,31 @@ export default function App() {
       cancelled = true;
       unlisten.forEach((u) => u());
     };
+  }, []);
+
+  // Closing the window or quitting asks about unsaved Drafts first. If asking itself fails, the
+  // window must still close: a broken guard never traps the app.
+  useEffect(() => {
+    const drafts = () => useDrafts.getState().drafts;
+    const settle = async (): Promise<boolean> => {
+      try {
+        return await settleDrafts(Object.keys(drafts()));
+      } catch (err) {
+        console.error("settling Drafts failed; closing anyway", err);
+        return true;
+      }
+    };
+    const unlisten = [
+      onWindowCloseRequested(async (e) => {
+        if (!Object.values(drafts()).some((d) => d.dirty)) return;
+        e.preventDefault();
+        if (await settle()) await destroyWindow();
+      }),
+      onQuitRequested(async () => {
+        if (await settle()) await appQuit();
+      }),
+    ];
+    return () => unlisten.forEach((u) => void u.then((f) => f()).catch(() => {}));
   }, []);
 
   useEffect(() => {
