@@ -424,30 +424,39 @@ impl ClaudeParser {
     /// A task stopped, or found finished by a blocking `TaskOutput`, ends with no
     /// notification: drop it and return its empty-text end item, which the frontend
     /// reads only for the status badge.
-    fn end_task(&mut self, target: &str, status: &str, ts: &Option<String>) -> Option<ChatItem> {
-        let call_id = self
+    /// An agent resumed by a message runs under each call that ran it: every one ends.
+    fn end_task(&mut self, target: &str, status: &str, ts: &Option<String>) -> Vec<ChatItem> {
+        let calls: Vec<String> = self
             .task_ids
             .iter()
-            .find(|(_, id)| id.as_str() == target)
-            .map(|(call, _)| call.clone())?;
-        self.task_ids.remove(&call_id);
-        if !self.background.iter().any(|t| t.call_id == call_id) {
-            return None;
+            .filter(|(_, id)| id.as_str() == target)
+            .map(|(call, _)| call.clone())
+            .collect();
+        let mut items = vec![];
+        for call_id in self
+            .background
+            .iter()
+            .map(|t| t.call_id.clone())
+            .filter(|c| calls.contains(c))
+            .collect::<Vec<_>>()
+        {
+            if self.ended.len() >= TRACKED_MAX {
+                self.ended.pop_front();
+            }
+            self.ended.push_back(call_id.clone());
+            items.push(ChatItem::System {
+                ts: ts.clone(),
+                text: String::new(),
+                task: Some(TaskEnd {
+                    call_id,
+                    status: status.into(),
+                    exit_code: None,
+                }),
+            });
         }
-        self.background.retain(|t| t.call_id != call_id);
-        if self.ended.len() >= TRACKED_MAX {
-            self.ended.pop_front();
-        }
-        self.ended.push_back(call_id.clone());
-        Some(ChatItem::System {
-            ts: ts.clone(),
-            text: String::new(),
-            task: Some(TaskEnd {
-                call_id,
-                status: status.into(),
-                exit_code: None,
-            }),
-        })
+        self.task_ids.retain(|call, _| !calls.contains(call));
+        self.background.retain(|t| !calls.contains(&t.call_id));
+        items
     }
 
     /// Replays one `queue-operation` record: `enqueue` adds, `dequeue` takes the oldest
@@ -1924,6 +1933,25 @@ mod tests {
         // The end names the agent alone, as a resumed run's notification does.
         let end_note = format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<status>completed</status>\n</task-notification>");
         push(&mut p, &delivered(&end_note));
+        assert_eq!(p.meta().background, vec![]);
+    }
+
+    #[test]
+    fn task_stop_on_an_agent_woken_while_waiting_ends_every_call_that_ran_it() {
+        let resumed = serde_json::json!({"success":true,"message":"Resuming agent a18a42e","resumedAgentId":AGENT_ID}).to_string();
+        let (_, _, mut p) = run_with(
+            &[
+                finished_agent()[..2].to_vec(),
+                vec![delivered(&agent_note("completed", STILL_RUNNING))],
+                send_message("s1", AGENT_ID, &resumed),
+            ]
+            .concat()
+            .join("\n"),
+        );
+        assert_eq!(p.meta().background.len(), 2);
+        push(&mut p, &stop_call("x1", "TaskStop", "task_id", AGENT_ID));
+        let items = push(&mut p, &stop_result("x1", AGENT_ID, false));
+        assert_eq!(system_items(items).len(), 2);
         assert_eq!(p.meta().background, vec![]);
     }
 
