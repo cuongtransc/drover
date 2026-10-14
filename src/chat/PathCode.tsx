@@ -35,11 +35,11 @@ export function PathCode({ text, children }: { text: string; children?: ReactNod
   const open = () => {
     // A "files" target is inside `root`, so it is set.
     if (target.kind === "files" && root) {
-      openInFiles(wsRef, root, target.abs, target.line);
+      openInFiles(wsRef, root, target.abs, target.line, pane ?? undefined);
       return;
     }
     if (target.kind === "remote") {
-      openInFiles(wsRef, target.abs.slice(0, target.abs.lastIndexOf("/")) || "/", target.abs, target.line);
+      openInFiles(wsRef, target.abs.slice(0, target.abs.lastIndexOf("/")) || "/", target.abs, target.line, pane ?? undefined);
       return;
     }
     openLocalFile(target.abs).then(
