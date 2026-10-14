@@ -91,4 +91,13 @@ describe("open items", () => {
     expect(closingKeys(s, "all", ks[1])).toEqual(ks);
     expect(closingKeys(s, "one", "nope")).toEqual([]);
   });
+
+  it("closingKeys counts an unpinned preview item", () => {
+    const s = openItem(openItem(NO_ITEMS, f("a"), pin), f("p"), peek);
+    const ks = s.items.map(itemKey);
+    expect(s.preview).toBe(ks[1]);
+    expect(closingKeys(s, "right", ks[0])).toEqual([ks[1]]);
+    expect(closingKeys(s, "others", ks[0])).toEqual([ks[1]]);
+    expect(closeItems(s, "others", ks[0]).items.map(itemKey)).toEqual([ks[0]]);
+  });
 });

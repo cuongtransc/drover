@@ -5,7 +5,7 @@ vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 import { useApp } from "../store/app";
 import { itemKey } from "../store/openItems";
 import { closeItemsGuarded, settleDrafts } from "./closeGuard";
-import { draftKey, useDrafts } from "./drafts";
+import { draftKey, isDirty, useDrafts } from "./drafts";
 import { saveDraft } from "./save";
 import { filesKey } from "./store";
 import { UnsavedDialog } from "./unsaved";
@@ -28,7 +28,9 @@ describe("settleDrafts", () => {
     // Like the real one: nothing is written for a Draft already saving or in conflict.
     vi.mocked(saveDraft).mockReset().mockImplementation(async (k) => {
       const d = useDrafts.getState().drafts[k];
-      return !!d && !d.saving && !d.conflict;
+      if (!d || d.saving || d.conflict) return false;
+      useDrafts.getState().saved(k, { text: d.state.doc.toString(), size: 1, mtime: 2, cksum: 2 });
+      return true;
     });
     vi.mocked(showToast).mockClear();
     render(<UnsavedDialog />);
@@ -134,5 +136,47 @@ describe("settleDrafts", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
     await act(() => q);
     expect(useApp.getState().openItems.items).toHaveLength(0);
+  });
+
+  it("an edit typed while Save All runs aborts the close and keeps that edit", async () => {
+    openDraft("a.txt", true);
+    openDraft("b.txt", true);
+    const [ka, kb] = ["a.txt", "b.txt"].map((r) => draftKey(fk, r));
+    vi.mocked(saveDraft).mockImplementation(async (k) => {
+      if (k === kb) {
+        // user types into a.txt (already saved) while b.txt saves
+        useDrafts.getState().saved(ka, { text: "!t", size: 2, mtime: 2, cksum: 2 });
+        const st = useDrafts.getState().drafts[ka].state;
+        useDrafts.getState().update(ka, st.update({ changes: { from: 0, insert: "?" } }).state);
+      }
+      return true;
+    });
+    const p = settleDrafts([ka, kb]);
+    fireEvent.click(await screen.findByRole("button", { name: "Save All" }));
+    expect(await p).toBe(false);
+    expect(useDrafts.getState().drafts[ka]).toBeTruthy();
+    expect(isDirty(ka)).toBe(true);
+  });
+
+  it("closeItemsGuarded aborts when the item set changed during the dialog to include an unasked dirty Draft", async () => {
+    useApp.getState().openFile(ws, "/r", "a.txt", { pin: true });
+    openDraft("a.txt", true);
+    const ka = draftKey(fk, "a.txt");
+    const p = closeItemsGuarded(ka, "right");
+    // asked about nothing yet dirty to the right; nothing is dirty -> no dialog, closes at once
+    await act(() => p);
+    expect(useApp.getState().openItems.items).toHaveLength(1);
+
+    useApp.getState().openFile(ws, "/r", "b.txt", { pin: true });
+    openDraft("b.txt", true);
+    const q = closeItemsGuarded(ka, "all");
+    await screen.findByRole("dialog");
+    // c.txt is opened and edited while the dialog is up
+    useApp.getState().openFile(ws, "/r", "c.txt", { pin: true });
+    openDraft("c.txt", true);
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    await act(() => q);
+    expect(useApp.getState().openItems.items).toHaveLength(3);
+    expect(isDirty(draftKey(fk, "c.txt"))).toBe(true);
   });
 });

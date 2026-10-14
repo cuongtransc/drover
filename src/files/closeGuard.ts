@@ -36,11 +36,15 @@ async function saveForClose(key: string): Promise<boolean> {
   return false;
 }
 
-/** Resolves true when it is fine to lose the Drafts of `keys` (they are dropped then); false keeps every Draft. */
-export async function settleDrafts(keys: string[]): Promise<boolean> {
-  const drop = () => keys.forEach((k) => useDrafts.getState().drop(k));
+/** Resolves true when it is fine to lose the Drafts of `keys` (they are dropped then); false keeps every Draft.
+ *  `now`, when given, lists the keys about to be closed once the asking is over: a dirty one not asked
+ *  about, or any Draft edited again while saving, aborts (the new edit stays). */
+export async function settleDrafts(keys: string[], now: () => string[] = () => keys): Promise<boolean> {
   const dirty = keys.filter(isDirty);
+  const drop = () => new Set([...keys, ...now()]).forEach((k) => useDrafts.getState().drop(k));
+  const surprise = () => now().some((k) => isDirty(k) && !dirty.includes(k));
   if (dirty.length === 0) {
+    if (surprise()) return false;
     drop();
     return true;
   }
@@ -49,13 +53,15 @@ export async function settleDrafts(keys: string[]): Promise<boolean> {
   if (choice === "cancel") return false;
   if (choice === "save") {
     for (const k of dirty) if (!(await saveForClose(k))) return false;
+    if (dirty.some(isDirty)) return false;
   }
+  if (surprise()) return false;
   drop();
   return true;
 }
 
 /** `closeItems`, but only once the Drafts of the items it would close are settled. */
 export async function closeItemsGuarded(key: string, scope: "one" | CloseScope): Promise<void> {
-  const keys = closingKeys(useApp.getState().openItems, scope, key);
-  if (await settleDrafts(keys)) useApp.getState().closeItems(key, scope);
+  const now = () => closingKeys(useApp.getState().openItems, scope, key);
+  if (await settleDrafts(now(), now)) useApp.getState().closeItems(key, scope);
 }
