@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useApp } from "../store/app";
+import { draftKey, useDrafts } from "../files/drafts";
+import { filesKey } from "../files/store";
 import { OpenStrip } from "./OpenStrip";
 import { itemKey, NO_ITEMS } from "../store/openItems";
 import type { MachineView, PaneView } from "../lib/types";
@@ -35,6 +37,7 @@ const openPinned = (...ids: string[]) => {
 describe("OpenStrip", () => {
   beforeEach(() => {
     useApp.setState({ machines: {}, order: [], selected: null, openItems: NO_ITEMS });
+    useDrafts.setState(useDrafts.getInitialState(), true);
     useApp.getState().upsertMachine(m);
   });
 
@@ -141,5 +144,21 @@ describe("OpenStrip", () => {
     fireEvent.drop(item(/Mermaid diagram/), { dataTransfer });
     expect(open()).toEqual(["p1", "p3", "p2"]);
     expect(item(/Mermaid diagram/).className).not.toMatch(/drop-/);
+  });
+
+  it("marks a file with unsaved changes and labels its close button, a clean Draft neither", () => {
+    const ws = { machine_id: "local", session: "default", workspace_id: "w2" };
+    const fk = filesKey(ws, "/r");
+    useApp.getState().openFile(ws, "/r", "a.md", { pin: true });
+    useApp.getState().openFile(ws, "/r", "b.md", { pin: true });
+    for (const rel of ["a.md", "b.md"]) useDrafts.getState().open({ fk, machineId: "local", root: "/r", rel }, { text: "t", size: 1, mtime: 1, cksum: 1 });
+    const s = useDrafts.getState().drafts[draftKey(fk, "a.md")].state;
+    useDrafts.getState().update(draftKey(fk, "a.md"), s.update({ changes: { from: 0, insert: "!" } }).state);
+    render(<OpenStrip />);
+    const item = (name: string) => screen.getByRole("tab", { name }).closest(".files-tab-item") as HTMLElement;
+    expect(item("a.md").classList.contains("dirty")).toBe(true);
+    expect(screen.getByRole("button", { name: "Remove a.md (unsaved)" })).toBeTruthy();
+    expect(item("b.md").classList.contains("dirty")).toBe(false);
+    expect(screen.getByRole("button", { name: "Remove b.md" })).toBeTruthy();
   });
 });

@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { closeItemsGuarded } from "../files/closeGuard";
 import { ContextMenu, type MenuItem } from "../sidebar/ContextMenu";
 import { StatusDot } from "../sidebar/StatusDot";
+import { useShallow } from "zustand/react/shallow";
+import { useDrafts } from "../files/drafts";
 import { useApp } from "../store/app";
 import { itemKey, type OpenItem } from "../store/openItems";
 import type { MachineView, PaneView } from "../lib/types";
@@ -62,6 +64,8 @@ export const OpenStrip = memo(function OpenStrip() {
   const activate = useApp((s) => s.activateItem);
   const pin = useApp((s) => s.pinItem);
   const moveItem = useApp((s) => s.moveItem);
+  // Keys of the dirty Drafts: unchanged by keystrokes once a Draft is dirty.
+  const dirty = useDrafts(useShallow((s) => Object.entries(s.drafts).filter(([, d]) => d.dirty).map(([k]) => k)));
   const [menu, setMenu] = useState<{ x: number; y: number; key: string } | null>(null);
   // The tab being dragged, and the tab and side it would land on.
   const [dragging, setDragging] = useState<string | null>(null);
@@ -109,6 +113,7 @@ export const OpenStrip = memo(function OpenStrip() {
     >
       {tabs.map(({ key, label, title, where, pane }) => {
         const isActive = key === active;
+        const unsaved = dirty.includes(key);
         const state = `${isActive ? " active" : ""}${key === preview ? " preview" : ""}`;
         const drop = over?.key === key ? ` drop-${over.side}` : "";
         const onDragOver = (e: DragEvent) => {
@@ -124,7 +129,7 @@ export const OpenStrip = memo(function OpenStrip() {
             key={key}
             role="none"
             title={title}
-            className={`files-tab-item${state}${dragging === key ? " dragging" : ""}${drop}`}
+            className={`files-tab-item${state}${unsaved ? " dirty" : ""}${dragging === key ? " dragging" : ""}${drop}`}
             draggable
             onDragStart={(e) => {
               // WebKit starts a drag only when it carries data.
@@ -186,7 +191,7 @@ export const OpenStrip = memo(function OpenStrip() {
             <button
               type="button"
               className="files-tab-close"
-              aria-label={`Remove ${label}`}
+              aria-label={`Remove ${label}${unsaved ? " (unsaved)" : ""}`}
               title={pane ? "Remove from Open strip (the pane keeps running)" : "Remove from Open strip"}
               onClick={(e) => {
                 e.stopPropagation();
