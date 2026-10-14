@@ -71,7 +71,7 @@ A way of viewing a Pane: the **Terminal lens** (the raw attached terminal) or th
 _Avoid_: mode, view
 
 **Files panel**:
-The file tree of one Workspace under the agent list, following the active Open item, rooted at its Workspace folder (else the selected Pane's cwd). It reads files, and moves files in by Upload and out by Download; it never overwrites, edits or deletes (ADR-0005).
+The file tree of one Workspace under the agent list, following the active Open item, rooted at its Workspace folder (else the selected Pane's cwd). It reads files, moves files in by Upload and out by Download, and its File viewer edits a text file's content in Edit mode; it never renames or deletes (ADR-0005, ADR-0009).
 _Avoid_: files overlay, file browser
 
 **Open item**:
@@ -81,6 +81,14 @@ _Avoid_: tab (a herdr Tab is a layout of Panes), close (closing ends a Pane or T
 **File viewer**:
 The main area's view of the active file Open item.
 _Avoid_: file lens (a Lens views a Pane)
+
+**Edit mode**:
+The File viewer's state in which the user changes a text file's content and saves it; the viewer opens in view mode and enters Edit mode only from its Edit button. Distinct from **Edit** in the Chat lens, which rewinds an Agent.
+_Avoid_: editor, edit (alone)
+
+**Draft**:
+A file's unsaved content in Edit mode, together with the version on disk it started from. A Draft is dirty when it differs from that version; Save writes it only if the file on disk is still that version.
+_Avoid_: buffer, unsaved file
 
 **Files watch**:
 The live feed of changes under the Files panel's root (`inotifywait`, a `find` poll loop, or FSEvents) that reloads the open file, the loaded folders of the tree and the CHANGED group. One at a time, owned by the Files panel.

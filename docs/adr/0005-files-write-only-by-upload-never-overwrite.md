@@ -1,6 +1,6 @@
 # 0005: The Files overlay writes only by Upload, and Upload never overwrites
 
-> Status: Accepted · Date: 2026-10-07
+> Status: Accepted · Date: 2026-10-07 · Partly superseded by [0009](./0009-file-viewer-edits-save-never-silently-overwrites.md): the File viewer edits a file's content
 
 ## Context
 
