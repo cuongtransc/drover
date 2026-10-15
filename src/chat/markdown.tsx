@@ -1,5 +1,11 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { createPortal } from "react-dom";
+import { ContextMenu, type MenuEntry } from "../sidebar/ContextMenu";
+import { CopyIcon, GlobeIcon } from "../ui/icons";
+import { showToast } from "../ui/Toast";
+import { useLinkMenu } from "./linkMenu";
 import { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -24,20 +30,45 @@ export function nodeText(node: unknown): string {
   return (n?.children ?? []).map(nodeText).join("");
 }
 
+/** A link in Chat: a web page opens in the browser, on a click or from its menu (Drover's, in place
+ *  of WebKit's, whose Open Link would load the page into the app). */
 export function ExternalLink({ href, children, className, title }: { href?: string; children?: ReactNode; className?: string; title?: string }) {
   const external = !!href && /^https?:\/\//i.test(href);
+  const menuOf = useLinkMenu();
+  const open = () => {
+    if (external) void openUrl(href).catch((err) => console.error("openUrl failed", err));
+  };
+  const copy = (text: string, done: string) =>
+    writeText(text).then(
+      () => showToast(done, { alert: false }),
+      (e) => showToast(`Cannot copy: ${String((e as { message?: string } | null)?.message ?? e)}`),
+    );
+  const items = (selected: string): MenuEntry[] => [
+    ...(external ? [{ label: "Open in Browser", icon: GlobeIcon, onSelect: open }] : []),
+    ...(href ? [{ label: "Copy Link", icon: CopyIcon, onSelect: () => copy(href, "Link copied") }] : []),
+    ...(selected ? [{ label: "Copy", icon: CopyIcon, keys: "⌘C", onSelect: () => copy(selected, "Copied") }] : []),
+  ];
   return (
-    <a
-      href={href}
-      className={className}
-      title={title}
-      onClick={(e) => {
-        e.preventDefault();
-        if (external) void openUrl(href).catch((err) => console.error("openUrl failed", err));
-      }}
-    >
-      {children}
-    </a>
+    <>
+      <a
+        href={href}
+        className={className}
+        title={title}
+        onClick={(e) => {
+          e.preventDefault();
+          open();
+        }}
+        onMouseDown={menuOf.onMouseDown}
+        onContextMenu={menuOf.onContextMenu}
+      >
+        {children}
+      </a>
+      {menuOf.menu &&
+        createPortal(
+          <ContextMenu x={menuOf.menu.x} y={menuOf.menu.y} items={items(menuOf.menu.selected)} onClose={menuOf.close} />,
+          document.body,
+        )}
+    </>
   );
 }
 

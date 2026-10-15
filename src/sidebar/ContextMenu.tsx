@@ -14,7 +14,8 @@ export interface MenuItem {
   disabled?: boolean;
   /** Says why the item is disabled, under it. */
   note?: string;
-  /** Keys that do the same, shown at the item's end in macOS symbols (`⌥⌘R`, `↩`). */
+  /** Keys that do the same, in macOS symbols (`⌥⌘R`, `↩`): given as `aria-keyshortcuts`, never
+   *  drawn. Apple's HIG puts keys in the main menus; a context menu is already the shortcut. */
   keys?: string;
 }
 
@@ -89,11 +90,6 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
               <it.icon />
               {it.label}
               {it.checked && <CheckIcon className="icon ctx-check" />}
-              {it.keys && (
-                <span className="ctx-keys" aria-hidden="true">
-                  {it.keys}
-                </span>
-              )}
             </button>
             {it.note && <div className="ctx-note">{it.note}</div>}
           </li>

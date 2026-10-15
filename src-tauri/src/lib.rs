@@ -9,6 +9,7 @@ pub mod herdr;
 pub mod lanes;
 pub mod layout;
 pub mod machines;
+mod navigation;
 pub mod notify;
 pub mod open_file;
 pub mod quit_guard;
@@ -33,6 +34,26 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("navigation-guard")
+                .on_navigation(
+                    |webview, url| match navigation::decide(url, tauri::is_dev()) {
+                        navigation::Nav::Allow => true,
+                        navigation::Nav::Browser => {
+                            use tauri_plugin_opener::OpenerExt;
+                            if let Err(e) = webview.opener().open_url(url.as_str(), None::<&str>) {
+                                tracing::warn!("navigation: cannot open {url} in the browser: {e}");
+                            }
+                            false
+                        }
+                        navigation::Nav::Deny => {
+                            tracing::warn!("navigation: refused {url}");
+                            false
+                        }
+                    },
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .menu(app_menu)
         .on_menu_event(|app, event| {

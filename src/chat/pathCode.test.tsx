@@ -295,11 +295,14 @@ describe("paths in chat", () => {
       expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3 now.");
     });
 
-    it("shows the keys that do the same on a focused path", () => {
+    it("names the keys of a focused path for assistive tech, and lists them in the link's tooltip", () => {
       show("Edit `src/a.ts:3` now.");
-      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
-      const keys = screen.getAllByRole("menuitem").map((b) => b.querySelector(".ctx-keys")?.textContent ?? "");
-      expect(keys).toEqual(["↩", "⌘↩", "⌥⌘R", "⌥⌘C"]);
+      const link = screen.getByRole("link", { name: "src/a.ts:3" });
+      expect(link.getAttribute("title")).toContain("⌥⌘R Reveal in Finder");
+      fireEvent.contextMenu(link);
+      const keys = screen.getAllByRole("menuitem").map((b) => b.getAttribute("aria-keyshortcuts"));
+      expect(keys).toEqual(["Enter", "Meta+Enter", "Alt+Meta+R", "Alt+Meta+C"]);
+      expect(screen.getAllByRole("menuitem").map((b) => b.textContent)).toEqual(["Open in Files", "Open on this Mac", "Reveal in Finder", "Copy Path"]);
     });
 
     it("on another machine: only what does not need this Mac", () => {
