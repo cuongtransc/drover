@@ -4,11 +4,11 @@ vi.mock("../lib/ipc", () => ({
   chatImage: vi.fn(),
   openLocalFile: vi.fn().mockResolvedValue("opened"),
   revealLocalFile: vi.fn().mockResolvedValue(undefined),
-  filesFirstFile: vi.fn(),
+  filesFirstFiles: vi.fn(),
 }));
 vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn(async () => {}) }));
-import { filesFirstFile, openLocalFile, revealLocalFile } from "../lib/ipc";
+import { filesFirstFiles, openLocalFile, revealLocalFile } from "../lib/ipc";
 import { showToast } from "../ui/Toast";
 import type { ChatItem } from "../lib/types";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -17,7 +17,7 @@ import { useApp } from "../store/app";
 import { NO_ITEMS } from "../store/openItems";
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
-import { ChatPathsContext, chatPaths } from "./pathContext";
+import { ChatPathsContext, pathResolver } from "./pathResolver";
 
 const pane = { machine_id: "m1", session: "s", pane_id: "p1" };
 const machine = (kind: string) =>
@@ -42,7 +42,7 @@ function show(markdown: string) {
 function showChat(items: ChatItem[]) {
   render(
     <ChatPaneContext.Provider value={pane}>
-      <ChatPathsContext.Provider value={chatPaths(() => items)}>
+      <ChatPathsContext.Provider value={pathResolver("m1", () => items)}>
         {items.map((it, i) => (it.kind === "assistant_text" ? <ChatItemView key={i} item={it} /> : null))}
       </ChatPathsContext.Provider>
     </ChatPaneContext.Provider>,
@@ -51,8 +51,7 @@ function showChat(items: ChatItem[]) {
 const bash = (command: string): ChatItem => ({ kind: "tool_call", id: command, name: "Bash", input_summary: "", input: { command } });
 
 beforeEach(() => {
-  // The machine has the first place tried, unless a test says otherwise.
-  vi.mocked(filesFirstFile).mockReset().mockImplementation(async (_m, paths) => paths[0] ?? null);
+  vi.mocked(filesFirstFiles).mockReset();
   vi.mocked(showToast).mockClear();
   vi.mocked(openLocalFile).mockClear();
   vi.mocked(revealLocalFile).mockClear();
@@ -62,59 +61,69 @@ beforeEach(() => {
 });
 
 describe("paths in chat", () => {
-  describe("a relative path not in the session's folder", () => {
+  describe("in a Chat, which asks the machine where each path is", () => {
     const items = [
       bash("cd ~/Dev/other && git worktree add .worktrees/wt && cd .worktrees/wt && cp ~/x.svg profiles/a.svg"),
-      { kind: "assistant_text", markdown: "Saved `profiles/a.svg`." } as ChatItem,
+      { kind: "assistant_text", markdown: "Saved `profiles/a.svg`, see `/tmp/gone.log`." } as ChatItem,
     ];
+    const WT = "/Users/me/Dev/other/.worktrees/wt/profiles/a.svg";
 
-    it("opens where the agent worked, the first place the machine has it", async () => {
-      vi.mocked(filesFirstFile).mockResolvedValue("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg");
+    it("is plain code until the machine answers", async () => {
+      vi.mocked(filesFirstFiles).mockReturnValue(new Promise(() => {}));
       showChat(items);
-      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(screen.getByText("profiles/a.svg").tagName).toBe("CODE");
+      // Asked once the wait is over, still unanswered.
+      await waitFor(() => expect(filesFirstFiles).toHaveBeenCalled());
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("links a path to where the agent worked, asking once for the whole message", async () => {
+      vi.mocked(filesFirstFiles).mockResolvedValue([WT, "/tmp/gone.log"]);
+      showChat(items);
+      fireEvent.click(await screen.findByRole("link", { name: "profiles/a.svg" }));
       const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
-      await waitFor(() =>
-        expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/Dev/other/.worktrees/wt/profiles", rel: "a.svg" }]),
-      );
-      expect(filesFirstFile).toHaveBeenCalledWith("m1", [
-        "/Users/me/Dev/other/.worktrees/wt/profiles/a.svg",
-        "/Users/me/Dev/other/profiles/a.svg",
-        "/Users/me/app/profiles/a.svg",
+      expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/Dev/other/.worktrees/wt/profiles", rel: "a.svg" }]);
+      expect(filesFirstFiles).toHaveBeenCalledTimes(1);
+      expect(filesFirstFiles).toHaveBeenCalledWith("m1", [
+        [WT, "/Users/me/Dev/other/profiles/a.svg", "/Users/me/app/profiles/a.svg"],
+        ["/tmp/gone.log"],
       ]);
     });
 
     it("copies and reveals the path found", async () => {
-      vi.mocked(filesFirstFile).mockResolvedValue("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg");
+      vi.mocked(filesFirstFiles).mockResolvedValue([WT, null]);
       showChat(items);
-      fireEvent.contextMenu(screen.getByRole("link", { name: "profiles/a.svg" }));
+      fireEvent.contextMenu(await screen.findByRole("link", { name: "profiles/a.svg" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "Copy Path" }));
-      await waitFor(() => expect(writeText).toHaveBeenCalledWith("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg"));
+      expect(writeText).toHaveBeenCalledWith(WT);
       fireEvent.contextMenu(screen.getByRole("link", { name: "profiles/a.svg" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "Reveal in Finder" }));
-      await waitFor(() => expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg"));
+      expect(revealLocalFile).toHaveBeenCalledWith(WT);
     });
 
-    it("says so, and opens nothing, when no place has it", async () => {
-      vi.mocked(filesFirstFile).mockResolvedValue(null);
+    it("leaves a path no place has as plain code, relative or absolute", async () => {
+      vi.mocked(filesFirstFiles).mockResolvedValue([null, null]);
       showChat(items);
-      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
-      await waitFor(() => expect(showToast).toHaveBeenCalledWith("Not found: profiles/a.svg (looked in 3 places)"));
-      expect(useApp.getState().openItems.items).toEqual([]);
+      await waitFor(() => expect(filesFirstFiles).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 0));
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(screen.getByText("/tmp/gone.log").tagName).toBe("CODE");
     });
 
-    it("falls back to the session's folder when the machine cannot be asked", async () => {
-      vi.mocked(filesFirstFile).mockRejectedValue({ code: "unavailable", message: "offline" });
+    it("links as written when the machine cannot say", async () => {
+      vi.mocked(filesFirstFiles).mockRejectedValue({ code: "unavailable", message: "offline" });
       showChat(items);
-      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
+      fireEvent.click(await screen.findByRole("link", { name: "profiles/a.svg" }));
       const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
-      await waitFor(() => expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "profiles/a.svg" }]));
+      expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "profiles/a.svg" }]);
     });
   });
 
-  it("never asks the machine about an absolute path", () => {
+  it("outside a Chat, links a path as written without asking the machine", () => {
     show("`/Users/me/app/src/a.ts`");
     fireEvent.click(screen.getByRole("link", { name: "/Users/me/app/src/a.ts" }));
-    expect(filesFirstFile).not.toHaveBeenCalled();
+    expect(filesFirstFiles).not.toHaveBeenCalled();
     expect(useApp.getState().openItems.items).toHaveLength(1);
   });
 

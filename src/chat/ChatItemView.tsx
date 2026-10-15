@@ -9,7 +9,7 @@ import { checklist, checklistSummary, type ChecklistRow } from "./checklist";
 import { BackgroundContext, taskBadge } from "./backgroundTaskState";
 import { ChatImages } from "./images";
 import { SkillChips } from "./skills";
-import { ChatItemContext } from "./pathContext";
+import { ChatItemContext } from "./pathResolver";
 import { toolIcon } from "./toolIcon";
 
 type ToolResult = Extract<ChatItem, { kind: "tool_result" }>;

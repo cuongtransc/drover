@@ -904,15 +904,23 @@ pub async fn files_image(
         .map(tauri::ipc::Response::new)
 }
 
-/// Of the places a path in Chat may be, the first that is a file on the Machine (`files::first`).
+/// For each path in Chat, the first of its places that is a file on the Machine (`files::first`).
 #[tauri::command]
-pub async fn files_first_file(
+pub async fn files_first_files(
     mgr: Mgr<'_>,
     machine_id: String,
-    paths: Vec<String>,
-) -> Result<Option<String>, AppError> {
+    groups: Vec<Vec<String>>,
+) -> Result<Vec<Option<String>>, AppError> {
     let t = mgr.transport(&machine_id)?;
-    crate::files::first::first_file(&*t, &paths).await
+    let started = std::time::Instant::now();
+    let found = crate::files::first::first_files(&*t, &groups).await;
+    let places: usize = groups.iter().map(Vec::len).sum();
+    tracing::info!(
+        "chat paths: {machine_id}: {} paths, {places} places, {} ms",
+        groups.len(),
+        started.elapsed().as_millis()
+    );
+    found
 }
 
 #[tauri::command]

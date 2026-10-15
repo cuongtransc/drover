@@ -1,7 +1,7 @@
-import { useContext, useMemo, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { filesFirstFile, openLocalFile, revealLocalFile } from "../lib/ipc";
+import { openLocalFile, revealLocalFile } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { openInFiles } from "../files/openPath";
 import { resolveRoot } from "../files/root";
@@ -10,19 +10,16 @@ import { CopyIcon, FileCopyIcon, FileIcon, FolderOpenIcon, LaptopIcon } from "..
 import { showToast } from "../ui/Toast";
 import type { WorkspaceRef } from "../workspaces/folder";
 import { ChatPaneContext } from "./images";
-import { ChatItemContext, ChatPathsContext } from "./pathContext";
-import { pathCandidates } from "./pathHints";
 import { parsePathRef, pathTarget, type PathTarget } from "./pathLinks";
-
-/** The most places one click asks the machine about (`files::first::MAX_CANDIDATES`). */
-const MAX_PLACES = 64;
+import { ChatItemContext, ChatPathsContext, type Found } from "./pathResolver";
 
 const message = (e: unknown) => String((e as { message?: string } | null)?.message ?? e);
 
 /**
  * Inline code in a chat message. A file path becomes a link that opens in Files at its `:line`,
- * rooted at the pane's workspace folder, or at the file's own folder when it is outside. A relative
- * path is looked for first where the agent worked (`pathCandidates`), then in the session's folder. Cmd+click
+ * rooted at the pane's workspace folder, or at the file's own folder when it is outside. In a Chat it
+ * links only once the machine says where the file is: a relative path is looked for first where the
+ * agent worked, then in the session's folder (`pathResolver`); one no place has stays code. Cmd+click
  * on this Mac hands it to macOS instead. Its right-click menu offers both, Reveal in Finder (this
  * Mac), Copy Path, and Copy for a selection, in place of WebKit's menu (whose Open Link would load
  * the file into the app). Anything else, or a path this app cannot reach, renders as plain code.
@@ -33,8 +30,10 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
   const ref = useMemo(() => parsePathRef(text), [text]);
   const machine = useApp((s) => (pane && ref ? s.machines[pane.machine_id] : undefined));
   const [menu, setMenu] = useState<{ x: number; y: number; selected: string } | null>(null);
-  const paths = useContext(ChatPathsContext);
+  const resolver = useContext(ChatPathsContext);
   const item = useContext(ChatItemContext);
+  // Outside a Chat there is nothing to ask: the path links as written (undefined).
+  const [found, setFound] = useState<Found | "pending">(() => (resolver && ref ? resolver.known(item, ref.path) : undefined));
   const place = useMemo(() => {
     if (!pane || !ref || !machine) return null;
     const ws = machine.sessions.find((s) => s.name === pane.session)?.workspaces.find((w) => w.tabs.some((t) => t.panes.some((p) => p.pane_id === pane.pane_id)));
@@ -45,34 +44,26 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
     const target = pathTarget(ref, { root, home: machine.home ?? null });
     return target && { wsRef, root, target };
   }, [pane, ref, machine]);
-
-  if (!place) return plain ? <>{children}</> : <code>{children}</code>;
-  const { wsRef, root, target } = place;
-  const local = machine?.kind === "local";
   const home = machine?.home ?? null;
-  /** A relative path is looked for; an absolute one is where it says. */
-  const lookup = !!pane && !!ref && !ref.path.startsWith("/") && !ref.path.startsWith("~/");
-  /** The first place the machine has a relative path, or null (said in a toast) when none does. */
-  const locate = async (): Promise<PathTarget | null> => {
-    if (!pane || !ref) return target;
-    const { hints, upTo } = paths?.hintsBefore(item) ?? { hints: [], upTo: 0 };
-    const places = pathCandidates(ref.path, hints, upTo, { root, home }, MAX_PLACES);
-    let found: string | null;
-    try {
-      found = await filesFirstFile(pane.machine_id, places);
-    } catch {
-      return target; // The machine cannot say: the session's folder, as before.
-    }
-    if (!found) {
-      showToast(`Not found: ${ref.path} (looked in ${places.length} ${places.length === 1 ? "place" : "places"})`);
-      return null;
-    }
-    return pathTarget({ path: found, line: ref.line }, { root, home });
-  };
-  const at = (act: (t: PathTarget) => unknown) => () => {
-    if (!lookup) act(target);
-    else void locate().then((t) => t && act(t));
-  };
+  const root = place?.root ?? null;
+
+  useEffect(() => {
+    if (!resolver || !ref || !place || found !== "pending") return;
+    let gone = false;
+    void resolver.resolve(item, ref.path, { root, home }).then((f) => {
+      if (!gone) setFound(f);
+    });
+    return () => {
+      gone = true;
+    };
+  }, [resolver, item, ref, place, found, root, home]);
+
+  // Not known yet, or no place has it: code, not a link that leads nowhere.
+  if (!place || !ref || found === "pending" || found === null) return plain ? <>{children}</> : <code>{children}</code>;
+  const { wsRef } = place;
+  const target = (found && pathTarget({ path: found, line: ref.line }, { root, home })) || place.target;
+  const local = machine?.kind === "local";
+  const at = (act: (t: PathTarget) => unknown) => () => act(target);
   const open = (target: PathTarget, mac: boolean) => {
     if (!mac) {
       // A "files" target is inside `root`, so it is set.
