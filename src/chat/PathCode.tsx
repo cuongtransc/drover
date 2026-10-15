@@ -87,18 +87,36 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
       () => showToast(done, { alert: false }),
       (e) => showToast(`Cannot copy: ${message(e)}`),
     );
+  // Each item's keys work on the focused path (`onKeyDown`); the menu shows them.
   const items = (selected: string): MenuEntry[] => [
-    { label: "Open in Files", icon: FileIcon, onSelect: at((t) => open(t, false)) },
+    { label: "Open in Files", icon: FileIcon, keys: "↩", onSelect: at((t) => open(t, false)) },
     ...(local
       ? [
-          { label: "Open on this Mac", icon: LaptopIcon, onSelect: at((t) => open(t, true)) },
-          { label: "Reveal in Finder", icon: FolderOpenIcon, onSelect: at(reveal) },
+          { label: "Open on this Mac", icon: LaptopIcon, keys: "⌘↩", onSelect: at((t) => open(t, true)) },
+          { label: "Reveal in Finder", icon: FolderOpenIcon, keys: "⌥⌘R", onSelect: at(reveal) },
         ]
       : []),
     "sep",
-    { label: "Copy Path", icon: FileCopyIcon, onSelect: at((t) => copy(t.abs, "Path copied")) },
-    ...(selected ? [{ label: "Copy", icon: CopyIcon, onSelect: () => copy(selected, "Copied") }] : []),
+    { label: "Copy Path", icon: FileCopyIcon, keys: "⌥⌘C", onSelect: at((t) => copy(t.abs, "Path copied")) },
+    ...(selected ? [{ label: "Copy", icon: CopyIcon, keys: "⌘C", onSelect: () => copy(selected, "Copied") }] : []),
   ];
+  /** The keys of the menu, on the focused path; Enter is the link's own click. */
+  const onKey = (e: React.KeyboardEvent<HTMLAnchorElement>) => {
+    const plainKey = !e.metaKey && !e.altKey && !e.ctrlKey;
+    const cmd = e.metaKey && !e.ctrlKey && !e.shiftKey;
+    let act: (() => void) | null = null;
+    if ((e.key === "F10" && e.shiftKey && plainKey) || (e.key === "ContextMenu" && plainKey && !e.shiftKey)) {
+      const r = e.currentTarget.getBoundingClientRect();
+      act = () => setMenu({ x: r.left, y: r.bottom, selected: window.getSelection()?.toString() ?? "" });
+    } else if (cmd && !e.altKey && e.key === "Enter") act = at((t) => open(t, local));
+    else if (cmd && e.altKey && e.code === "KeyR") act = local ? at(reveal) : () => {};
+    else if (cmd && e.altKey && e.code === "KeyC") act = at((t) => copy(t.abs, "Path copied"));
+    if (!act) return;
+    // Handled here: no app shortcut and no terminal sees it.
+    e.preventDefault();
+    e.stopPropagation();
+    act();
+  };
   return (
     <>
       <a
@@ -115,6 +133,7 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
           const sel = window.getSelection();
           before.current = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
         }}
+        onKeyDown={onKey}
         onContextMenu={(e) => {
           e.preventDefault();
           // WebKit selects the link between the mousedown and this event; put back what was selected.

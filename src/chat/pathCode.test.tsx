@@ -61,6 +61,58 @@ beforeEach(() => {
 });
 
 describe("paths in chat", () => {
+  describe("keys on a focused path", () => {
+    const press = (init: KeyboardEventInit) => {
+      show("Edit `src/a.ts:3` now.");
+      const link = screen.getByRole("link", { name: "src/a.ts:3" });
+      link.focus();
+      const outside = vi.fn();
+      window.addEventListener("keydown", outside);
+      fireEvent.keyDown(link, init);
+      window.removeEventListener("keydown", outside);
+      return outside;
+    };
+
+    it("⌥⌘R reveals it in Finder, and no app shortcut sees the key", () => {
+      const outside = press({ key: "®", code: "KeyR", metaKey: true, altKey: true });
+      expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+      expect(outside).not.toHaveBeenCalled();
+    });
+
+    it("⌥⌘C copies its path", () => {
+      press({ key: "ç", code: "KeyC", metaKey: true, altKey: true });
+      expect(writeText).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+    });
+
+    it("⌘↩ opens it on this Mac", () => {
+      press({ key: "Enter", code: "Enter", metaKey: true });
+      expect(openLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+    });
+
+    it("⇧F10 and the Menu key open its menu", () => {
+      press({ key: "F10", code: "F10", shiftKey: true });
+      expect(screen.getByRole("menu")).toBeTruthy();
+      fireEvent.keyDown(window, { key: "Escape" });
+      fireEvent.keyDown(screen.getByRole("link", { name: "src/a.ts:3" }), { key: "ContextMenu", code: "ContextMenu" });
+      expect(screen.getByRole("menu")).toBeTruthy();
+    });
+
+    it("leaves other keys alone", () => {
+      const outside = press({ key: "r", code: "KeyR", metaKey: true });
+      expect(outside).toHaveBeenCalled();
+      expect(revealLocalFile).not.toHaveBeenCalled();
+    });
+
+    it("on another machine, reveals nothing and ⌘↩ opens it in Files", () => {
+      useApp.setState({ machines: { m1: machine("ssh") } });
+      press({ key: "®", code: "KeyR", metaKey: true, altKey: true });
+      expect(revealLocalFile).not.toHaveBeenCalled();
+      fireEvent.keyDown(screen.getByRole("link", { name: "src/a.ts:3" }), { key: "Enter", code: "Enter", metaKey: true });
+      expect(openLocalFile).not.toHaveBeenCalled();
+      expect(useApp.getState().openItems.items).toHaveLength(1);
+    });
+  });
+
   describe("in a Chat, which asks the machine where each path is", () => {
     const items = [
       bash("cd ~/Dev/other && git worktree add .worktrees/wt && cd .worktrees/wt && cp ~/x.svg profiles/a.svg"),
@@ -162,7 +214,8 @@ describe("paths in chat", () => {
   });
 
   describe("right-click menu", () => {
-    const items = () => screen.getAllByRole("menuitem").map((b) => b.textContent);
+    // The label, without the keys shown at the item's end.
+    const items = () => screen.getAllByRole("menuitem").map((b) => b.textContent!.replace(b.querySelector(".ctx-keys")?.textContent ?? "", ""));
     const pick = (name: string) => fireEvent.click(screen.getByRole("menuitem", { name }));
 
     it("on this Mac: open in Files, open on this Mac, reveal in Finder, copy the path", () => {
@@ -240,6 +293,13 @@ describe("paths in chat", () => {
       expect(getSelection()!.toString()).toBe("Edit src/a.ts:3 now.");
       pick("Copy");
       expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3 now.");
+    });
+
+    it("shows the keys that do the same on a focused path", () => {
+      show("Edit `src/a.ts:3` now.");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      const keys = screen.getAllByRole("menuitem").map((b) => b.querySelector(".ctx-keys")?.textContent ?? "");
+      expect(keys).toEqual(["↩", "⌘↩", "⌥⌘R", "⌥⌘C"]);
     });
 
     it("on another machine: only what does not need this Mac", () => {
