@@ -559,7 +559,7 @@ describe("Sessions filter", () => {
 });
 
 describe("Stopped Sessions fold", () => {
-  const stopped = (name: string) => ({ name, running: false, status: "unknown" as const, error: null, workspaces: [] });
+  const stopped = (name: string) => ({ name, running: false, loaded: false, status: "unknown" as const, error: null, workspaces: [] });
   const box: MachineView = { ...m, sessions: [m.sessions[0], stopped("old-a"), stopped("old-b"), stopped("old-c")] };
   const sessions = () => within(screen.getByRole("region", { name: "Sessions" }));
   const S = (name: string) => ({ kind: "session" as const, key: sessionKey("box", name) });
@@ -631,7 +631,7 @@ describe("Stopped Sessions fold", () => {
   });
 
   it("does not open a fold when a Session stops where it is", () => {
-    const running = { ...box, sessions: [m.sessions[0], stopped("old-a"), stopped("old-b"), { ...stopped("old-c"), running: true, status: "idle" as const }] };
+    const running = { ...box, sessions: [m.sessions[0], stopped("old-a"), stopped("old-b"), { ...stopped("old-c"), running: true, loaded: true, status: "idle" as const }] };
     useApp.setState({ machines: { box: running } });
     render(<Sidebar />);
     act(() => useApp.setState({ machines: { box } }));

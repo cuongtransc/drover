@@ -5,7 +5,7 @@ import { foldStopped } from "./stoppedFold";
 
 const machine = (state: MachineView["state"] = "connected") => ({ id: "box", state } as MachineView);
 const s = (name: string, running: boolean, m = machine()): RSession =>
-  ({ kind: "session", key: `box/${name}`, machine: m, session: { name, running, status: "idle", error: null, workspaces: [] } });
+  ({ kind: "session", key: `box/${name}`, machine: m, session: { name, running, loaded: running, status: "idle", error: null, workspaces: [] } });
 const g = (id: string): RGroup => ({ kind: "group", id, label: id, children: [] });
 const names = (nodes: RNode[]) => nodes.map((n) => (n.kind === "group" ? `[${n.id}]` : n.session.name));
 
