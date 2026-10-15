@@ -403,6 +403,19 @@ export function Composer({
   return (
     <div className="composer">
       <div className="composer-top">
+        {/* The suggestion already shows in the empty box; this sends it at once, while Tab only puts
+            it in the box. First on the left, beside the quick replies, as one more reply. Mounted for
+            Claude whether or not one is offered, so the row doesn't shift. */}
+        {agent === "claude" && (
+          <button
+            className="keycap composer-suggestion"
+            title={offered ? `Send Claude's suggestion: “${offered}” (Tab only puts it in the box)` : "Send Claude's suggestion, when it offers one"}
+            disabled={!offered || sending}
+            onClick={() => offered && sendQuick(offered)}
+          >
+            Suggestion
+          </button>
+        )}
         {((showQuick && quickReplies.length > 0) || compact) && (
           <div className="composer-quick" role="group" aria-label="Quick replies">
             {compact && (
@@ -431,18 +444,6 @@ export function Composer({
               onClick={toggleBtw}
             >
               /btw
-            </button>
-          )}
-          {/* The suggestion already shows in the empty box; this sends it at once, while Tab only puts
-              it in the box. Mounted for Claude whether or not one is offered, so the row doesn't shift. */}
-          {agent === "claude" && (
-            <button
-              className="keycap"
-              title={offered ? `Send Claude's suggestion: “${offered}” (Tab only puts it in the box)` : "Send Claude's suggestion, when it offers one"}
-              disabled={!offered || sending}
-              onClick={() => offered && sendQuick(offered)}
-            >
-              Suggestion
             </button>
           )}
           {KEYS.map((k) => (
