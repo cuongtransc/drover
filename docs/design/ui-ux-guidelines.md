@@ -64,6 +64,13 @@ and by how calm it is when nothing needs the user.
     something WebKit or macOS provides (a context menu, a viewer), list what the default offered
     and keep every item that still makes sense. Drop only the ones that do harm. *Don't*: the first
     Chat path menu offered only Reveal in Finder and lost Copy and Copy Link (#164).
+13. **Find finds what is shown.** A find bar searches the text the reader can see, whatever
+    part of the view it is in, and nothing that is folded away. The count ("2 / 5") and the
+    marks come from the same text, so the nth match counted is the nth one marked. The view
+    moves to a match only when the reader moves it (types, steps), never because the matches
+    shift under it (the list grows, a block opens). *Don't* pick the scope by what seems worth
+    finding: Chat's first Find skipped every Work block, so thinking on screen could not be
+    found, nor an open block's commands (#183).
 
 ## 3. Visual system
 
@@ -179,7 +186,7 @@ app (tests, the browser harness).
 | Menu | Items |
 |---|---|
 | File | New Tab ⌘T · Go to File… ⌘P — Reveal in Finder ⌥⌘R · Open on this Mac · Copy Path ⌥⌘C (the focused Chat path, else the open file) — Remove Item ⌘W |
-| Edit | macOS's Undo … Select All — Find… ⌘F · Find Next ⌘G · Find Previous ⇧⌘G (the open file's find bar; its editor's search while it is edited; in Chat, what the loaded rows show: your messages, the answers, the thinking shown, and an open Work block’s narration and command lines, not the output folded in a card) |
+| Edit | macOS's Undo … Select All — Find… ⌘F · Find Next ⌘G · Find Previous ⇧⌘G (the open file's find bar; its editor's search while it is edited; in Chat, what the loaded rows show: your messages, the answers, the thinking shown, and an open Work block’s narration and command lines, not the output folded in a card; §2.13) |
 | View | Toggle Sidebar ⌘B · Focus Layout ⇧⌘B · Toggle Files Panel ⌘E · Agent Board ⇧⌘D — Bigger / Smaller / Default Font Size ⌘= ⌘− ⌘0 |
 | Go | Jump to Pane… ⌘K · Next / Previous Blocked or Review ⌘J ⇧⌘J — Next / Previous Open Item ⇧⌘] ⇧⌘[ |
 | Help | Drover Guide · Keyboard Shortcuts… (Settings › Shortcuts) |
