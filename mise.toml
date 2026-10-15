@@ -109,9 +109,14 @@ run = "cargo fmt --check"
 description = "Type-check the frontend"
 run = "pnpm typecheck"
 
+# The gate's cargo tasks build in the main checkout's target (scripts/main-target.sh): a fresh
+# worktree then compiles the drover crate only, not its ~330 dependencies. build:local, dev and
+# clean keep the worktree's own target: build:local's up-to-date check compares this worktree's
+# sources with the bundle, and a shared bundle could be another worktree's.
 [tasks.lint]
 description = "Lint the backend; any warning fails"
 dir = "src-tauri"
+env = { CARGO_TARGET_DIR = "{{ exec(command=config_root ~ '/scripts/main-target.sh') }}" }
 run = "cargo clippy -- -D warnings"
 
 [tasks."test:frontend"]
@@ -136,7 +141,7 @@ run = [
 [tasks."test:backend"]
 description = "Backend unit tests"
 dir = "src-tauri"
-env = { RUST_BACKTRACE = "1" }
+env = { RUST_BACKTRACE = "1", CARGO_TARGET_DIR = "{{ exec(command=config_root ~ '/scripts/main-target.sh') }}" }
 run = "cargo test"
 
 # A throwaway keychain and a tiny bundle; never the login keychain or /Applications.
@@ -150,13 +155,18 @@ description = "Tests for the state migration script"
 run = "sh scripts/migrate-id.test.sh"
 
 # A throwaway repo; never this one.
+[tasks."test:main-target"]
+description = "Tests for the script that names the gate's shared cargo target"
+run = "sh scripts/main-target.test.sh"
+
+# A throwaway repo; never this one.
 [tasks."test:ci-scope"]
 description = "Tests for the script that tells ci whether the backend changed"
 run = "sh scripts/rust-changed.test.sh"
 
 [tasks.test]
 description = "Frontend, backend and signing script tests"
-depends = ["test:frontend", "test:backend", "test:sign", "test:migrate", "test:ci-scope"]
+depends = ["test:frontend", "test:backend", "test:sign", "test:migrate", "test:ci-scope", "test:main-target"]
 
 # fmt, clippy and cargo test, only when src-tauri/ differs from origin/main (scripts/rust-changed.sh):
 # two PRs in three leave the backend alone, and a fresh worktree compiled it for 13 minutes each time.
@@ -184,7 +194,7 @@ if [ -n "$hits" ]; then echo "lint:terms (warning) — see CONTEXT.md:"; echo "$
 
 [tasks.ci]
 description = "The gate: format, typecheck, lint and test must pass; term check warns"
-depends = ["ci:backend", "typecheck", "test:frontend", "test:sign", "test:migrate", "test:ci-scope", "lint:terms"]
+depends = ["ci:backend", "typecheck", "test:frontend", "test:sign", "test:migrate", "test:ci-scope", "test:main-target", "lint:terms"]
 run = "echo 'ci passed'"
 
 # Regenerates src-tauri/icons from one square source image. Only needed when the
