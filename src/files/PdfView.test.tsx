@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => new ArrayBuffer(4)), Channel: class {} }));
 import { invoke } from "@tauri-apps/api/core";
 import { PdfView } from "./PdfView";
+import conf from "../../src-tauri/tauri.conf.json";
 
 describe("PdfView", () => {
   // jsdom has no object URLs.
@@ -36,5 +37,21 @@ describe("PdfView", () => {
     vi.mocked(invoke).mockRejectedValueOnce({ code: "invalid", message: "PDF larger than 20 MB" });
     const { findByText } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
     expect(await findByText("PDF larger than 20 MB")).toBeTruthy();
+  });
+});
+
+// The PDF frame is a blob: document, which inherits the page's CSP. From a header (as Tauri sends
+// it) `frame-ancestors 'none'` or `'self'` blanks that frame; only the page's own origin, named,
+// lets it draw (checked in a WKWebView, 2026-10-15).
+describe("CSP for the PDF frame", () => {
+  const directive = (csp: string, name: string) =>
+    csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `));
+  it.each([
+    ["csp", "tauri://localhost"],
+    ["devCsp", "http://localhost:1420"],
+  ] as const)("%s allows blob: frames and names its origin as the only ancestor", (key, origin) => {
+    const csp = conf.app.security[key];
+    expect(directive(csp, "frame-src")).toBe("frame-src blob:");
+    expect(directive(csp, "frame-ancestors")).toBe(`frame-ancestors ${origin}`);
   });
 });
