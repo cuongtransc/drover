@@ -12,6 +12,7 @@ whichever Machine it lives.
 | Read a PDF | Click it: it shows in WebKit's PDF viewer (up to 20 MB). Pinch or right-click → **Zoom In** to zoom; ⌘+/⌘− change Drover's font size, not the PDF |
 | Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it. On this Mac, ⌘-click hands it to macOS |
 | Do more with that path | Right-click it: **Open in Files**, **Open on this Mac**, **Reveal in Finder** (the last two on this Mac only), **Copy Path**, and **Copy** when you had selected text |
+| Do the same from the keyboard | Tab to the path, then ↩ (Files), ⌘↩ (this Mac), ⌥⌘R (Reveal in Finder), ⌥⌘C (Copy Path), or ⇧F10 for the menu, which lists these keys too |
 | Copy a file to the Mac | Right-click → **Download**. It lands in `~/Downloads`; a name already there gets `name (1).ext` |
 | Copy files to the Workspace | Right-click a folder → **Upload Files…** or **Upload Folder…** (the macOS open panel; drag and drop is off) |
 | Read the tree again | ⌘R. On the local Mac it also happens by itself when Drover gets the focus back and when an agent of the Workspace stops working: macOS can drop file events while a build churns files, so the tree may miss a change until then |

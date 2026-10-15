@@ -222,8 +222,11 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
 - **A right-click never changes the selection.** On macOS, WebKit selects the link under the
   pointer between the right (or Ctrl+) mousedown and `contextmenu`, and `preventDefault()` does
   not stop it. Save the range on mousedown and put it back before the menu reads it (#166).
-- Each item also has a keyboard path (§2.8). **Known gap**: the Chat path menu's Reveal in Finder
-  and Copy Path have none yet; Tab to the link and Enter opens it in Files.
+- Each item also has a keyboard path (§2.8), and the menu shows it at the item's end in `--fg-3`
+  (the item's colour when lit), with `aria-keyshortcuts`; the label stays the accessible name. Show
+  only keys that do exactly what the item does: the Open strip's Remove acts on the clicked item
+  while ⌘W removes the active one, so it shows none. Mouse modifiers (⌘-click) go in tooltips, not
+  in menus. On a Chat path the keys work while it is focused (#170).
 
 ## 5. Accessibility checklist
 
@@ -396,6 +399,7 @@ file. Applied 2026-10-14/15 (#155, #157, #164–#167); the user guide is
 | Click | Opens it in Files at its `:line`, on any Machine (a folder shows its listing) |
 | ⌘-click, this Mac | Hands it to macOS: the default app for a viewable kind, otherwise Reveal in Finder |
 | Right-click | Open in Files · Open on this Mac · Reveal in Finder (this Mac only) — Copy Path · Copy (a selection) |
+| Keys, on a path focused with Tab | ↩ Open in Files · ⌘↩ Open on this Mac (Files on another machine) · ⌥⌘R Reveal in Finder · ⌥⌘C Copy Path · ⇧F10 or Menu key: the menu |
 
 - **Where a relative path is**: the places the agent used before that message come first: file
   paths its tools named that end in it, then the folders its Bash commands went into (`cd`,
