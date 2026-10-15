@@ -9,6 +9,7 @@ import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, useSettings } from "./settings/store";
 import type { ActionId } from "./shortcuts/actions";
 import { actionFor } from "./shortcuts/dispatch";
+import { startMenuSync } from "./shortcuts/menuSync";
 import { keptByDialog, runAction } from "./shortcuts/run";
 import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
@@ -176,6 +177,9 @@ export default function App() {
       unlisten?.();
     };
   }, []);
+
+  // The menu bar carries the user's keys (none while Settings records one).
+  useEffect(() => startMenuSync(), []);
 
   // A menu bar item, chosen or reached by its key: the menu takes its keys before the page (ADR 0010).
   useEffect(() => {
