@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::cksum::cksum;
-use super::paths::{check_rel, io_error, is_image, script_argv};
-use super::{BINARY_SNIFF_BYTES, MAX_IMAGE_BYTES, MAX_TEXT_BYTES};
+use super::paths::{check_rel, io_error, is_image, is_pdf, script_argv};
+use super::{BINARY_SNIFF_BYTES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, MAX_TEXT_BYTES};
 use crate::error::{AppError, AppResult};
 use crate::transport::{exec_bytes, Transport};
 
@@ -12,6 +12,7 @@ pub enum ContentKind {
     Text,
     Binary,
     Image,
+    Pdf,
 }
 
 #[derive(Serialize, Debug)]
@@ -121,8 +122,14 @@ fn bad_output() -> AppError {
 
 pub async fn read_file(t: &dyn Transport, root: &str, rel: &str) -> AppResult<FileContent> {
     check_rel(rel)?;
-    let image = is_image(rel);
-    let flag = if image { "img" } else { "txt" };
+    let viewer = if is_image(rel) {
+        Some(ContentKind::Image)
+    } else if is_pdf(rel) {
+        Some(ContentKind::Pdf)
+    } else {
+        None
+    };
+    let flag = if viewer.is_some() { "img" } else { "txt" };
     let (sniff, max) = (BINARY_SNIFF_BYTES.to_string(), MAX_TEXT_BYTES.to_string());
     let out = exec_bytes(
         t,
@@ -144,8 +151,8 @@ pub async fn read_file(t: &dyn Transport, root: &str, rel: &str) -> AppResult<Fi
         cksum: None,
         editable: false,
     };
-    if image {
-        return Ok(content(ContentKind::Image, None, false));
+    if let Some(kind) = viewer {
+        return Ok(content(kind, None, false));
     }
     let (binary, body) = split_line(rest);
     match binary {
@@ -174,12 +181,33 @@ pub async fn read_file(t: &dyn Transport, root: &str, rel: &str) -> AppResult<Fi
 }
 
 pub async fn read_image(t: &dyn Transport, root: &str, rel: &str) -> AppResult<Vec<u8>> {
+    read_bytes(t, root, rel, MAX_IMAGE_BYTES, "image").await
+}
+
+pub async fn read_pdf(t: &dyn Transport, root: &str, rel: &str) -> AppResult<Vec<u8>> {
+    read_bytes(t, root, rel, MAX_PDF_BYTES, "PDF").await
+}
+
+/// The whole file, refused when larger than `limit`; `what` names the kind in that error.
+async fn read_bytes(
+    t: &dyn Transport,
+    root: &str,
+    rel: &str,
+    limit: usize,
+    what: &str,
+) -> AppResult<Vec<u8>> {
     check_rel(rel)?;
-    let limit = MAX_IMAGE_BYTES.to_string();
-    let out = exec_bytes(t, &script_argv(IMAGE_SCRIPT, &[root, rel, &limit])).await?;
+    let max = limit.to_string();
+    let out = exec_bytes(t, &script_argv(IMAGE_SCRIPT, &[root, rel, &max])).await?;
     match out.status {
         0 => {}
-        4 => return Err(AppError::new("invalid", "image larger than 5 MB")),
+        4 => {
+            let mb = limit / (1024 * 1024);
+            return Err(AppError::new(
+                "invalid",
+                format!("{what} larger than {mb} MB"),
+            ));
+        }
         5 => return Err(bad_output()),
         s => return Err(script_error(s, &out.stderr, rel)),
     }
@@ -267,6 +295,35 @@ mod tests {
         assert_eq!(
             read_image(&LocalTransport, &r, "p.png").await.unwrap(),
             vec![0x89, b'P', b'N', b'G', 0]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pdf_is_its_own_kind_and_reads_whole() {
+        let (_t, r) = root();
+        std::fs::write(format!("{r}/a.pdf"), b"%PDF-1.4\n\0bin").unwrap();
+        let c = read_file(&LocalTransport, &r, "a.pdf").await.unwrap();
+        assert!(matches!(c.kind, ContentKind::Pdf));
+        assert_eq!((c.text, c.editable, c.size), (None, false, 13));
+        assert_eq!(
+            read_pdf(&LocalTransport, &r, "a.pdf").await.unwrap(),
+            b"%PDF-1.4\n\0bin".to_vec()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pdf_may_be_larger_than_an_image_but_not_unbounded() {
+        let (_t, r) = root();
+        std::fs::write(format!("{r}/ok.pdf"), vec![0u8; MAX_IMAGE_BYTES + 1]).unwrap();
+        assert_eq!(
+            read_pdf(&LocalTransport, &r, "ok.pdf").await.unwrap().len(),
+            MAX_IMAGE_BYTES + 1
+        );
+        std::fs::write(format!("{r}/huge.pdf"), vec![0u8; MAX_PDF_BYTES + 1]).unwrap();
+        let e = read_pdf(&LocalTransport, &r, "huge.pdf").await.unwrap_err();
+        assert_eq!(
+            (e.code.as_str(), e.message.as_str()),
+            ("invalid", "PDF larger than 20 MB")
         );
     }
 

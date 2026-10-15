@@ -3,6 +3,7 @@ import type { FindQuery, FindStatus } from "./find";
 import { ImageView } from "./ImageView";
 import { lineOfHash } from "./links";
 import { MarkdownView } from "./MarkdownView";
+import { PdfView } from "./PdfView";
 import { TextView } from "./TextView";
 
 export type FileMode = "render" | "source";
@@ -50,6 +51,7 @@ export function FileView({
   onOutline?(has: boolean): void;
 }) {
   if (content.kind === "image") return <ImageView machineId={machineId} root={root} rel={rel} mtime={content.mtime} />;
+  if (content.kind === "pdf") return <PdfView machineId={machineId} root={root} rel={rel} mtime={content.mtime} />;
   if (content.kind === "text" && content.text === null) {
     return <div className="files-notice">No content was returned for this file</div>;
   }

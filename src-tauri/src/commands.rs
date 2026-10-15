@@ -895,6 +895,20 @@ pub async fn files_image(
 }
 
 #[tauri::command]
+pub async fn files_pdf(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    root: String,
+    rel: String,
+) -> Result<tauri::ipc::Response, AppError> {
+    let root = files_root(&mgr, &machine_id, &root)?;
+    let t = mgr.transport(&machine_id)?;
+    read::read_pdf(&*t, &root, &rel)
+        .await
+        .map(tauri::ipc::Response::new)
+}
+
+#[tauri::command]
 pub async fn files_watch(
     mgr: Mgr<'_>,
     watch: State<'_, Arc<FilesWatch>>,

@@ -170,6 +170,8 @@ export const filesWrite = (machineId: string, root: string, rel: string, text: s
 export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
 export const filesImage = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_image", { machineId, root, rel });
+export const filesPdf = (machineId: string, root: string, rel: string) =>
+  invoke<ArrayBuffer>("files_pdf", { machineId, root, rel });
 export const filesWatch = (machineId: string, root: string, hidden: string[], events: Channel<WatchEvent>) =>
   invoke<number>("files_watch", { machineId, root, hidden, events });
 export const filesUnwatch = (id: number) => invoke<void>("files_unwatch", { id });

@@ -101,6 +101,7 @@ pub fn run() {
             commands::files_read,
             commands::files_write,
             commands::files_image,
+            commands::files_pdf,
             commands::files_changed,
             commands::files_watch,
             commands::files_unwatch,

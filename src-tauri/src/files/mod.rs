@@ -15,6 +15,7 @@ pub mod watch_manager;
 
 pub const MAX_TEXT_BYTES: usize = 2 * 1024 * 1024;
 pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
+pub const MAX_PDF_BYTES: usize = 20 * 1024 * 1024;
 pub const BINARY_SNIFF_BYTES: usize = 8192;
 pub const MAX_LIST_FILES: usize = 50_000;
 pub const MAX_DIR_ENTRIES: usize = 5000;

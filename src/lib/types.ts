@@ -197,7 +197,7 @@ export interface FileEntry {
   kind: "file" | "dir" | "symlink" | "dirlink";
 }
 export interface FileContent {
-  kind: "text" | "binary" | "image";
+  kind: "text" | "binary" | "image" | "pdf";
   text: string | null;
   truncated: boolean;
   size: number;
