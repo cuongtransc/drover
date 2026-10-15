@@ -429,7 +429,8 @@ nothing to the bundle. That has a cost, accepted on 2026-10-15 over pdf.js (+1.7
 
 - its zoom HUD floats over the pages and cannot be moved;
 - ⌘+/⌘− stay Drover's font zoom: the viewer has no zoom API. Pinch and its right-click menu zoom;
-- a PDF that changes on disk reloads at page 1.
+- reloading starts at page 1 (the viewer gives no scroll position), so a PDF that changes on disk
+  stays as it is under a "changed on disk" banner, and reloads when the reader clicks **Reload**.
 
 The viewer's backdrop is white in both themes, so Files paints it with the panel's colour and
 follows `data-theme`. A checklist or guide never promises what the viewer itself does not do (the

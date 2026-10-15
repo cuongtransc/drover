@@ -9,7 +9,7 @@ whichever Machine it lives.
 | Find a file by name | ⌘P (**Go to file**) |
 | See what changed | The **CHANGED** group above the tree lists git's changes under the root |
 | Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Reveal in Finder and Open on this Mac (a file on this Mac), Copy contents, an Outline for Markdown, and find |
-| Read a PDF | Click it: it shows in WebKit's PDF viewer (up to 20 MB). Pinch or right-click → **Zoom In** to zoom; ⌘+/⌘− change Drover's font size, not the PDF |
+| Read a PDF | Click it: it shows in WebKit's PDF viewer (up to 20 MB). Pinch or right-click → **Zoom In** to zoom; ⌘+/⌘− change Drover's font size, not the PDF. If the file changes while you read, a banner offers **Reload**: the page you are on stays until you click it |
 | Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it. On this Mac, ⌘-click hands it to macOS |
 | Do more with that path | Right-click it: **Open in Files**, **Open on this Mac**, **Reveal in Finder** (the last two on this Mac only), **Copy Path**, and **Copy** when you had selected text |
 | Do the same from the keyboard | Tab to the path, then ↩ (Files), ⌘↩ (this Mac), ⌥⌘R (Reveal in Finder), ⌥⌘C (Copy Path), or ⇧F10 for the menu |
