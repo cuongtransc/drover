@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => new ArrayBuffer(4)), Channel: class {} }));
 import { invoke } from "@tauri-apps/api/core";
@@ -10,6 +10,7 @@ describe("PdfView", () => {
   const { createObjectURL, revokeObjectURL } = URL;
   beforeEach(() => {
     vi.mocked(invoke).mockClear();
+    document.documentElement.dataset.theme = "dark";
     URL.createObjectURL = vi.fn(() => "blob:x");
     URL.revokeObjectURL = vi.fn();
   });
@@ -32,6 +33,24 @@ describe("PdfView", () => {
     await findByTitle("a.pdf");
     expect(vi.mocked(invoke)).toHaveBeenCalledTimes(2);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:x");
+  });
+  it("paints the frame's backdrop with the panel's colour, again when the theme changes", async () => {
+    const { container, findByTitle } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
+    const frame = (await findByTitle("a.pdf")) as HTMLIFrameElement;
+    const wrap = container.querySelector(".files-pdf-wrap") as HTMLElement;
+    wrap.style.backgroundColor = "rgb(30, 30, 30)";
+    // jsdom leaves a blob: frame's document empty; WebKit's holds the viewer.
+    const doc = frame.contentDocument!;
+    if (!doc.documentElement) doc.appendChild(doc.createElement("html"));
+    fireEvent.load(frame);
+    const html = () => frame.contentDocument!.documentElement.style;
+    expect(html().background).toBe("rgb(30, 30, 30)");
+    expect(html().colorScheme).toBe("dark");
+    // App puts the theme on <html data-theme> in its own effect, after this view's effects ran.
+    wrap.style.backgroundColor = "rgb(245, 245, 247)";
+    document.documentElement.dataset.theme = "light";
+    await waitFor(() => expect(html().background).toBe("rgb(245, 245, 247)"));
+    expect(html().colorScheme).toBe("light");
   });
   it("shows why a PDF could not be read", async () => {
     vi.mocked(invoke).mockRejectedValueOnce({ code: "invalid", message: "PDF larger than 20 MB" });
