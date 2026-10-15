@@ -246,7 +246,12 @@ fn message_items(entry_id: &str, entry: &Value, sink: &mut dyn ImageSink) -> Vec
                         }
                     }
                     "thinking" => {
-                        if let Some(t) = b.get("thinking").and_then(Value::as_str) {
+                        // An empty block (no text kept) has nothing to show.
+                        if let Some(t) = b
+                            .get("thinking")
+                            .and_then(Value::as_str)
+                            .filter(|t| !t.trim().is_empty())
+                        {
                             items.push(ChatItem::Thinking {
                                 ts: ts.clone(),
                                 text: t.to_string(),
@@ -635,6 +640,17 @@ mod tests {
             ),
             o => panic!("{o:?}"),
         }
+    }
+    #[test]
+    fn skips_thinking_with_no_text() {
+        let line = r#"{"type":"message","id":"b","message":{"role":"assistant","content":[{"type":"thinking","thinking":""},{"type":"thinking","thinking":"plan"}]}}"#;
+        assert_eq!(
+            appended(feed(&mut PiParser::default(), line)),
+            [Thinking {
+                ts: None,
+                text: "plan".into()
+            }]
+        );
     }
     #[test]
     fn reads_model_and_thinking_level() {

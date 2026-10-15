@@ -671,7 +671,12 @@ impl ClaudeParser {
                             }
                         }
                         ("assistant", "thinking") => {
-                            if let Some(t) = b.get("thinking").and_then(Value::as_str) {
+                            // Often only the signature is kept: an empty block has nothing to show.
+                            if let Some(t) = b
+                                .get("thinking")
+                                .and_then(Value::as_str)
+                                .filter(|t| !t.trim().is_empty())
+                            {
                                 items.push(ChatItem::Thinking {
                                     ts: ts.clone(),
                                     text: t.to_string(),
@@ -877,6 +882,22 @@ fn context_tokens(usage: Option<&Value>) -> Option<u64> {
 mod tests {
     use super::*;
     use crate::transcript::{ChatItem::*, Parser, ParserOutput};
+    #[test]
+    fn skips_thinking_with_no_text() {
+        // Claude often writes only the signature: the text is empty and there is nothing to show.
+        let line = r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"","signature":"EqQ"},{"type":"thinking","thinking":"Plan","signature":"EqR"}]}}"#;
+        match ClaudeParser::default().push_line(line, &mut Vec::<(String, String, Vec<u8>)>::new())
+        {
+            ParserOutput::Append(v) => assert_eq!(
+                v,
+                [ChatItem::Thinking {
+                    ts: None,
+                    text: "Plan".into()
+                }]
+            ),
+            other => panic!("expected Append, got {other:?}"),
+        }
+    }
     #[test]
     fn caps_a_huge_write_but_summarises_the_whole_input() {
         let content = "x".repeat(1024 * 1024);
