@@ -225,6 +225,8 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
 - **A right-click never changes the selection.** On macOS, WebKit selects the link under the
   pointer between the right (or Ctrl+) mousedown and `contextmenu`, and `preventDefault()` does
   not stop it. Save the range on mousedown and put it back before the menu reads it (#166).
+- **What a context menu offers is also in the main interface** (Apple's HIG): the File viewer's
+  header has Copy path, Reveal in Finder and Open on this Mac, as Chat's path menu does.
 - Each item also has a keyboard path (§2.8). **A context menu never shows keys**: Apple's HIG puts
   them in the main menus, since a context menu is already the shortcut. The keys go in the item's
   `aria-keyshortcuts`, and on screen in the element's tooltip and in the guide. On a Chat path they

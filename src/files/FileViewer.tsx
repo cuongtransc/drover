@@ -1,11 +1,11 @@
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useShallow } from "zustand/react/shallow";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { filesRead } from "../lib/ipc";
+import { filesRead, openLocalFile, revealLocalFile } from "../lib/ipc";
 import type { FileChange, FileContent } from "../lib/types";
 import { useApp } from "../store/app";
 import { itemKey, type OpenItem } from "../store/openItems";
-import { CopyIcon, FileCopyIcon, OutlineIcon } from "../ui/icons";
+import { CopyIcon, FileCopyIcon, FolderOpenIcon, LaptopIcon, OutlineIcon } from "../ui/icons";
 import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
 import { closeItemsGuarded, settleDrafts } from "./closeGuard";
@@ -277,6 +277,15 @@ export function FileViewer({ item, online }: Props) {
   }, []);
 
   const fullPath = absPath(root, rel);
+  // On this Mac, what Chat's path menu offers is here too (Apple's HIG: a context menu's items are
+  // also in the main interface).
+  const local = useApp((s) => s.machines[machineId]?.kind === "local");
+  const failed = (what: string) => (e: unknown) => showToast(`Cannot ${what} ${fullPath}: ${String((e as { message?: string } | null)?.message ?? e)}`);
+  const reveal = () => void revealLocalFile(fullPath).catch(failed("show in Finder"));
+  const openOnMac = () =>
+    void openLocalFile(fullPath).then((done) => {
+      if (done === "revealed") showToast(`Shown in Finder: ${fullPath}`, { alert: false });
+    }, failed("open"));
   const copyPath = () => {
     writeText(fullPath).then(
       () => showToast("Path copied"),
@@ -301,6 +310,16 @@ export function FileViewer({ item, online }: Props) {
         <button type="button" className="icon-btn" aria-label="Copy path" title="Copy path" onClick={copyPath}>
           <CopyIcon />
         </button>
+        {local && (
+          <>
+            <button type="button" className="icon-btn" aria-label="Reveal in Finder" title="Reveal in Finder" onClick={reveal}>
+              <FolderOpenIcon />
+            </button>
+            <button type="button" className="icon-btn" aria-label="Open on this Mac" title="Open on this Mac" onClick={openOnMac}>
+              <LaptopIcon />
+            </button>
+          </>
+        )}
         {shown?.kind === "text" && shown.text !== null && (
           <button type="button" className="icon-btn" aria-label="Copy contents" title={`Copy contents${cut}`} onClick={copyContents}>
             <FileCopyIcon />
