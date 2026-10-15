@@ -216,14 +216,19 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
 
 - **The menu is drawn by `ContextMenu`**: it opens at the pointer, or ending at it when it would
   cross the window's right or bottom edge, and always stays 8px inside the window (#165).
-- **A menu that replaces WebKit's** (a right-click on a Chat path) keeps what WebKit's menu gave:
-  **Copy** when text was selected, and **Copy Path** in place of Copy Link. It leaves out
-  **Open Link**, which would load the target into the app's own webview (§2.12).
+- **Every link in Chat has Drover's menu, never WebKit's**, whose Open Link loads the page into the
+  app's own window (checked in a WKWebView: the page became `https://example.com/`). A file path:
+  Open in Files · Open on this Mac · Reveal in Finder — Copy Path · Copy. A web link: Open in
+  Browser · Copy Link · Copy. **Copy** shows when text was selected (§2.12). Behind the menus, the
+  webview itself stays on the app's pages: `navigation.rs` sends a web page to the browser and
+  refuses anything else (`file:`, `javascript:`, `data:`), whatever asked for it.
 - **A right-click never changes the selection.** On macOS, WebKit selects the link under the
   pointer between the right (or Ctrl+) mousedown and `contextmenu`, and `preventDefault()` does
   not stop it. Save the range on mousedown and put it back before the menu reads it (#166).
-- Each item also has a keyboard path (§2.8). **Known gap**: the Chat path menu's Reveal in Finder
-  and Copy Path have none yet; Tab to the link and Enter opens it in Files.
+- Each item also has a keyboard path (§2.8). **A context menu never shows keys**: Apple's HIG puts
+  them in the main menus, since a context menu is already the shortcut. The keys go in the item's
+  `aria-keyshortcuts`, and on screen in the element's tooltip and in the guide. On a Chat path they
+  work while it is focused (#170): its tooltip lists them.
 
 ## 5. Accessibility checklist
 
@@ -396,6 +401,7 @@ file. Applied 2026-10-14/15 (#155, #157, #164–#167); the user guide is
 | Click | Opens it in Files at its `:line`, on any Machine (a folder shows its listing) |
 | ⌘-click, this Mac | Hands it to macOS: the default app for a viewable kind, otherwise Reveal in Finder |
 | Right-click | Open in Files · Open on this Mac · Reveal in Finder (this Mac only) — Copy Path · Copy (a selection) |
+| Keys, on a path focused with Tab | ↩ Open in Files · ⌘↩ Open on this Mac (Files on another machine) · ⌥⌘R Reveal in Finder · ⌥⌘C Copy Path · ⇧F10 or Menu key: the menu |
 
 - **Where a relative path is**: the places the agent used before that message come first: file
   paths its tools named that end in it, then the folders its Bash commands went into (`cd`,

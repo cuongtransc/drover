@@ -14,12 +14,13 @@ describe("ContextMenu", () => {
     expect(kinds).toEqual(["A", "sep", "B"]);
   });
 
-  it("shows an item's keys at its end, and none for an item without", () => {
+  // Apple's HIG: keys belong in the main menus, not in context menus, which are a shortcut already.
+  it("names an item's keys for assistive tech, never on screen", () => {
     render(<ContextMenu x={0} y={0} items={[{ ...item("A"), keys: "⌥⌘R" }, item("B")]} onClose={() => {}} />);
     const [a, b] = screen.getAllByRole("menuitem");
-    expect(a.querySelector(".ctx-keys")?.textContent).toBe("⌥⌘R");
-    expect(b.querySelector(".ctx-keys")).toBeNull();
-    expect(a).toHaveProperty("textContent", "A⌥⌘R");
+    expect(a.getAttribute("aria-keyshortcuts")).toBe("Alt+Meta+R");
+    expect(b.getAttribute("aria-keyshortcuts")).toBeNull();
+    expect(a.textContent).toBe("A");
   });
 
   describe("near the window's edges", () => {

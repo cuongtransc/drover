@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openLocalFile, revealLocalFile } from "../lib/ipc";
@@ -10,6 +10,7 @@ import { CopyIcon, FileCopyIcon, FileIcon, FolderOpenIcon, LaptopIcon } from "..
 import { showToast } from "../ui/Toast";
 import type { WorkspaceRef } from "../workspaces/folder";
 import { ChatPaneContext } from "./images";
+import { useLinkMenu } from "./linkMenu";
 import { parsePathRef, pathTarget, type PathTarget } from "./pathLinks";
 import { ChatItemContext, ChatPathsContext, type Found } from "./pathResolver";
 
@@ -29,13 +30,12 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
   const pane = useContext(ChatPaneContext);
   const ref = useMemo(() => parsePathRef(text), [text]);
   const machine = useApp((s) => (pane && ref ? s.machines[pane.machine_id] : undefined));
-  const [menu, setMenu] = useState<{ x: number; y: number; selected: string } | null>(null);
+  const menuOf = useLinkMenu();
+  const { menu } = menuOf;
   const resolver = useContext(ChatPathsContext);
   const item = useContext(ChatItemContext);
   // Outside a Chat there is nothing to ask: the path links as written (undefined).
   const [found, setFound] = useState<Found | "pending">(() => (resolver && ref ? resolver.known(item, ref.path) : undefined));
-  /** The selection when a menu click went down: a range, `null` for none, unset before one. */
-  const before = useRef<Range | null | undefined>(undefined);
   const place = useMemo(() => {
     if (!pane || !ref || !machine) return null;
     const ws = machine.sessions.find((s) => s.name === pane.session)?.workspaces.find((w) => w.tabs.some((t) => t.panes.some((p) => p.pane_id === pane.pane_id)));
@@ -107,7 +107,7 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
     let act: (() => void) | null = null;
     if ((e.key === "F10" && e.shiftKey && plainKey) || (e.key === "ContextMenu" && plainKey && !e.shiftKey)) {
       const r = e.currentTarget.getBoundingClientRect();
-      act = () => setMenu({ x: r.left, y: r.bottom, selected: window.getSelection()?.toString() ?? "" });
+      act = () => menuOf.openAt(r.left, r.bottom);
     } else if (cmd && !e.altKey && e.key === "Enter") act = at((t) => open(t, local));
     else if (cmd && e.altKey && e.code === "KeyR") act = local ? at(reveal) : () => {};
     else if (cmd && e.altKey && e.code === "KeyC") act = at((t) => copy(t.abs, "Path copied"));
@@ -122,35 +122,25 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
       <a
         className={plain ? "chat-path chat-path-plain" : "chat-path"}
         href={target.abs}
-        title={local ? "Open in Files · ⌘-click: open on this Mac" : `Open in Files, from ${machine?.label ?? pane?.machine_id}`}
+        title={
+          local
+            ? "Open in Files · ⌘-click: open on this Mac\nFocused: ⌘↩ on this Mac · ⌥⌘R Reveal in Finder · ⌥⌘C Copy Path · ⇧F10 menu"
+            : `Open in Files, from ${machine?.label ?? pane?.machine_id}\nFocused: ⌥⌘C Copy Path · ⇧F10 menu`
+        }
         onClick={(e) => {
           e.preventDefault();
           const mac = local && e.metaKey;
           at((t) => open(t, mac))();
         }}
-        onMouseDown={(e) => {
-          if (e.button !== 2 && !(e.button === 0 && e.ctrlKey)) return;
-          const sel = window.getSelection();
-          before.current = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
-        }}
+        onMouseDown={menuOf.onMouseDown}
         onKeyDown={onKey}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          // WebKit selects the link between the mousedown and this event; put back what was selected.
-          const sel = window.getSelection();
-          if (sel && before.current !== undefined) {
-            sel.removeAllRanges();
-            if (before.current) sel.addRange(before.current);
-          }
-          before.current = undefined;
-          setMenu({ x: e.clientX, y: e.clientY, selected: sel?.toString() ?? "" });
-        }}
+        onContextMenu={menuOf.onContextMenu}
       >
         {plain ? children : <code>{children}</code>}
       </a>
       {menu &&
         createPortal(
-          <ContextMenu x={menu.x} y={menu.y} items={items(menu.selected)} onClose={() => setMenu(null)} />,
+          <ContextMenu x={menu.x} y={menu.y} items={items(menu.selected)} onClose={menuOf.close} />,
           document.body,
         )}
     </>
