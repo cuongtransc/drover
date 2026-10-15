@@ -31,6 +31,7 @@ import { showToast } from "../ui/Toast";
 import { useApp } from "../store/app";
 import { useFilesBus } from "./bus";
 import { FileViewer } from "./FileViewer";
+import { requestFind } from "./findBus";
 import { HIGHLIGHT_LIMIT } from "./limits";
 import { filesKey, useFiles } from "./store";
 
@@ -108,6 +109,23 @@ describe("FileViewer", () => {
     input.blur();
     press("f");
     expect(document.activeElement).toBe(input);
+  });
+
+  // In the app the menu bar takes ⌘F and ⌘G (Edit › Find…, Find Next, Find Previous; ADR 0010).
+  it("Edit › Find… and Find Next / Previous do what ⌘F and ⌘G do", async () => {
+    texts["m.ts"] = "foo foo\nfoo";
+    render(<FileViewer item={file("m.ts")} online />);
+    await waitFor(() => expect(document.querySelector(".files-text")).not.toBeNull());
+    act(() => requestFind("open"));
+    const input = screen.getByPlaceholderText("Find in file");
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "foo" } });
+    const count = () => document.querySelector(".files-find-count")!.textContent;
+    expect(count()).toBe("1 / 3");
+    act(() => requestFind("next"));
+    expect(count()).toBe("2 / 3");
+    act(() => requestFind("prev"));
+    expect(count()).toBe("1 / 3");
   });
 
   it("Match case narrows the matches; ⌘G and ⇧⌘G step through them", async () => {

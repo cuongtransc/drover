@@ -103,9 +103,12 @@ export const onMenuAction = (cb: (id: ActionId, repeat: boolean) => void): Promi
 /** Fires with what File's Reveal in Finder, Open on this Mac or Copy Path asks for. */
 export const onMenuFile = (cb: (what: "reveal" | "open" | "copy") => void): Promise<UnlistenFn> =>
   listen<"reveal" | "open" | "copy">("menu://file", (e) => cb(e.payload));
-/** Gives the menu bar's action items the user's keys, and File's own keys unless `fileKeys` is
- *  false (while Settings records a key, with every binding null). */
-export const menuSetShortcuts = (bindings: Bindings, fileKeys: boolean) => invoke<void>("menu_set_shortcuts", { bindings, fileKeys });
+/** Gives the menu bar's action items the user's keys, and the fixed keys (File's, Find's) unless
+ *  `fixedKeys` is false (while Settings records a key, with every binding null). */
+export const menuSetShortcuts = (bindings: Bindings, fixedKeys: boolean) => invoke<void>("menu_set_shortcuts", { bindings, fixedKeys });
+/** Fires with what Edit's Find…, Find Next or Find Previous asks for. */
+export const onMenuFind = (cb: (what: "open" | "next" | "prev") => void): Promise<UnlistenFn> =>
+  listen<"open" | "next" | "prev">("menu://find", (e) => cb(e.payload));
 /** Enables File's items for the file they act on: on this Mac, on another machine, or none. */
 export const menuSetFileTarget = (target: "local" | "remote" | "none") => invoke<void>("menu_set_file_target", { target });
 /** Fires with the pane of a desktop notification the user clicked. */

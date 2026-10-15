@@ -58,6 +58,14 @@ pub const LAYOUT: &[(&str, &[Entry])] = &[
         ],
     ),
     (
+        "Edit",
+        &[
+            item("find:open", "Find…"),
+            item("find:next", "Find Next"),
+            item("find:prev", "Find Previous"),
+        ],
+    ),
+    (
         "View",
         &[
             item("action:layout.sidebar", "Toggle Sidebar"),
@@ -90,10 +98,14 @@ pub const LAYOUT: &[(&str, &[Entry])] = &[
     ),
 ];
 
-/// File items' own keys: they act on a file, not on an app action, so they are not rebindable.
-pub const FILE_KEYS: &[(&str, &str)] = &[
+/// Keys of items that are not app actions (a file's, Find's): fixed, not rebindable, and reserved
+/// in `src/shortcuts/chord.ts`.
+pub const FIXED_KEYS: &[(&str, &str)] = &[
     ("file:reveal", "CmdOrCtrl+Alt+KeyR"),
     ("file:copy", "CmdOrCtrl+Alt+KeyC"),
+    ("find:open", "CmdOrCtrl+KeyF"),
+    ("find:next", "CmdOrCtrl+KeyG"),
+    ("find:prev", "CmdOrCtrl+Shift+KeyG"),
 ];
 
 pub const GUIDE_URL: &str =
@@ -124,6 +136,10 @@ pub fn route(id: &str) -> Option<Route> {
     }
     if let Some(action) = id.strip_prefix("action:") {
         return (!action.is_empty()).then(|| Route::Action(action.into()));
+    }
+    if let Some(what) = id.strip_prefix("find:") {
+        return matches!(what, "open" | "next" | "prev")
+            .then(|| Route::Emit("menu://find", Some(what.into())));
     }
     if let Some(what) = id.strip_prefix("file:") {
         return matches!(what, "reveal" | "open" | "copy")
@@ -162,12 +178,12 @@ pub struct MenuBar<R: tauri::Runtime> {
 }
 
 /// Sets each action item's key from the user's bindings (none for a missing or null one), and
-/// File's own keys, which go while Settings records a key (`file_keys` false).
+/// the fixed keys (File's, Find's), which go while Settings records a key (`fixed_keys` false).
 #[tauri::command]
 pub fn menu_set_shortcuts(
     bar: tauri::State<'_, MenuBar<tauri::Wry>>,
     bindings: std::collections::HashMap<String, Option<Chord>>,
-    file_keys: bool,
+    fixed_keys: bool,
 ) -> Result<(), crate::error::AppError> {
     let items = locked(&bar)?;
     for (id, item) in items.iter() {
@@ -177,8 +193,8 @@ pub fn menu_set_shortcuts(
                 .cloned()
                 .flatten()
                 .map(|c| accelerator(&c))
-        } else if let Some((_, k)) = FILE_KEYS.iter().find(|(i, _)| i == id) {
-            file_keys.then(|| k.to_string())
+        } else if let Some((_, k)) = FIXED_KEYS.iter().find(|(i, _)| i == id) {
+            fixed_keys.then(|| k.to_string())
         } else {
             continue;
         };
@@ -299,6 +315,26 @@ mod tests {
     }
 
     #[test]
+    fn edit_has_find_with_its_fixed_keys() {
+        let edit = LAYOUT
+            .iter()
+            .find(|(t, _)| *t == "Edit")
+            .expect("Edit in the layout");
+        let ids: Vec<&str> = edit.1.iter().filter_map(Entry::id).collect();
+        assert_eq!(ids, ["find:open", "find:next", "find:prev"]);
+        for id in ids {
+            let (_, key) = FIXED_KEYS
+                .iter()
+                .find(|(i, _)| *i == id)
+                .expect("a fixed key");
+            assert!(
+                key.parse::<muda::accelerator::Accelerator>().is_ok(),
+                "{key}"
+            );
+        }
+    }
+
+    #[test]
     fn routes() {
         assert_eq!(route("action:jump"), Some(Route::Action("jump".into())));
         assert_eq!(
@@ -310,6 +346,11 @@ mod tests {
             Some(Route::Emit("menu://settings", Some("shortcuts".into())))
         );
         assert_eq!(route("help:guide"), Some(Route::OpenGuide));
+        assert_eq!(
+            route("find:next"),
+            Some(Route::Emit("menu://find", Some("next".into())))
+        );
+        assert_eq!(route("find:other"), None);
         assert_eq!(
             route("settings"),
             Some(Route::Emit("menu://settings", None))

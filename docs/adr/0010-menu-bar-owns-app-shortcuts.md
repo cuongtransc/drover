@@ -38,6 +38,13 @@ takes: the item sends `menu://action/<id>` to the webview, which runs the action
 - Tests that pressed a shortcut on `window` now send the menu event instead; the key path itself
   is checked in the installed app.
 
+## Update 2026-10-16: Find joins Edit
+
+Edit › Find… ⌘F, Find Next ⌘G and Find Previous ⇧⌘G send `menu://find`. The open file's find
+bar answers them, or, while the file is edited, the editor's own search (`openSearchPanel`,
+`findNext`, `findPrevious` on its view), which no longer needs the keys themselves. The third
+rule of the Decision no longer holds back any shortcut.
+
 ## Alternatives considered
 
 - **Menu shows keys, the webview still handles them**: the menu takes the key first, so the

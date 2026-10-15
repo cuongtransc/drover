@@ -22,9 +22,9 @@ describe("startMenuSync", () => {
   it("clears every key while Settings records one, and restores them after", () => {
     const stop = startMenuSync();
     useShortcuts.setState({ recording: true });
-    const [cleared, fileKeys] = vi.mocked(menuSetShortcuts).mock.lastCall!;
-    // File's own keys go too, or ⌥⌘C would copy a path instead of reaching the recorder.
-    expect(fileKeys).toBe(false);
+    const [cleared, fixedKeys] = vi.mocked(menuSetShortcuts).mock.lastCall!;
+    // The fixed keys go too, or ⌥⌘C would copy a path instead of reaching the recorder.
+    expect(fixedKeys).toBe(false);
     expect(Object.keys(cleared)).toEqual(Object.keys(DEFAULT_BINDINGS));
     expect(Object.values(cleared).every((c) => c === null)).toBe(true);
     useShortcuts.setState({ recording: false });

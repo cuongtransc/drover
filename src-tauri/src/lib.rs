@@ -264,7 +264,8 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<
     Ok(menu)
 }
 
-/// Drover's File, View, Go and Help (`menu_bar::LAYOUT`): File and Help replace the default ones,
+/// Drover's File, Edit, View, Go and Help (`menu_bar::LAYOUT`): File and Help replace the default
+/// ones, Find goes at the end of Edit,
 /// View's items go above its Enter Full Screen, Go is new after View. The items are kept in
 /// `MenuBar` for the frontend to set their keys and File's `enabled`.
 fn add_drover_menus<R: tauri::Runtime>(
@@ -279,7 +280,7 @@ fn add_drover_menus<R: tauri::Runtime>(
             match entry {
                 menu_bar::Entry::Sep => items.push(Box::new(PredefinedMenuItem::separator(app)?)),
                 menu_bar::Entry::Item { id, label } => {
-                    let key = menu_bar::FILE_KEYS
+                    let key = menu_bar::FIXED_KEYS
                         .iter()
                         .find(|(i, _)| i == id)
                         .map(|(_, k)| *k);
@@ -303,6 +304,14 @@ fn add_drover_menus<R: tauri::Runtime>(
                     let sep = PredefinedMenuItem::separator(app)?;
                     with_sep.push(&sep);
                     view.insert_items(&with_sep, 0)?;
+                }
+            }
+            ("Edit", Some(at)) => {
+                // Find goes below the default Undo … Select All.
+                if let Some(edit) = menu.items()?[at].as_submenu().cloned() {
+                    let sep = PredefinedMenuItem::separator(app)?;
+                    edit.append(&sep)?;
+                    edit.append_items(&refs)?;
                 }
             }
             (_, Some(at)) => {
