@@ -35,6 +35,21 @@ pub fn opens_in_default_app(path: &Path) -> bool {
 
 /// What a click on `path` should do, after checking it is an absolute path that exists.
 pub fn decide(path: &Path) -> AppResult<Opened> {
+    let meta = existing(path)?;
+    Ok(if meta.is_file() && opens_in_default_app(path) {
+        Opened::Opened
+    } else {
+        Opened::Revealed
+    })
+}
+
+/// Checks `path` before it is revealed in Finder: any kind, as revealing runs nothing.
+pub fn check_reveal(path: &Path) -> AppResult<()> {
+    existing(path).map(|_| ())
+}
+
+/// The metadata of `path`, an absolute path that exists.
+fn existing(path: &Path) -> AppResult<std::fs::Metadata> {
     if !path.is_absolute() {
         return Err(AppError::new(
             "invalid",
@@ -51,11 +66,7 @@ pub fn decide(path: &Path) -> AppResult<Opened> {
         }
         Err(e) => return Err(e.into()),
     };
-    Ok(if meta.is_file() && opens_in_default_app(path) {
-        Opened::Opened
-    } else {
-        Opened::Revealed
-    })
+    Ok(meta)
 }
 
 #[cfg(test)]
@@ -101,5 +112,22 @@ mod tests {
             "not_found"
         );
         assert_eq!(decide(Path::new("rel/a.png")).unwrap_err().code, "invalid");
+    }
+
+    #[test]
+    fn reveals_only_an_absolute_path_that_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("run.command");
+        fs::write(&script, b"x").unwrap();
+        assert!(check_reveal(&script).is_ok());
+        assert!(check_reveal(dir.path()).is_ok());
+        assert_eq!(
+            check_reveal(&dir.path().join("gone.txt")).unwrap_err().code,
+            "not_found"
+        );
+        assert_eq!(
+            check_reveal(Path::new("rel/a")).unwrap_err().code,
+            "invalid"
+        );
     }
 }

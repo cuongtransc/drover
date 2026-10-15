@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened") }));
-import { openLocalFile } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened"), revealLocalFile: vi.fn().mockResolvedValue(undefined) }));
+import { openLocalFile, revealLocalFile } from "../lib/ipc";
 import { useFilesBus } from "../files/bus";
 import { useApp } from "../store/app";
 import { NO_ITEMS } from "../store/openItems";
@@ -29,6 +29,7 @@ function show(markdown: string) {
 
 beforeEach(() => {
   vi.mocked(openLocalFile).mockClear();
+  vi.mocked(revealLocalFile).mockClear();
   useApp.setState({ machines: { m1: machine("local") }, openItems: NO_ITEMS });
   useFilesBus.setState({ jump: null });
 });
@@ -67,6 +68,22 @@ describe("paths in chat", () => {
     fireEvent.click(screen.getByRole("link", { name: "/tmp/x/a.md" }), { metaKey: true });
     expect(openLocalFile).not.toHaveBeenCalled();
     expect(useApp.getState().openItems.items).toHaveLength(1);
+  });
+
+  it("reveals a path in Finder from its right-click menu on this Mac, the path without its line", () => {
+    show("Edit `src/a.ts:3`.");
+    fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reveal in Finder" }));
+    expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(useApp.getState().openItems.items).toEqual([]);
+  });
+
+  it("offers no Reveal in Finder for a path on another machine", () => {
+    useApp.setState({ machines: { m1: machine("ssh") } });
+    show("`/tmp/x/a.md`");
+    fireEvent.contextMenu(screen.getByRole("link", { name: "/tmp/x/a.md" }));
+    expect(screen.queryByRole("menuitem", { name: "Reveal in Finder" })).toBeNull();
   });
 
   it("opens a path outside the folder on another machine in Files, from its own folder", () => {

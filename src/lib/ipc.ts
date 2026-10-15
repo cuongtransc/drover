@@ -54,6 +54,8 @@ export const herdrCall = <T>(machineId: string, session: string, method: string,
 /** Saves image bytes on the Machine (remote ones over ssh) and returns the path there. */
 /** Opens a file on this Mac: a viewable kind in its default app, anything else shown in Finder. */
 export const openLocalFile = (path: string) => invoke<"opened" | "revealed">("open_local_file", { path });
+/** Shows a file on this Mac in Finder, whatever its kind. */
+export const revealLocalFile = (path: string) => invoke<void>("reveal_local_file", { path });
 export const imageSaveTemp = (machineId: string, bytes: Uint8Array, ext: string) =>
   invoke<string>("image_save_temp", bytes, { headers: { "x-machine-id": machineId, "x-image-ext": ext } });
 

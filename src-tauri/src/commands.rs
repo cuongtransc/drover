@@ -48,6 +48,16 @@ pub async fn open_local_file(
     Ok(outcome)
 }
 
+/// Shows a file a chat message names in Finder, on this Mac, whatever its kind.
+#[tauri::command]
+pub async fn reveal_local_file(app: tauri::AppHandle, path: String) -> Result<(), AppError> {
+    use tauri_plugin_opener::OpenerExt;
+    crate::open_file::check_reveal(std::path::Path::new(&path))?;
+    app.opener()
+        .reveal_item_in_dir(&path)
+        .map_err(|e| AppError::new("io", e.to_string()))
+}
+
 #[tauri::command]
 pub async fn machines_list(mgr: Mgr<'_>) -> Result<Vec<MachineView>, AppError> {
     Ok(mgr.views())
