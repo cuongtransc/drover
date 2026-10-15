@@ -1,20 +1,20 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { appQuit, appSetUnsaved, destroyWindow, machinesList, onMachine, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
+import { appQuit, appSetUnsaved, destroyWindow, machinesList, onMachine, onMenuAction, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
 import { syncUnsaved } from "./files/unsavedSync";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
-import { applyChatFont, type FontZoom, useSettings, zoomFont } from "./settings/store";
+import { applyChatFont, useSettings } from "./settings/store";
 import type { ActionId } from "./shortcuts/actions";
 import { actionFor } from "./shortcuts/dispatch";
+import { keptByDialog, runAction } from "./shortcuts/run";
 import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { LayoutControls } from "./main/LayoutControls";
 import { useDockBadge } from "./main/dockBadge";
 import { TriageHud } from "./main/TriageHud";
-import { useTriage } from "./main/triage";
 import { useLayout } from "./settings/layout";
 import { TopBar } from "./main/TopBar";
 import { Sidebar } from "./sidebar/Sidebar";
@@ -24,12 +24,10 @@ import { AgentList } from "./agents/AgentList";
 import { watchProtectPrune } from "./agents/protect";
 import { watchForkPrune } from "./agents/forkSession";
 import { AgentDashboard } from "./dashboard/AgentDashboard";
-import { closeItemsGuarded, settleDrafts } from "./files/closeGuard";
+import { settleDrafts } from "./files/closeGuard";
 import { useDrafts } from "./files/drafts";
 import { UnsavedDialog } from "./files/unsaved";
 import { FilesPanel } from "./files/FilesPanel";
-import { useFilesPanel } from "./files/panelStore";
-import { openNewTabHere } from "./agents/newTabShortcut";
 import { paneKey } from "./lib/types";
 import { activeItem, chosenLens, selectedPane, useApp } from "./store/app";
 import { itemKey } from "./store/openItems";
@@ -106,8 +104,6 @@ function EmptyMain() {
   );
 }
 
-/** Actions an open dialog (`.overlay`) keeps from running: their keys may mean something there. */
-const KEPT_BY_DIALOGS = new Set<ActionId>(["files.toggle", "files.goto", "item.remove", "item.prev", "item.next"]);
 /** Actions a held key runs again. */
 const REPEATS = new Set<ActionId>(["item.prev", "item.next", "font.bigger", "font.smaller", "font.reset"]);
 
@@ -181,6 +177,12 @@ export default function App() {
     };
   }, []);
 
+  // A menu bar item, chosen or reached by its key: the menu takes its keys before the page (ADR 0010).
+  useEffect(() => {
+    const off = onMenuAction((id) => void runAction(id, { setPaletteOpen }));
+    return () => void off.then((f) => f()).catch(() => {});
+  }, []);
+
   // Notifications: show one per status change, and jump to its pane when clicked.
   useEffect(() => {
     let cancelled = false;
@@ -237,51 +239,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const zoom = (z: FontZoom) => {
-      const s = useApp.getState();
-      const open = s.selected ? selectedPane(s)?.pane : null;
-      if (!open || !s.selected) return false;
-      zoomFont(defaultLens(open, chosenLens(s, paneKey(s.selected))), z);
-      return true;
-    };
-    const leaveFocus = () => {
-      if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
-    };
-    // Each returns false when it did nothing, leaving the key to the page.
-    const run: Record<ActionId, () => boolean | void> = {
-      // ⌘+ / ⌘− / ⌘0: the font of the view on screen, Terminal or Chat (iTerm, Ghostty).
-      "font.bigger": () => zoom(1),
-      "font.smaller": () => zoom(-1),
-      "font.reset": () => zoom(0),
-      // While the dashboard is open, the Jump key focuses its search instead.
-      jump: () => (useApp.getState().dashboardOpen ? false : setPaletteOpen((o) => !o)),
-      "triage.next": () => useTriage.getState().step(1),
-      "triage.prev": () => useTriage.getState().step(-1),
-      board: () => useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen),
-      "layout.sidebar": () => useLayout.getState().toggle("sidebar"),
-      "layout.focus": () => useLayout.getState().toggle("focus"),
-      "tabs.new": () =>
-        void openNewTabHere().catch((err: unknown) =>
-          showToast(`Could not open a new tab: ${(err as { message?: string } | null)?.message ?? String(err)}`),
-        ),
-      // Shown means expanded and not hidden by Focus, which hides the Agents column and the panel with it.
-      "files.toggle": () => {
-        const panel = useFilesPanel.getState();
-        if (!panel.collapsed && useLayout.getState().layout !== "focus") return panel.setCollapsed(true);
-        leaveFocus();
-        panel.focusTree();
-      },
-      "files.goto": () => {
-        leaveFocus();
-        useFilesPanel.getState().focusGoto();
-      },
-      "item.remove": () => {
-        const active = useApp.getState().openItems.active;
-        if (active) void closeItemsGuarded(active, "one");
-      },
-      "item.prev": () => useApp.getState().cycleItems(-1),
-      "item.next": () => useApp.getState().cycleItems(1),
-    };
     const onKey = (e: KeyboardEvent) => {
       const keys = useShortcuts.getState();
       // Settings is recording a key: it gets the key, nothing runs.
@@ -289,12 +246,12 @@ export default function App() {
       const action = actionFor(e, keys.bindings);
       if (!action) return;
       // A dialog keeps its keys.
-      if (KEPT_BY_DIALOGS.has(action) && document.querySelector(".overlay")) return;
+      if (keptByDialog(action)) return;
       if (e.repeat && !REPEATS.has(action)) {
         e.preventDefault();
         return;
       }
-      if (run[action]() !== false) e.preventDefault();
+      if (runAction(action, { setPaletteOpen })) e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

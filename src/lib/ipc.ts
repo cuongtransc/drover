@@ -2,6 +2,8 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { showToast } from "../ui/Toast";
+import type { ActionId } from "../shortcuts/actions";
+import type { Bindings } from "../shortcuts/store";
 import type { LaneRecord } from "../agents/roles";
 import type { AttachEvent, Changed, ChatEvent, ChatItem, FileContent, FileEntry, FileList, FileVersion, GitStatus, Located, MachineView, PaneRef, PaneStatusEvent, QuotaOutcome, QuotaProvider, CtaQuota, SlashCommand, WatchEvent } from "./types";
 
@@ -91,8 +93,18 @@ export const onPaneStatus = (cb: (e: PaneStatusEvent) => void): Promise<Unlisten
   listen<PaneStatusEvent>("pane://status", (e) => cb(e.payload));
 export const notifyPane = (pane: PaneRef, title: string, body: string) =>
   invoke<void>("notify_pane", { pane, title, body });
-/** Fires when the app menu's Settings… (⌘,) is chosen. */
-export const onMenuSettings = (cb: () => void): Promise<UnlistenFn> => listen("menu://settings", () => cb());
+/** Fires when the app menu's Settings… (⌘,) is chosen, or Help › Keyboard Shortcuts… ("shortcuts"). */
+export const onMenuSettings = (cb: (section: "shortcuts" | null) => void): Promise<UnlistenFn> =>
+  listen<"shortcuts" | null>("menu://settings", (e) => cb(e.payload ?? null));
+/** Fires with the action of a menu bar item the user chose, by click or by its key (ADR 0010). */
+export const onMenuAction = (cb: (id: ActionId) => void): Promise<UnlistenFn> => listen<ActionId>("menu://action", (e) => cb(e.payload));
+/** Fires with what File's Reveal in Finder, Open on this Mac or Copy Path asks for. */
+export const onMenuFile = (cb: (what: "reveal" | "open" | "copy") => void): Promise<UnlistenFn> =>
+  listen<"reveal" | "open" | "copy">("menu://file", (e) => cb(e.payload));
+/** Gives the menu bar's action items the user's keys (all null: no keys, while Settings records one). */
+export const menuSetShortcuts = (bindings: Bindings) => invoke<void>("menu_set_shortcuts", { bindings });
+/** Enables File's items for the file they act on: on this Mac, on another machine, or none. */
+export const menuSetFileTarget = (target: "local" | "remote" | "none") => invoke<void>("menu_set_file_target", { target });
 /** Fires with the pane of a desktop notification the user clicked. */
 export const onNotifyActivate = (cb: (pane: PaneRef) => void): Promise<UnlistenFn> =>
   listen<PaneRef>("notify://activate", (e) => cb(e.payload));
