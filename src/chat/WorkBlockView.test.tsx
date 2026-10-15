@@ -64,7 +64,7 @@ describe("WorkBlockView", () => {
     };
 
     it("shows its text under the folded header, without the narration", () => {
-      const { container } = render(<WorkBlockView block={withThinking} results={results} open={false} onToggle={() => {}} live={false} />);
+      const { container } = render(<WorkBlockView block={withThinking} results={results} open={false} onToggle={() => {}} live={false} thinking />);
       // Trimmed: the line keeps newlines inside the text, so a trailing one would add a blank line.
       expect(container.querySelector(".chat-work-thinking span")?.textContent).toBe(thought);
       expect(screen.queryByText("Checking the files.")).toBeNull();
@@ -73,13 +73,20 @@ describe("WorkBlockView", () => {
     });
 
     it("keeps its text shown once, in its place, when the block opens", () => {
-      render(<WorkBlockView block={withThinking} results={results} open onToggle={() => {}} live={false} />);
+      render(<WorkBlockView block={withThinking} results={results} open onToggle={() => {}} live={false} thinking />);
       expect(screen.getAllByText(thought)).toHaveLength(1);
       expect(screen.getByText(thought).closest("details")?.open).toBe(true);
     });
 
+    it("stays folded, and closed when the block opens, unless asked to show it", () => {
+      const { container, rerender } = render(<WorkBlockView block={withThinking} results={results} open={false} onToggle={() => {}} live={false} />);
+      expect(container.querySelector(".chat-work-thinking")).toBeNull();
+      rerender(<WorkBlockView block={withThinking} results={results} open onToggle={() => {}} live={false} />);
+      expect(container.querySelector("details.chat-thinking")?.hasAttribute("open")).toBe(false);
+    });
+
     it("adds no lines when the turn has none", () => {
-      const { container } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} />);
+      const { container } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} thinking />);
       expect(container.querySelector(".chat-work-thinking")).toBeNull();
     });
   });

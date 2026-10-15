@@ -174,7 +174,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **File viewer** | The main area while a file's Open item is active | `src/files/FileViewer.tsx` |
 | **CHANGED group** | Git's changes under the root, above the Files tree | `ChangedList`, `useChanged`, `files_changed` |
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |
-| **Work block** | One turn's work folded under "Worked for …"; its thinking stays shown while folded | `src/chat/WorkBlockView.tsx` |
+| **Work block** | One turn's work folded under "Worked for …"; Claude's thinking stays shown while folded | `src/chat/WorkBlockView.tsx` |
 | **Queued messages** | Messages sent mid-turn that the agent has not read yet | `src/chat/QueuedMessages.tsx` |
 | **Background tasks strip** | The Agent's running Background tasks above Queued messages, each with its time running; a row jumps to its tool card | `src/chat/BackgroundTasks.tsx` |
 | **Working line** | The spinner and "Working 1m 23s" (counted from the prompt) over the Composer while the agent works | `src/chat/WorkingIndicator.tsx` |

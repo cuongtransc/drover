@@ -477,6 +477,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                     working={view.status === "working" && row.last}
                     focusCall={pendingCard}
                     onFocusHandled={clearPendingCard}
+                    thinking={view.agent === "claude"}
                   />
                 ) : (
                   <ChatItemView

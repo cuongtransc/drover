@@ -18,6 +18,7 @@ export const WorkBlockView = memo(function WorkBlockView({
   working = live,
   focusCall,
   onFocusHandled,
+  thinking = false,
 }: {
   block: WorkBlock;
   results: Map<string, ToolResult>;
@@ -31,6 +32,8 @@ export const WorkBlockView = memo(function WorkBlockView({
   focusCall?: string | null;
   /** Called after the focused call has been scrolled into view. */
   onFocusHandled?: () => void;
+  /** Show the thinking text, folded or open: Claude's is a short summary; pi's, the raw reasoning, stays folded. */
+  thinking?: boolean;
 }) {
   const rowsRef = useRef<HTMLDivElement>(null);
   // Runs when the block mounts or opens, so a jumped-to row the virtualizer only just rendered
@@ -59,7 +62,7 @@ export const WorkBlockView = memo(function WorkBlockView({
         )}
       </button>
       <SkillChips chips={turnSkills(block.items, results)} />
-      {!open && <ThinkingLines items={block.items} />}
+      {!open && thinking && <ThinkingLines items={block.items} />}
       {open && (
         <div className="chat-work-rows" ref={rowsRef}>
           {block.items.map((it, i) => (
@@ -68,6 +71,7 @@ export const WorkBlockView = memo(function WorkBlockView({
                 item={it}
                 result={it.kind === "tool_call" ? results.get(it.id) : undefined}
                 running={working && it.kind === "tool_call" && !results.has(it.id)}
+                thinkingOpen={thinking}
               />
             </div>
           ))}
