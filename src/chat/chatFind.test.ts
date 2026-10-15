@@ -36,7 +36,7 @@ describe("thinking", () => {
   const rows = [block([think("  plan the parser  "), answer("parser narration"), think("parser again")])];
 
   it("finds in a Work block's thinking when it is shown (Claude's), not its narration", () => {
-    expect(chatFindHits(rows, "parser", false, true)).toEqual([
+    expect(chatFindHits(rows, "parser", false, { thinking: true })).toEqual([
       { row: 0, nth: 0 },
       { row: 0, nth: 1 },
     ]);
@@ -55,7 +55,7 @@ describe("thinking", () => {
     open:
       '<button class="chat-work-head">Worked · parser.ts</button><div class="chat-work-rows">' +
       '<details class="chat-thinking" open><summary>Thinking…</summary><div class="chat-dim">  plan the parser  </div></details>' +
-      '<div class="chat-narration">parser narration</div>' +
+      '<div class="chat-narration">narration</div>' +
       '<details class="chat-thinking" open><summary>Thinking…</summary><div class="chat-dim">parser again</div></details></div>',
   };
   it.each(Object.entries(html))("marks only the thinking of a %s Work block", (_, inner) => {
@@ -63,6 +63,37 @@ describe("thinking", () => {
     el.innerHTML = `<div class="chat-row chat-work">${inner}</div>`;
     expect(rowFindRanges(el, "work", "parser", false, true).map((r) => r.toString())).toEqual(["parser", "parser"]);
     expect(rowFindRanges(el, "work", "parser", false, false)).toEqual([]);
+  });
+});
+
+describe("an open Work block", () => {
+  const call = (id: string, input_summary: string): ChatItem =>
+    ({ kind: "tool_call", id, name: "Bash", input_summary, input: { command: input_summary } }) as ChatItem;
+  const result: ChatItem = { kind: "tool_result", call_id: "c1", output: "parser output", is_error: false };
+  const rows: ChatRow[] = [
+    { kind: "work", key: "w", block: { id: "w", items: [{ kind: "thinking", text: "plan" }, answer("check the **parser**"), call("c1", "rg parser src"), result] } as never, last: false },
+  ];
+  const open = (id: string) => id === "w";
+
+  it("finds what it shows: narration and each command's line, not the output folded in the card", () => {
+    expect(chatFindHits(rows, "parser", false, { isOpen: open })).toEqual([
+      { row: 0, nth: 0 },
+      { row: 0, nth: 1 },
+    ]);
+    expect(chatFindHits(rows, "bash", false, { isOpen: open })).toHaveLength(1);
+    expect(chatFindHits(rows, "parser", false)).toEqual([]);
+  });
+
+  it("marks the same text on screen", () => {
+    const el = document.createElement("div");
+    el.innerHTML =
+      '<div class="chat-row chat-work"><button class="chat-work-head">Worked · parser</button><div class="chat-work-rows">' +
+      '<div><details class="chat-thinking"><summary>Thinking…</summary><div class="chat-dim">plan</div></details></div>' +
+      '<div class="chat-narration"><div class="chat-row chat-assistant"><p>check the <strong>parser</strong></p></div></div>' +
+      '<div data-call="c1"><div class="chat-tool"><button class="chat-tool-row"><span class="chat-tool-name">Bash</span>' +
+      '<span class="chat-tool-sep"> · </span><span class="chat-tool-summary">rg parser src</span></button>' +
+      '<div class="chat-tool-body"><pre class="chat-result">parser output</pre></div></div></div></div></div>';
+    expect(rowFindRanges(el, "work", "parser", false, false).map((r) => r.toString())).toEqual(["parser", "parser"]);
   });
 });
 

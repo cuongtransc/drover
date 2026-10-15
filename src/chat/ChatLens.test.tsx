@@ -244,6 +244,28 @@ describe("ChatLens", () => {
     expect(scrolledTo.filter((i) => i === 0).length).toBe(after);
   });
 
+  it("finds in a Work block once it is opened, without moving the view to another match", async () => {
+    viewport.on = true;
+    render(<ChatLens pane={pane} view={idlePi} />);
+    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
+    const items = [
+      { kind: "user", text: "run ls", ts: "2026-10-16T01:00:00Z" },
+      { kind: "tool_call", id: "c1", name: "Bash", input_summary: "ls -la", input: { command: "ls -la" }, ts: "2026-10-16T01:00:01Z" },
+      { kind: "tool_result", call_id: "c1", output: "ls output", is_error: false, ts: "2026-10-16T01:00:02Z" },
+      { kind: "assistant_text", markdown: "Done.", ts: "2026-10-16T01:00:03Z" },
+    ];
+    act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
+    act(() => requestFind("open"));
+    fireEvent.change(screen.getByPlaceholderText("Find in chat"), { target: { value: "ls" } });
+    const count = () => document.querySelector(".files-find-count")!.textContent;
+    expect(count()).toBe("1 / 1");
+    act(() => requestFind("next"));
+    const before = scrolledTo.length;
+    fireEvent.click(document.querySelector(".chat-work-head")!);
+    expect(count()).toBe("2 / 2");
+    expect(scrolledTo.slice(before)).not.toContain(1);
+  });
+
   it("says the transcript is loading until the first reset or error", async () => {
     const { unmount } = render(<ChatLens pane={pane} view={idlePi} />);
     expect(screen.queryByText("Loading transcript…")).toBeNull();

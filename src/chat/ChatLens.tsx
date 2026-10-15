@@ -255,7 +255,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const live = view.status === "working" || view.status === "blocked";
   const start = useMemo(() => liveStart(rows), [rows]);
 
-  // Find (Edit › Find…, ⌘F): your messages, the answers and the thinking shown, in the loaded rows (chatFind).
+  // Find (Edit › Find…, ⌘F): what the loaded rows show: your messages, the answers, thinking, an open Work block (chatFind).
   const showThinking = view.agent === "claude";
   const [findOpen, setFindOpen] = useState(false);
   const [findFocus, setFindFocus] = useState(0);
@@ -271,7 +271,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     getItemKey: (i) => rows[i].key,
   });
 
-  const hits = useMemo(() => (findOpen ? chatFindHits(rows, findQuery, findCase, showThinking) : []), [findOpen, rows, findQuery, findCase, showThinking]);
+  const hits = useMemo(
+    () => (findOpen ? chatFindHits(rows, findQuery, findCase, { thinking: showThinking, isOpen: (id) => chosenOpen.get(id) ?? false }) : []),
+    [findOpen, rows, findQuery, findCase, showThinking, chosenOpen],
+  );
   const hitAt = hits.length ? wrapIndex(0, findSteps, hits.length) : -1;
   // Numbers, not the hit object: rows change as the chat grows, and that must not scroll again.
   const hitRow = hitAt >= 0 ? hits[hitAt].row : -1;
@@ -299,10 +302,13 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     setHighlight(FIND_ALL, all);
     setHighlight(FIND_CURRENT, current ? [current] : []);
   }, [findOpen, findQuery, findCase, hitRow, hitNth, rows, showThinking]);
-  // To the current match's row when it changes; paint once it has mounted.
+  // To the current match's row when the reader moves it (types, steps); not when the matches
+  // shift under it (the chat grows, a Work block opens). Paint once it has mounted.
+  const hitRowRef = useRef(hitRow);
+  hitRowRef.current = hitRow;
   useEffect(() => {
-    if (hitRow >= 0) virtRef.current.scrollToIndex(hitRow, { align: "center" });
-  }, [hitRow, hitNth]);
+    if (hitRowRef.current >= 0) virtRef.current.scrollToIndex(hitRowRef.current, { align: "center" });
+  }, [findQuery, findCase, findSteps]);
   useEffect(() => {
     const f = requestAnimationFrame(paintFind);
     return () => cancelAnimationFrame(f);

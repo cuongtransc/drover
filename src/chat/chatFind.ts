@@ -1,5 +1,7 @@
 import { findMatches } from "../files/find";
 import { findRanges } from "../files/domFind";
+import type { ChatItem } from "../lib/types";
+import { checklist, checklistSummary } from "./checklist";
 import type { ChatRow } from "./workBlocks";
 
 /** One match: the row it is in, and which match it is in that row. */
@@ -17,14 +19,34 @@ export function plainMarkdown(md: string): string {
     .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+|\d+\.\s+)/gm, "");
 }
 
-/**
- * The searched text of a row: your messages, the answers, and a Work block's thinking when it is
- * shown (`thinking`, Claude's); not tools or narration.
- */
-function rowText(row: ChatRow, thinking: boolean): string | null {
+/** What `chatFindHits` searches beyond your messages and the answers: what the Chat shows. */
+export interface ChatFindScope {
+  /** A Work block's thinking is shown (Claude's), under its folded header or open. */
+  thinking?: boolean;
+  /** Whether a Work block is open: then its narration and each command's line show too. */
+  isOpen?: (id: string) => boolean;
+}
+
+/** A command's line in an open Work block, as its card shows it folded. */
+function callLine(it: Extract<ChatItem, { kind: "tool_call" }>): string {
+  const todos = checklist(it.input);
+  return `${it.name}\n${todos ? checklistSummary(todos) : it.input_summary}`;
+}
+
+/** The searched text of a row: what it shows, not tool output (folded in each card). */
+function rowText(row: ChatRow, scope: ChatFindScope): string | null {
   if (row.kind === "work") {
-    if (!thinking) return null;
-    return row.block.items.flatMap((it) => (it.kind === "thinking" && it.text.trim() ? [it.text.trim()] : [])).join("\n");
+    const open = scope.isOpen?.(row.block.id) ?? false;
+    return row.block.items
+      .flatMap((it) => {
+        if (it.kind === "thinking")
+          return scope.thinking && it.text.trim() ? [it.text.trim()] : [];
+        if (!open) return [];
+        if (it.kind === "assistant_text") return [plainMarkdown(it.markdown)];
+        if (it.kind === "tool_call") return [callLine(it)];
+        return [];
+      })
+      .join("\n");
   }
   const it = row.item;
   if (it.kind === "user") return it.text;
@@ -33,11 +55,16 @@ function rowText(row: ChatRow, thinking: boolean): string | null {
 }
 
 /** Every match of `query` in the Chat's loaded rows, in order. */
-export function chatFindHits(rows: readonly ChatRow[], query: string, matchCase: boolean, thinking = false): ChatHit[] {
+export function chatFindHits(
+  rows: readonly ChatRow[],
+  query: string,
+  matchCase: boolean,
+  scope: ChatFindScope = {},
+): ChatHit[] {
   if (!query) return [];
   const out: ChatHit[] = [];
   rows.forEach((r, row) => {
-    const text = rowText(r, thinking);
+    const text = rowText(r, scope);
     if (!text) return;
     const n = findMatches(text.split("\n"), query, matchCase).length;
     for (let nth = 0; nth < n; nth++) out.push({ row, nth });
@@ -45,12 +72,22 @@ export function chatFindHits(rows: readonly ChatRow[], query: string, matchCase:
   return out;
 }
 
-/** Where a Work block shows its thinking: the lines under the folded header, or each open Thinking. */
-const THINKING_TEXT = ".chat-work-thinking span, .chat-thinking .chat-dim";
+/** A Work row's searched text on screen: thinking (folded or open), narration, each command's line. */
+const WORK_TEXT =
+  ".chat-work-thinking span, .chat-thinking .chat-dim, .chat-narration, .chat-tool-name, .chat-tool-summary";
+const WORK_TEXT_NO_THINKING =
+  ".chat-narration, .chat-tool-name, .chat-tool-summary";
 
 /** The marks for a row on screen: the same text `chatFindHits` counts, so the nth match lines up. */
-export function rowFindRanges(el: Element, kind: ChatRow["kind"], query: string, matchCase: boolean, thinking: boolean): Range[] {
+export function rowFindRanges(
+  el: Element,
+  kind: ChatRow["kind"],
+  query: string,
+  matchCase: boolean,
+  thinking: boolean,
+): Range[] {
   if (kind !== "work") return findRanges(el, query, matchCase);
-  if (!thinking) return [];
-  return [...el.querySelectorAll(THINKING_TEXT)].flatMap((t) => findRanges(t, query, matchCase));
+  return [
+    ...el.querySelectorAll(thinking ? WORK_TEXT : WORK_TEXT_NO_THINKING),
+  ].flatMap((t) => findRanges(t, query, matchCase));
 }
