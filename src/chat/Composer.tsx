@@ -442,7 +442,7 @@ export function Composer({
               disabled={!offered || sending}
               onClick={() => offered && sendQuick(offered)}
             >
-              Send suggestion
+              Suggestion
             </button>
           )}
           {KEYS.map((k) => (
