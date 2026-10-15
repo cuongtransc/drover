@@ -146,6 +146,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 
 | Surface | What it is | Code |
 |---|---|---|
+| **Menu bar** | The macOS menu bar: Drover, File, Edit, View, Go, Window, Help; every shortcut shows here (ADR 0010) | `src-tauri/src/lib.rs` `app_menu` |
 | **Sidebar** | The left column: Bookmarks, Sessions, Machines | `src/sidebar/Sidebar.tsx` |
 | **Layout controls** / **Board button** | Beside the traffic lights: ⌘B / ⇧⌘B, and the Agent Board with its count | `src/main/LayoutControls.tsx`, `.board-btn` |
 | **Session row** | A Session in the Sidebar | `SessionRow` |
