@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
 import { PathInput } from "../ui/PathInput";
 import { CheckIcon, LockIcon } from "../ui/icons";
@@ -30,7 +30,30 @@ function grouped(items: MenuEntry[]): MenuEntry[] {
   return out;
 }
 
+/** The gap kept between a menu and the window's edges. */
+const EDGE = 8;
+
+/**
+ * Where a menu of `size` opens for a pointer at `at` in a window `room` long: at the pointer, or
+ * ending at it when it would cross the far edge; inside the window either way.
+ */
+function fit(at: number, size: number, room: number): { pos: number; flipped: boolean } {
+  const flipped = at + size > room - EDGE;
+  const pos = flipped ? at - size : at;
+  return { pos: Math.min(Math.max(pos, EDGE), room - EDGE - size), flipped };
+}
+
 export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; items: MenuEntry[]; onClose: () => void }) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [place, setPlace] = useState({ left: x, top: y, transformOrigin: "left top" });
+  // Measured before the first paint, so a menu near an edge never shows cut off.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const h = fit(x, el.offsetWidth, window.innerWidth);
+    const v = fit(y, el.offsetHeight, window.innerHeight);
+    setPlace({ left: h.pos, top: v.pos, transformOrigin: `${h.flipped ? "right" : "left"} ${v.flipped ? "bottom" : "top"}` });
+  }, [x, y]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
@@ -38,7 +61,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
   }, [onClose]);
   return (
     <div className="overlay clear" onMouseDown={onClose} onContextMenu={(e) => { e.preventDefault(); onClose(); }}>
-      <ul className="ctx-menu" role="menu" style={{ left: x, top: y }} onMouseDown={(e) => e.stopPropagation()}>
+      <ul ref={ref} className="ctx-menu" role="menu" style={place} onMouseDown={(e) => e.stopPropagation()}>
         {grouped(items).map((it, i) =>
           it === "sep" ? (
             <li key={`sep-${i}`} role="separator" className="ctx-sep" />
