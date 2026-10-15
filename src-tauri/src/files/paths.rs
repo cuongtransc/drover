@@ -26,15 +26,21 @@ pub fn resolve_root(home: &str, root: &str) -> AppResult<String> {
     Ok(if trimmed.is_empty() { "/" } else { trimmed }.to_string())
 }
 
-pub fn is_image(rel: &str) -> bool {
+/// The lowercased extension of `rel`'s name; `.png` is a dotfile with no stem, so has none.
+fn ext(rel: &str) -> Option<String> {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     match name.rsplit_once('.') {
-        // `.png` is a dotfile with no stem, not an image.
-        Some((stem, ext)) if !stem.is_empty() => {
-            IMAGE_EXTS.contains(&ext.to_ascii_lowercase().as_str())
-        }
-        _ => false,
+        Some((stem, ext)) if !stem.is_empty() => Some(ext.to_ascii_lowercase()),
+        _ => None,
     }
+}
+
+pub fn is_image(rel: &str) -> bool {
+    ext(rel).is_some_and(|e| IMAGE_EXTS.contains(&e.as_str()))
+}
+
+pub fn is_pdf(rel: &str) -> bool {
+    ext(rel).as_deref() == Some("pdf")
 }
 
 /// An `io` error for a script that failed: its stderr, or `exit N` when it printed nothing.
@@ -107,6 +113,15 @@ mod tests {
         assert!(!is_image("png"));
         assert!(!is_image(".png"));
         assert!(!is_image("dir/.PNG"));
+    }
+
+    #[test]
+    fn pdfs_by_extension() {
+        assert!(is_pdf("docs/Review.PDF"));
+        assert!(!is_pdf("pdf"));
+        assert!(!is_pdf(".pdf"));
+        assert!(!is_pdf("a.pdfx"));
+        assert!(!is_image("a.pdf"));
     }
 
     #[test]

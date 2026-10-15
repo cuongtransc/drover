@@ -6,7 +6,7 @@ vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 
 import { invoke } from "@tauri-apps/api/core";
 import { showToast } from "../ui/Toast";
-import { completeFiles, filesImage, filesListAll, filesListDir, filesRead, filesWatch, filesWrite, herdrCall } from "./ipc";
+import { completeFiles, filesImage, filesListAll, filesListDir, filesPdf, filesRead, filesWatch, filesWrite, herdrCall } from "./ipc";
 
 describe("herdrCall", () => {
   it("toasts on timeout and rethrows", async () => {
@@ -52,5 +52,7 @@ describe("files ipc", () => {
     expect(invoke).toHaveBeenLastCalledWith("complete_files", { machineId: "devtuf", session: "default", paneId: "p1", hidden });
     await filesImage("local", "/x", "a.png");
     expect(invoke).toHaveBeenLastCalledWith("files_image", { machineId: "local", root: "/x", rel: "a.png" });
+    await filesPdf("local", "/x", "a.pdf");
+    expect(invoke).toHaveBeenLastCalledWith("files_pdf", { machineId: "local", root: "/x", rel: "a.pdf" });
   });
 });

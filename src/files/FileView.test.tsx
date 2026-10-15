@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(), Channel: class {} }));
+import { invoke } from "@tauri-apps/api/core";
 import { FileView } from "./FileView";
 
 const base = { machineId: "local", root: "/r", onMode: () => {}, onOpen: () => {}, find: null, initialScroll: 0, saveScroll: () => {} };
@@ -10,6 +11,12 @@ describe("FileView", () => {
   it("shows the binary notice", () => {
     render(<FileView {...base} rel="a.bin" mode="render" content={{ kind: "binary", text: null, truncated: false, size: 2048, mtime: 1, cksum: null, editable: false }} />);
     expect(screen.getByText("Binary file, not shown")).toBeTruthy();
+  });
+  it("shows a PDF in the PDF view, not the binary notice", () => {
+    vi.mocked(invoke).mockReturnValueOnce(new Promise(() => {}));
+    const { container } = render(<FileView {...base} rel="a.pdf" mode="render" content={{ kind: "pdf", text: null, truncated: false, size: 2048, mtime: 1, cksum: null, editable: false }} />);
+    expect(screen.queryByText("Binary file, not shown")).toBeNull();
+    expect(container.querySelector(".files-pdf-wrap")).toBeTruthy();
   });
   it("shows a notice, not the binary one, for text without content", () => {
     render(<FileView {...base} rel="a.ts" mode="render" content={{ kind: "text", text: null, truncated: false, size: 2, mtime: 1, cksum: null, editable: false }} />);
