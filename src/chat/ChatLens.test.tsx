@@ -203,6 +203,32 @@ describe("ChatLens", () => {
     expect(screen.queryByText("Loading transcript…")).toBeNull();
   });
 
+  describe("thinking under a folded Work block", () => {
+    const turn = [
+      { kind: "user", text: "go", ts: "2026-10-16T01:00:00Z" },
+      { kind: "thinking", text: "Plan: link to the wallet page", ts: "2026-10-16T01:00:01Z" },
+      { kind: "tool_call", id: "c1", name: "Bash", input_summary: "ls", input: { command: "ls" }, ts: "2026-10-16T01:00:02Z" },
+      { kind: "tool_result", call_id: "c1", output: "a", is_error: false, ts: "2026-10-16T01:00:03Z" },
+      { kind: "assistant_text", markdown: "Done.", ts: "2026-10-16T01:00:04Z" },
+    ];
+    const show = (agent: string) => {
+      viewport.on = true;
+      render(<ChatLens pane={pane} view={{ status: "idle", agent, title: agent } as PaneView} />);
+      act(() => channels[channels.length - 1].onmessage({ type: "reset", items: turn, total: turn.length }));
+    };
+
+    it("shows Claude's: a one-line summary written for the reader", () => {
+      show("claude");
+      expect(screen.getByText("Plan: link to the wallet page")).toBeTruthy();
+    });
+
+    it("keeps pi's folded: its thinking is the whole raw reasoning", () => {
+      show("pi");
+      expect(screen.getByText("Done.")).toBeTruthy();
+      expect(screen.queryByText("Plan: link to the wallet page")).toBeNull();
+    });
+  });
+
   it("shows a message sent mid-turn as queued until the agent reads it", () => {
     render(<ChatLens pane={pane} view={{ status: "working", agent: "claude", title: "claude" } as PaneView} />);
     const send = (queued: string[]) =>

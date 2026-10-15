@@ -142,6 +142,8 @@ interface ItemProps {
   copy?: boolean;
   /** A tool call the live turn is still waiting on: spins at the end of its row. */
   running?: boolean;
+  /** A thinking item starts open. */
+  thinkingOpen?: boolean;
 }
 
 /** `copy`: offer a copy button on a user message or an answer (not on narration inside a work block). */
@@ -153,7 +155,7 @@ export const ChatItemView = memo(function ChatItemView(props: ItemProps) {
   );
 });
 
-function ItemBody({ item, result, copy = false, running = false }: ItemProps) {
+function ItemBody({ item, result, copy = false, running = false, thinkingOpen = false }: ItemProps) {
   const edit = useContext(ChatEditContext);
   switch (item.kind) {
     case "user":
@@ -189,8 +191,8 @@ function ItemBody({ item, result, copy = false, running = false }: ItemProps) {
       );
     case "thinking":
       return (
-        // Open by default: the folded Work block shows this text, so opening it must not hide it.
-        <details className="chat-row chat-thinking" open>
+        // Open when the folded Work block shows this text, so opening the block does not hide it.
+        <details className="chat-row chat-thinking" open={thinkingOpen}>
           <summary><BrainIcon className="icon chat-thinking-icon" />Thinking…</summary>
           <div className="chat-dim">{item.text}</div>
         </details>
