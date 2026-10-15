@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/ipc", () => ({ quotaFetch: vi.fn(), quotaCta: vi.fn() }));
 import { quotaCta, quotaFetch } from "../lib/ipc";
+import { runAction } from "../shortcuts/run";
 import type { MachineView, PaneView } from "../lib/types";
 import { initialQuota, useQuota } from "../quota/store";
 import { useApp } from "../store/app";
@@ -133,6 +134,17 @@ describe("AgentDashboard", () => {
     (document.activeElement as HTMLElement | null)?.blur();
     fireEvent.keyDown(window, { key: "k", metaKey: true });
     expect(document.activeElement).toBe(screen.getByPlaceholderText(/search/i));
+  });
+
+  // In the app the menu bar takes the Jump key (ADR 0010): its menu item focuses the search.
+  it("focuses search when Go › Jump to Pane runs while it is open", () => {
+    act(() => useApp.getState().setDashboardOpen(true));
+    render(<AgentDashboard />);
+    (document.activeElement as HTMLElement | null)?.blur();
+    const palette = vi.fn();
+    act(() => void runAction("jump", { setPaletteOpen: palette }));
+    expect(document.activeElement).toBe(screen.getByPlaceholderText(/search/i));
+    expect(palette).not.toHaveBeenCalled();
   });
 
   it("focuses its search with the Jump key, rebound or not", () => {

@@ -924,6 +924,7 @@ dependencies = [
  "core-text",
  "flate2",
  "libc",
+ "muda",
  "notify",
  "objc2",
  "objc2-foundation",
