@@ -7,11 +7,10 @@ import { syncUnsaved } from "./files/unsavedSync";
 import { Palette } from "./palette/Palette";
 import { Settings, useSettingsOpen } from "./settings/Settings";
 import { applyChatFont, useSettings } from "./settings/store";
-import type { ActionId } from "./shortcuts/actions";
 import { actionFor } from "./shortcuts/dispatch";
 import { startMenuSync } from "./shortcuts/menuSync";
 import { startFileMenu } from "./files/fileTarget";
-import { keptByDialog, runAction } from "./shortcuts/run";
+import { keptByDialog, REPEATS, runAction, runMenuAction } from "./shortcuts/run";
 import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
 import { LayoutControls } from "./main/LayoutControls";
@@ -106,8 +105,6 @@ function EmptyMain() {
   );
 }
 
-/** Actions a held key runs again. */
-const REPEATS = new Set<ActionId>(["item.prev", "item.next", "font.bigger", "font.smaller", "font.reset"]);
 
 const ChatLens = lazy(() => import("./chat/ChatLens").then((m) => ({ default: m.ChatLens })));
 const TerminalLens = lazy(() => import("./terminal/TerminalLens").then((m) => ({ default: m.TerminalLens })));
@@ -186,7 +183,7 @@ export default function App() {
 
   // A menu bar item, chosen or reached by its key: the menu takes its keys before the page (ADR 0010).
   useEffect(() => {
-    const off = onMenuAction((id) => void runAction(id, { setPaletteOpen }));
+    const off = onMenuAction((id, repeat) => void runMenuAction(id, repeat, { setPaletteOpen }));
     return () => void off.then((f) => f()).catch(() => {});
   }, []);
 

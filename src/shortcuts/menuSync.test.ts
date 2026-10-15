@@ -12,21 +12,23 @@ describe("startMenuSync", () => {
 
   it("sends the bindings at start and on every change", () => {
     const stop = startMenuSync();
-    expect(menuSetShortcuts).toHaveBeenLastCalledWith(DEFAULT_BINDINGS);
+    expect(menuSetShortcuts).toHaveBeenLastCalledWith(DEFAULT_BINDINGS, true);
     const next = { ...DEFAULT_BINDINGS, jump: { code: "KeyL", shift: false, alt: false, ctrl: false } };
     useShortcuts.setState({ bindings: next });
-    expect(menuSetShortcuts).toHaveBeenLastCalledWith(next);
+    expect(menuSetShortcuts).toHaveBeenLastCalledWith(next, true);
     stop();
   });
 
   it("clears every key while Settings records one, and restores them after", () => {
     const stop = startMenuSync();
     useShortcuts.setState({ recording: true });
-    const cleared = vi.mocked(menuSetShortcuts).mock.lastCall![0];
+    const [cleared, fileKeys] = vi.mocked(menuSetShortcuts).mock.lastCall!;
+    // File's own keys go too, or ⌥⌘C would copy a path instead of reaching the recorder.
+    expect(fileKeys).toBe(false);
     expect(Object.keys(cleared)).toEqual(Object.keys(DEFAULT_BINDINGS));
     expect(Object.values(cleared).every((c) => c === null)).toBe(true);
     useShortcuts.setState({ recording: false });
-    expect(menuSetShortcuts).toHaveBeenLastCalledWith(DEFAULT_BINDINGS);
+    expect(menuSetShortcuts).toHaveBeenLastCalledWith(DEFAULT_BINDINGS, true);
     stop();
   });
 

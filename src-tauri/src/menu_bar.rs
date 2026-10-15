@@ -33,6 +33,8 @@ impl Entry {
 pub enum Route {
     /// An event for the webview, with its payload.
     Emit(&'static str, Option<String>),
+    /// `menu://action` for this action, with whether its key is a held key's repeat.
+    Action(String),
     OpenGuide,
 }
 
@@ -121,7 +123,7 @@ pub fn route(id: &str) -> Option<Route> {
         _ => {}
     }
     if let Some(action) = id.strip_prefix("action:") {
-        return (!action.is_empty()).then(|| Route::Emit("menu://action", Some(action.into())));
+        return (!action.is_empty()).then(|| Route::Action(action.into()));
     }
     if let Some(what) = id.strip_prefix("file:") {
         return matches!(what, "reveal" | "open" | "copy")
@@ -130,31 +132,69 @@ pub fn route(id: &str) -> Option<Route> {
     None
 }
 
+/// Whether the event that chose a menu item is a held key's repeat (macOS repeats a menu's key
+/// equivalent while it is held). A click, or anything else, is not.
+pub fn key_repeat() -> bool {
+    #[cfg(target_os = "macos")]
+    // SAFETY: plain AppKit getters on the main thread, where menu events are delivered.
+    unsafe {
+        use objc2::runtime::AnyObject;
+        use objc2::{class, msg_send};
+        let app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+        if app.is_null() {
+            return false;
+        }
+        let event: *mut AnyObject = msg_send![app, currentEvent];
+        if event.is_null() {
+            return false;
+        }
+        // NSEventTypeKeyDown
+        let kind: usize = msg_send![event, type];
+        kind == 10 && msg_send![event, isARepeat]
+    }
+    #[cfg(not(target_os = "macos"))]
+    false
+}
+
 /// The items the frontend changes: accelerators of `action:*`, `enabled` of `file:*`.
 pub struct MenuBar<R: tauri::Runtime> {
     pub items: std::sync::Mutex<std::collections::HashMap<String, tauri::menu::MenuItem<R>>>,
 }
 
-/// Sets each action item's key from the user's bindings (none for a missing or null one).
+/// Sets each action item's key from the user's bindings (none for a missing or null one), and
+/// File's own keys, which go while Settings records a key (`file_keys` false).
 #[tauri::command]
 pub fn menu_set_shortcuts(
     bar: tauri::State<'_, MenuBar<tauri::Wry>>,
     bindings: std::collections::HashMap<String, Option<Chord>>,
+    file_keys: bool,
 ) -> Result<(), crate::error::AppError> {
-    let items = bar.items.lock().expect("menu items");
+    let items = locked(&bar)?;
     for (id, item) in items.iter() {
-        let Some(action) = id.strip_prefix("action:") else {
+        let key = if let Some(action) = id.strip_prefix("action:") {
+            bindings
+                .get(action)
+                .cloned()
+                .flatten()
+                .map(|c| accelerator(&c))
+        } else if let Some((_, k)) = FILE_KEYS.iter().find(|(i, _)| i == id) {
+            file_keys.then(|| k.to_string())
+        } else {
             continue;
         };
-        let key = bindings
-            .get(action)
-            .cloned()
-            .flatten()
-            .map(|c| accelerator(&c));
         item.set_accelerator(key.as_deref())
             .map_err(|e| crate::error::AppError::new("io", e.to_string()))?;
     }
     Ok(())
+}
+
+type Items<'a> =
+    std::sync::MutexGuard<'a, std::collections::HashMap<String, tauri::menu::MenuItem<tauri::Wry>>>;
+
+fn locked<'a>(bar: &'a MenuBar<tauri::Wry>) -> Result<Items<'a>, crate::error::AppError> {
+    bar.items
+        .lock()
+        .map_err(|_| crate::error::AppError::new("io", "menu items unavailable"))
 }
 
 /// Enables the File items for the file they would act on: on this Mac, elsewhere, or none.
@@ -163,7 +203,7 @@ pub fn menu_set_file_target(
     bar: tauri::State<'_, MenuBar<tauri::Wry>>,
     target: String,
 ) -> Result<(), crate::error::AppError> {
-    let items = bar.items.lock().expect("menu items");
+    let items = locked(&bar)?;
     for (id, on) in [
         ("file:reveal", target == "local"),
         ("file:open", target == "local"),
@@ -260,10 +300,7 @@ mod tests {
 
     #[test]
     fn routes() {
-        assert_eq!(
-            route("action:jump"),
-            Some(Route::Emit("menu://action", Some("jump".into())))
-        );
+        assert_eq!(route("action:jump"), Some(Route::Action("jump".into())));
         assert_eq!(
             route("file:reveal"),
             Some(Route::Emit("menu://file", Some("reveal".into())))

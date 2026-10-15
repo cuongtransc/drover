@@ -1,5 +1,6 @@
 import { openNewTabHere } from "../agents/newTabShortcut";
 import { closeItemsGuarded } from "../files/closeGuard";
+import { focusDashboardSearch } from "../dashboard/searchFocus";
 import { useFilesPanel } from "../files/panelStore";
 import { defaultLens } from "../lens";
 import { paneKey } from "../lib/types";
@@ -12,6 +13,9 @@ import type { ActionId } from "./actions";
 
 /** Actions an open dialog (`.overlay`) keeps from running: their keys may mean something there. */
 const KEPT_BY_DIALOGS = new Set<ActionId>(["files.toggle", "files.goto", "item.remove", "item.prev", "item.next"]);
+
+/** Actions a held key runs again. */
+export const REPEATS = new Set<ActionId>(["item.prev", "item.next", "font.bigger", "font.smaller", "font.reset"]);
 
 /** Whether an open dialog keeps `id` from running. */
 export function keptByDialog(id: ActionId): boolean {
@@ -41,7 +45,7 @@ export function runAction(id: ActionId, opts: { setPaletteOpen: (f: (open: boole
     "font.smaller": () => zoom(-1),
     "font.reset": () => zoom(0),
     // While the dashboard is open, the Jump key focuses its search instead.
-    jump: () => (useApp.getState().dashboardOpen ? false : opts.setPaletteOpen((o) => !o)),
+    jump: () => (useApp.getState().dashboardOpen ? focusDashboardSearch() : opts.setPaletteOpen((o) => !o)),
     "triage.next": () => useTriage.getState().step(1),
     "triage.prev": () => useTriage.getState().step(-1),
     board: () => useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen),
@@ -70,4 +74,10 @@ export function runAction(id: ActionId, opts: { setPaletteOpen: (f: (open: boole
     "item.next": () => useApp.getState().cycleItems(1),
   };
   return run[id]() !== false;
+}
+
+/** A menu bar item's action: macOS repeats its key while held, and only REPEATS run again. */
+export function runMenuAction(id: ActionId, repeat: boolean, opts: { setPaletteOpen: (f: (open: boolean) => boolean) => void }): boolean {
+  if (repeat && !REPEATS.has(id)) return false;
+  return runAction(id, opts);
 }

@@ -48,6 +48,9 @@ describe("reservedReason", () => {
     expect(reservedReason(c("KeyZ", { shift: true }))).toBe("Reserved by macOS");
     expect(reservedReason(c("Space"))).toBe("Reserved by macOS");
     expect(reservedReason(c("Comma"))).toBe("Reserved by Drover: Settings");
+    // File's Reveal in Finder and Copy Path keep their keys in the menu bar.
+    expect(reservedReason(c("KeyR", { alt: true }))).toBe("Reserved by Drover: Reveal in Finder");
+    expect(reservedReason(c("KeyC", { alt: true }))).toBe("Reserved by Drover: Copy Path");
     expect(reservedReason(c("KeyF"))).toBe("Reserved by Drover: Find");
     expect(reservedReason(c("KeyG"))).toBe("Reserved by Drover: Find next");
     expect(reservedReason(c("KeyG", { shift: true }))).toBe("Reserved by Drover: Find previous");

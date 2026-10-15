@@ -96,13 +96,16 @@ export const notifyPane = (pane: PaneRef, title: string, body: string) =>
 /** Fires when the app menu's Settings… (⌘,) is chosen, or Help › Keyboard Shortcuts… ("shortcuts"). */
 export const onMenuSettings = (cb: (section: "shortcuts" | null) => void): Promise<UnlistenFn> =>
   listen<"shortcuts" | null>("menu://settings", (e) => cb(e.payload ?? null));
-/** Fires with the action of a menu bar item the user chose, by click or by its key (ADR 0010). */
-export const onMenuAction = (cb: (id: ActionId) => void): Promise<UnlistenFn> => listen<ActionId>("menu://action", (e) => cb(e.payload));
+/** Fires with the action of a menu bar item the user chose, by click or by its key (ADR 0010);
+ *  `repeat` when macOS repeats the key of a held chord. */
+export const onMenuAction = (cb: (id: ActionId, repeat: boolean) => void): Promise<UnlistenFn> =>
+  listen<{ id: ActionId; repeat: boolean }>("menu://action", (e) => cb(e.payload.id, e.payload.repeat));
 /** Fires with what File's Reveal in Finder, Open on this Mac or Copy Path asks for. */
 export const onMenuFile = (cb: (what: "reveal" | "open" | "copy") => void): Promise<UnlistenFn> =>
   listen<"reveal" | "open" | "copy">("menu://file", (e) => cb(e.payload));
-/** Gives the menu bar's action items the user's keys (all null: no keys, while Settings records one). */
-export const menuSetShortcuts = (bindings: Bindings) => invoke<void>("menu_set_shortcuts", { bindings });
+/** Gives the menu bar's action items the user's keys, and File's own keys unless `fileKeys` is
+ *  false (while Settings records a key, with every binding null). */
+export const menuSetShortcuts = (bindings: Bindings, fileKeys: boolean) => invoke<void>("menu_set_shortcuts", { bindings, fileKeys });
 /** Enables File's items for the file they act on: on this Mac, on another machine, or none. */
 export const menuSetFileTarget = (target: "local" | "remote" | "none") => invoke<void>("menu_set_file_target", { target });
 /** Fires with the pane of a desktop notification the user clicked. */

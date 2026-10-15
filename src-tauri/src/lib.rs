@@ -63,6 +63,12 @@ pub fn run() {
                     tracing::warn!("emit {name} failed: {err}");
                 }
             }
+            Some(menu_bar::Route::Action(id)) => {
+                let payload = serde_json::json!({ "id": id, "repeat": menu_bar::key_repeat() });
+                if let Err(err) = app.emit("menu://action", payload) {
+                    tracing::warn!("emit menu://action failed: {err}");
+                }
+            }
             Some(menu_bar::Route::OpenGuide) => {
                 use tauri_plugin_opener::OpenerExt;
                 if let Err(err) = app.opener().open_url(menu_bar::GUIDE_URL, None::<&str>) {
@@ -291,14 +297,13 @@ fn add_drover_menus<R: tauri::Runtime>(
             .position(|i| i.as_submenu().and_then(|s| s.text().ok()).as_deref() == Some(*title));
         match (*title, existing) {
             ("View", Some(at)) => {
-                let view = menu.items()?[at]
-                    .as_submenu()
-                    .cloned()
-                    .expect("View submenu");
-                let mut with_sep = refs.clone();
-                let sep = PredefinedMenuItem::separator(app)?;
-                with_sep.push(&sep);
-                view.insert_items(&with_sep, 0)?;
+                // `existing` found it as a submenu, so this always holds.
+                if let Some(view) = menu.items()?[at].as_submenu().cloned() {
+                    let mut with_sep = refs.clone();
+                    let sep = PredefinedMenuItem::separator(app)?;
+                    with_sep.push(&sep);
+                    view.insert_items(&with_sep, 0)?;
+                }
             }
             (_, Some(at)) => {
                 let old = menu.items()?.remove(at);

@@ -84,6 +84,9 @@ const RESERVED: [Chord, string][] = [
     (c): [Chord, string] => [c, "Reserved by macOS"],
   ),
   [chord("Comma"), "Reserved by Drover: Settings"],
+  // File's own items in the menu bar (menu_bar::FILE_KEYS).
+  [chord("KeyR", { alt: true }), "Reserved by Drover: Reveal in Finder"],
+  [chord("KeyC", { alt: true }), "Reserved by Drover: Copy Path"],
   [chord("KeyF"), "Reserved by Drover: Find"],
   [chord("KeyG"), "Reserved by Drover: Find next"],
   [chord("KeyG", { shift: true }), "Reserved by Drover: Find previous"],

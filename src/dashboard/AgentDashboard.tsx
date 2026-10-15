@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DASHBOARD_SEARCH } from "./searchFocus";
 import { AgentIcon } from "../agents/AgentIcon";
 import { StatusDot } from "../sidebar/StatusDot";
 import { actionFor } from "../shortcuts/dispatch";
@@ -113,8 +114,17 @@ export function AgentDashboard() {
         else if (!document.querySelector(".overlay")) setOpen(false);
       }
     };
+    // The Jump action from the menu bar, which takes the key before the page (ADR 0010).
+    const onSearch = () => {
+      search.current?.focus();
+      search.current?.select();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(DASHBOARD_SEARCH, onSearch);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(DASHBOARD_SEARCH, onSearch);
+    };
   }, [setOpen]);
 
   const shown = cards.filter(
