@@ -9,6 +9,7 @@ pub mod herdr;
 pub mod lanes;
 pub mod layout;
 pub mod machines;
+pub mod menu_bar;
 mod navigation;
 pub mod notify;
 pub mod open_file;
@@ -56,12 +57,19 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .menu(app_menu)
-        .on_menu_event(|app, event| {
-            if let Some(name) = menu_event(event.id().as_ref()) {
-                if let Err(err) = app.emit(name, ()) {
+        .on_menu_event(|app, event| match menu_bar::route(event.id().as_ref()) {
+            Some(menu_bar::Route::Emit(name, payload)) => {
+                if let Err(err) = app.emit(name, payload) {
                     tracing::warn!("emit {name} failed: {err}");
                 }
             }
+            Some(menu_bar::Route::OpenGuide) => {
+                use tauri_plugin_opener::OpenerExt;
+                if let Err(err) = app.opener().open_url(menu_bar::GUIDE_URL, None::<&str>) {
+                    tracing::warn!("menu: cannot open the guide: {err}");
+                }
+            }
+            None => {}
         })
         .on_window_event(|window, event| {
             // Sessions made outside the app (a terminal, another client) show on return.
@@ -75,6 +83,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            menu_bar::menu_set_shortcuts,
+            menu_bar::menu_set_file_target,
             commands::app_quit,
             commands::app_set_unsaved,
             commands::machines_list,
@@ -195,15 +205,6 @@ const SETTINGS_MENU_ID: &str = "settings";
 const SETTINGS_MENU_TEXT: &str = "Settings…";
 const SETTINGS_ACCELERATOR: &str = "CmdOrCtrl+,";
 
-/// The webview event a click on our own menu item sends, if it is one.
-fn menu_event(id: &str) -> Option<&'static str> {
-    match id {
-        SETTINGS_MENU_ID => Some("menu://settings"),
-        QUIT_MENU_ID => Some(quit_guard::QUIT_REQUESTED),
-        _ => None,
-    }
-}
-
 /// The Quit menu item's text, named after the app as it is installed.
 fn quit_label(app_name: &str) -> String {
     format!("Quit {app_name}")
@@ -253,7 +254,71 @@ fn app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<
             }
         }
     }
+    add_drover_menus(app, &menu)?;
     Ok(menu)
+}
+
+/// Drover's File, View, Go and Help (`menu_bar::LAYOUT`): File and Help replace the default ones,
+/// View's items go above its Enter Full Screen, Go is new after View. The items are kept in
+/// `MenuBar` for the frontend to set their keys and File's `enabled`.
+fn add_drover_menus<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    menu: &Menu<R>,
+) -> tauri::Result<()> {
+    use tauri::menu::{IsMenuItem, Submenu};
+    let mut kept = std::collections::HashMap::new();
+    for (title, entries) in menu_bar::LAYOUT {
+        let mut items: Vec<Box<dyn IsMenuItem<R>>> = Vec::new();
+        for entry in entries.iter() {
+            match entry {
+                menu_bar::Entry::Sep => items.push(Box::new(PredefinedMenuItem::separator(app)?)),
+                menu_bar::Entry::Item { id, label } => {
+                    let key = menu_bar::FILE_KEYS
+                        .iter()
+                        .find(|(i, _)| i == id)
+                        .map(|(_, k)| *k);
+                    // File items wait for a target; action items for the user's keys.
+                    let item = MenuItem::with_id(app, *id, *label, !id.starts_with("file:"), key)?;
+                    kept.insert(id.to_string(), item.clone());
+                    items.push(Box::new(item));
+                }
+            }
+        }
+        let refs: Vec<&dyn IsMenuItem<R>> = items.iter().map(|b| b.as_ref()).collect();
+        let existing = menu
+            .items()?
+            .into_iter()
+            .position(|i| i.as_submenu().and_then(|s| s.text().ok()).as_deref() == Some(*title));
+        match (*title, existing) {
+            ("View", Some(at)) => {
+                let view = menu.items()?[at]
+                    .as_submenu()
+                    .cloned()
+                    .expect("View submenu");
+                let mut with_sep = refs.clone();
+                let sep = PredefinedMenuItem::separator(app)?;
+                with_sep.push(&sep);
+                view.insert_items(&with_sep, 0)?;
+            }
+            (_, Some(at)) => {
+                let old = menu.items()?.remove(at);
+                menu.remove(&old)?;
+                menu.insert(&Submenu::with_items(app, *title, true, &refs)?, at)?;
+            }
+            (_, None) => {
+                // Go: after View, else before Window, else at the end.
+                let after_view = menu.items()?.iter().position(|i| {
+                    i.as_submenu().and_then(|s| s.text().ok()).as_deref() == Some("View")
+                });
+                let at = after_view.map(|v| v + 1).unwrap_or(menu.items()?.len());
+                menu.insert(&Submenu::with_items(app, *title, true, &refs)?, at)?;
+            }
+        }
+    }
+    app.manage(menu_bar::MenuBar {
+        items: std::sync::Mutex::new(kept),
+    });
+    Ok(())
 }
 
 /// Daily-rotating log files under `dir`, keeping the 5 most recent.
@@ -282,9 +347,15 @@ mod tests {
 
     #[test]
     fn settings_menu_item_opens_settings_in_the_webview() {
-        assert_eq!(menu_event(SETTINGS_MENU_ID), Some("menu://settings"));
-        assert_eq!(menu_event("quit"), Some("app://quit-requested"));
-        assert_eq!(menu_event("other"), None);
+        use menu_bar::{route, Route};
+        assert_eq!(
+            route(SETTINGS_MENU_ID),
+            Some(Route::Emit("menu://settings", None))
+        );
+        assert_eq!(
+            route(QUIT_MENU_ID),
+            Some(Route::Emit(quit_guard::QUIT_REQUESTED, None))
+        );
     }
 
     #[test]

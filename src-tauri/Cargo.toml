@@ -57,3 +57,7 @@ core-foundation = "0.10"
 core-text = "22.0.0"
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSUserNotification"] }
+
+[dev-dependencies]
+# Parses accelerator strings the way the menu bar does (menu_bar tests).
+muda = { version = "=0.20.0", default-features = false }

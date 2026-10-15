@@ -1,0 +1,287 @@
+//! The macOS menu bar's Drover menus (File, View, Go, Help). Each shortcut is an item carrying its
+//! key; the menu takes the key before the page (ADR 0010) and tells the webview which action to run.
+
+use serde::Deserialize;
+
+/// A Shortcut's keys, as the frontend's `Chord`: ⌘ with these modifiers and one `KeyboardEvent.code`.
+#[derive(Deserialize, Debug, Clone, PartialEq)]
+pub struct Chord {
+    pub code: String,
+    pub shift: bool,
+    pub alt: bool,
+    pub ctrl: bool,
+}
+
+pub enum Entry {
+    Item {
+        id: &'static str,
+        label: &'static str,
+    },
+    Sep,
+}
+
+impl Entry {
+    pub fn id(&self) -> Option<&'static str> {
+        match self {
+            Entry::Item { id, .. } => Some(id),
+            Entry::Sep => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Route {
+    /// An event for the webview, with its payload.
+    Emit(&'static str, Option<String>),
+    OpenGuide,
+}
+
+const fn item(id: &'static str, label: &'static str) -> Entry {
+    Entry::Item { id, label }
+}
+
+/// Drover's menus, in order, and their items (`action:<ActionId>` items take the user's keys).
+pub const LAYOUT: &[(&str, &[Entry])] = &[
+    (
+        "File",
+        &[
+            item("action:tabs.new", "New Tab"),
+            item("action:files.goto", "Go to File…"),
+            Entry::Sep,
+            item("file:reveal", "Reveal in Finder"),
+            item("file:open", "Open on this Mac"),
+            item("file:copy", "Copy Path"),
+            Entry::Sep,
+            item("action:item.remove", "Remove Item"),
+        ],
+    ),
+    (
+        "View",
+        &[
+            item("action:layout.sidebar", "Toggle Sidebar"),
+            item("action:layout.focus", "Focus Layout"),
+            item("action:files.toggle", "Toggle Files Panel"),
+            item("action:board", "Agent Board"),
+            Entry::Sep,
+            item("action:font.bigger", "Bigger Font"),
+            item("action:font.smaller", "Smaller Font"),
+            item("action:font.reset", "Default Font Size"),
+        ],
+    ),
+    (
+        "Go",
+        &[
+            item("action:jump", "Jump to Pane…"),
+            item("action:triage.next", "Next Blocked or Review"),
+            item("action:triage.prev", "Previous Blocked or Review"),
+            Entry::Sep,
+            item("action:item.next", "Next Open Item"),
+            item("action:item.prev", "Previous Open Item"),
+        ],
+    ),
+    (
+        "Help",
+        &[
+            item("help:guide", "Drover Guide"),
+            item("help:shortcuts", "Keyboard Shortcuts…"),
+        ],
+    ),
+];
+
+/// File items' own keys: they act on a file, not on an app action, so they are not rebindable.
+pub const FILE_KEYS: &[(&str, &str)] = &[
+    ("file:reveal", "CmdOrCtrl+Alt+KeyR"),
+    ("file:copy", "CmdOrCtrl+Alt+KeyC"),
+];
+
+pub const GUIDE_URL: &str =
+    "https://github.com/cuongtransc/drover/blob/main/docs/guide/00-index.md";
+
+/// The accelerator of `c`: `CmdOrCtrl`, then Ctrl, Alt, Shift when set, then the key's code.
+pub fn accelerator(c: &Chord) -> String {
+    let mut out = String::from("CmdOrCtrl");
+    for (on, name) in [(c.ctrl, "Ctrl"), (c.alt, "Alt"), (c.shift, "Shift")] {
+        if on {
+            out.push('+');
+            out.push_str(name);
+        }
+    }
+    out.push('+');
+    out.push_str(&c.code);
+    out
+}
+
+/// What a click on menu item `id` does.
+pub fn route(id: &str) -> Option<Route> {
+    match id {
+        "settings" => return Some(Route::Emit("menu://settings", None)),
+        "quit" => return Some(Route::Emit(crate::quit_guard::QUIT_REQUESTED, None)),
+        "help:guide" => return Some(Route::OpenGuide),
+        "help:shortcuts" => return Some(Route::Emit("menu://settings", Some("shortcuts".into()))),
+        _ => {}
+    }
+    if let Some(action) = id.strip_prefix("action:") {
+        return (!action.is_empty()).then(|| Route::Emit("menu://action", Some(action.into())));
+    }
+    if let Some(what) = id.strip_prefix("file:") {
+        return matches!(what, "reveal" | "open" | "copy")
+            .then(|| Route::Emit("menu://file", Some(what.into())));
+    }
+    None
+}
+
+/// The items the frontend changes: accelerators of `action:*`, `enabled` of `file:*`.
+pub struct MenuBar<R: tauri::Runtime> {
+    pub items: std::sync::Mutex<std::collections::HashMap<String, tauri::menu::MenuItem<R>>>,
+}
+
+/// Sets each action item's key from the user's bindings (none for a missing or null one).
+#[tauri::command]
+pub fn menu_set_shortcuts(
+    bar: tauri::State<'_, MenuBar<tauri::Wry>>,
+    bindings: std::collections::HashMap<String, Option<Chord>>,
+) -> Result<(), crate::error::AppError> {
+    let items = bar.items.lock().expect("menu items");
+    for (id, item) in items.iter() {
+        let Some(action) = id.strip_prefix("action:") else {
+            continue;
+        };
+        let key = bindings
+            .get(action)
+            .cloned()
+            .flatten()
+            .map(|c| accelerator(&c));
+        item.set_accelerator(key.as_deref())
+            .map_err(|e| crate::error::AppError::new("io", e.to_string()))?;
+    }
+    Ok(())
+}
+
+/// Enables the File items for the file they would act on: on this Mac, elsewhere, or none.
+#[tauri::command]
+pub fn menu_set_file_target(
+    bar: tauri::State<'_, MenuBar<tauri::Wry>>,
+    target: String,
+) -> Result<(), crate::error::AppError> {
+    let items = bar.items.lock().expect("menu items");
+    for (id, on) in [
+        ("file:reveal", target == "local"),
+        ("file:open", target == "local"),
+        ("file:copy", target == "local" || target == "remote"),
+    ] {
+        if let Some(item) = items.get(id) {
+            item.set_enabled(on)
+                .map_err(|e| crate::error::AppError::new("io", e.to_string()))?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn c(code: &str, shift: bool, alt: bool, ctrl: bool) -> Chord {
+        Chord {
+            code: code.into(),
+            shift,
+            alt,
+            ctrl,
+        }
+    }
+
+    #[test]
+    fn accelerators_for_every_modifier_and_default_key() {
+        assert_eq!(
+            accelerator(&c("KeyK", false, false, false)),
+            "CmdOrCtrl+KeyK"
+        );
+        assert_eq!(
+            accelerator(&c("KeyJ", true, false, false)),
+            "CmdOrCtrl+Shift+KeyJ"
+        );
+        assert_eq!(
+            accelerator(&c("BracketLeft", true, false, false)),
+            "CmdOrCtrl+Shift+BracketLeft"
+        );
+        assert_eq!(
+            accelerator(&c("Equal", false, false, false)),
+            "CmdOrCtrl+Equal"
+        );
+        assert_eq!(
+            accelerator(&c("Digit0", false, false, false)),
+            "CmdOrCtrl+Digit0"
+        );
+        assert_eq!(
+            accelerator(&c("KeyR", true, true, true)),
+            "CmdOrCtrl+Ctrl+Alt+Shift+KeyR"
+        );
+        for code in [
+            "KeyK",
+            "BracketRight",
+            "Minus",
+            "Comma",
+            "Backquote",
+            "Space",
+            "Tab",
+        ] {
+            let a = accelerator(&c(code, true, true, true));
+            assert!(a.parse::<muda::accelerator::Accelerator>().is_ok(), "{a}");
+        }
+    }
+
+    #[test]
+    fn every_action_is_in_the_layout_once() {
+        let ids: Vec<&str> = LAYOUT
+            .iter()
+            .flat_map(|(_, e)| e.iter())
+            .filter_map(Entry::id)
+            .collect();
+        for a in [
+            "jump",
+            "triage.next",
+            "triage.prev",
+            "board",
+            "layout.sidebar",
+            "layout.focus",
+            "tabs.new",
+            "files.toggle",
+            "files.goto",
+            "item.remove",
+            "item.prev",
+            "item.next",
+            "font.bigger",
+            "font.smaller",
+            "font.reset",
+        ] {
+            let want = format!("action:{a}");
+            assert_eq!(ids.iter().filter(|i| **i == want).count(), 1, "{a}");
+        }
+    }
+
+    #[test]
+    fn routes() {
+        assert_eq!(
+            route("action:jump"),
+            Some(Route::Emit("menu://action", Some("jump".into())))
+        );
+        assert_eq!(
+            route("file:reveal"),
+            Some(Route::Emit("menu://file", Some("reveal".into())))
+        );
+        assert_eq!(
+            route("help:shortcuts"),
+            Some(Route::Emit("menu://settings", Some("shortcuts".into())))
+        );
+        assert_eq!(route("help:guide"), Some(Route::OpenGuide));
+        assert_eq!(
+            route("settings"),
+            Some(Route::Emit("menu://settings", None))
+        );
+        assert_eq!(
+            route("quit"),
+            Some(Route::Emit("app://quit-requested", None))
+        );
+        assert_eq!(route("action:"), None);
+        assert_eq!(route("other"), None);
+    }
+}
