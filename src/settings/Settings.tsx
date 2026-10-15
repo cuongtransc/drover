@@ -404,10 +404,10 @@ const SECTIONS = [
   { id: "shortcuts", label: "Shortcuts", Body: ShortcutsSettings },
 ] as const;
 
-type SectionId = (typeof SECTIONS)[number]["id"];
+export type SectionId = (typeof SECTIONS)[number]["id"];
 
 function SettingsDialog({ onClose }: { onClose: () => void }) {
-  const [active, setActive] = useState<SectionId>("general");
+  const [active, setActive] = useState<SectionId>(() => useSettingsOpen.getState().section);
   const section = SECTIONS.find((x) => x.id === active) ?? SECTIONS[0];
   const ref = useRef<HTMLDivElement>(null);
   // Focus the dialog so Escape reaches it (autoFocus only applies to form controls).
@@ -452,10 +452,12 @@ function SettingsDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Whether the Settings dialog is open: the gear button and the app menu's Settings… ⌘, both open it. */
-export const useSettingsOpen = create<{ open: boolean; show: () => void; hide: () => void }>((setState) => ({
+/** Whether the Settings dialog is open: the gear button and the app menu's Settings… ⌘, both open it,
+ *  on General; Help › Keyboard Shortcuts… opens it on Shortcuts. */
+export const useSettingsOpen = create<{ open: boolean; section: SectionId; show: (section?: SectionId) => void; hide: () => void }>((setState) => ({
   open: false,
-  show: () => setState({ open: true }),
+  section: "general",
+  show: (section = "general") => setState({ open: true, section }),
   hide: () => setState({ open: false }),
 }));
 
@@ -466,7 +468,7 @@ export const Settings = memo(function Settings() {
   return (
     <div className="settings">
       {open && <SettingsDialog onClose={hide} />}
-      <button className="icon-btn" aria-label="Settings" aria-expanded={open} onClick={show}>
+      <button className="icon-btn" aria-label="Settings" aria-expanded={open} onClick={() => show()}>
         <GearIcon />
       </button>
       {jumpKey && (

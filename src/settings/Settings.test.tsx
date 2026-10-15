@@ -31,6 +31,15 @@ function openSettings() {
 }
 
 describe("Settings dialog", () => {
+  it("opens on the section it is asked for (Help › Keyboard Shortcuts…)", async () => {
+    render(<Settings />);
+    act(() => useSettingsOpen.getState().show("shortcuts"));
+    expect(await screen.findByRole("tabpanel", { name: "Shortcuts" })).toBeTruthy();
+    act(() => useSettingsOpen.getState().hide());
+    act(() => useSettingsOpen.getState().show());
+    expect(await screen.findByRole("tabpanel", { name: "General" })).toBeTruthy();
+  });
+
   it("opens when asked from outside (the app menu's Settings… ⌘,), and stays open when asked again", () => {
     render(<Settings />);
     act(() => useSettingsOpen.getState().show());

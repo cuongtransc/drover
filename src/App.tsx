@@ -169,7 +169,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
-    void onMenuSettings(() => useSettingsOpen.getState().show()).then((u) => {
+    void onMenuSettings((section) => useSettingsOpen.getState().show(section ?? undefined)).then((u) => {
       if (cancelled) u();
       else unlisten = u;
     });
