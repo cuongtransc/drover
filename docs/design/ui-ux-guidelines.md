@@ -179,7 +179,7 @@ app (tests, the browser harness).
 | Menu | Items |
 |---|---|
 | File | New Tab ⌘T · Go to File… ⌘P — Reveal in Finder ⌥⌘R · Open on this Mac · Copy Path ⌥⌘C (the focused Chat path, else the open file) — Remove Item ⌘W |
-| Edit | macOS's Undo … Select All — Find… ⌘F · Find Next ⌘G · Find Previous ⇧⌘G (the open file's find bar; its editor's search while it is edited; in Chat, your messages and the answers that are loaded) |
+| Edit | macOS's Undo … Select All — Find… ⌘F · Find Next ⌘G · Find Previous ⇧⌘G (the open file's find bar; its editor's search while it is edited; in Chat, your messages, the answers and the thinking it shows, among the loaded rows) |
 | View | Toggle Sidebar ⌘B · Focus Layout ⇧⌘B · Toggle Files Panel ⌘E · Agent Board ⇧⌘D — Bigger / Smaller / Default Font Size ⌘= ⌘− ⌘0 |
 | Go | Jump to Pane… ⌘K · Next / Previous Blocked or Review ⌘J ⇧⌘J — Next / Previous Open Item ⇧⌘] ⇧⌘[ |
 | Help | Drover Guide · Keyboard Shortcuts… (Settings › Shortcuts) |

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChatItem } from "../lib/types";
-import { chatFindHits, plainMarkdown } from "./chatFind";
+import { chatFindHits, plainMarkdown, rowFindRanges } from "./chatFind";
 import type { ChatRow } from "./workBlocks";
 
 const row = (item: ChatItem, i: number): ChatRow => ({ kind: "item", key: `k${i}`, item });
@@ -27,6 +27,42 @@ describe("chatFindHits", () => {
     const tool: ChatItem = { kind: "tool_result", call_id: "c", output: "foo", is_error: false };
     expect(chatFindHits([row(tool, 0), work(1)], "foo", false)).toEqual([]);
     expect(chatFindHits([row(user("foo"), 0)], "", false)).toEqual([]);
+  });
+});
+
+describe("thinking", () => {
+  const think = (text: string): ChatItem => ({ kind: "thinking", text });
+  const block = (items: ChatItem[]): ChatRow => ({ kind: "work", key: "w", block: { id: "w", items } as never, last: false });
+  const rows = [block([think("  plan the parser  "), answer("parser narration"), think("parser again")])];
+
+  it("finds in a Work block's thinking when it is shown (Claude's), not its narration", () => {
+    expect(chatFindHits(rows, "parser", false, true)).toEqual([
+      { row: 0, nth: 0 },
+      { row: 0, nth: 1 },
+    ]);
+  });
+
+  it("skips thinking that is not shown (pi's)", () => {
+    expect(chatFindHits(rows, "parser", false)).toEqual([]);
+  });
+
+  // The count above and the marks on screen must agree, folded or open.
+  const html = {
+    folded:
+      '<button class="chat-work-head">Worked · parser.ts</button>' +
+      '<div class="chat-work-rows"><div class="chat-work-thinking"><svg></svg><span>plan the parser</span></div>' +
+      '<div class="chat-work-thinking"><svg></svg><span>parser again</span></div></div>',
+    open:
+      '<button class="chat-work-head">Worked · parser.ts</button><div class="chat-work-rows">' +
+      '<details class="chat-thinking" open><summary>Thinking…</summary><div class="chat-dim">  plan the parser  </div></details>' +
+      '<div class="chat-narration">parser narration</div>' +
+      '<details class="chat-thinking" open><summary>Thinking…</summary><div class="chat-dim">parser again</div></details></div>',
+  };
+  it.each(Object.entries(html))("marks only the thinking of a %s Work block", (_, inner) => {
+    const el = document.createElement("div");
+    el.innerHTML = `<div class="chat-row chat-work">${inner}</div>`;
+    expect(rowFindRanges(el, "work", "parser", false, true).map((r) => r.toString())).toEqual(["parser", "parser"]);
+    expect(rowFindRanges(el, "work", "parser", false, false)).toEqual([]);
   });
 });
 

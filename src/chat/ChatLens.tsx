@@ -12,9 +12,9 @@ import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
 import { buildRows, liveStart, rowOfCall } from "./workBlocks";
-import { chatFindHits } from "./chatFind";
+import { chatFindHits, rowFindRanges } from "./chatFind";
 import { FindBar } from "../files/FindBar";
-import { clearHighlights, findRanges, setHighlight } from "../files/domFind";
+import { clearHighlights, setHighlight } from "../files/domFind";
 import { wrapIndex } from "../files/find";
 import { type FindRequest, onFindRequest } from "../files/findBus";
 
@@ -255,7 +255,8 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const live = view.status === "working" || view.status === "blocked";
   const start = useMemo(() => liveStart(rows), [rows]);
 
-  // Find (Edit › Find…, ⌘F): your messages and the answers in the loaded rows (chatFind).
+  // Find (Edit › Find…, ⌘F): your messages, the answers and the thinking shown, in the loaded rows (chatFind).
+  const showThinking = view.agent === "claude";
   const [findOpen, setFindOpen] = useState(false);
   const [findFocus, setFindFocus] = useState(0);
   const [findQuery, setFindQuery] = useState("");
@@ -270,7 +271,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     getItemKey: (i) => rows[i].key,
   });
 
-  const hits = useMemo(() => (findOpen ? chatFindHits(rows, findQuery, findCase) : []), [findOpen, rows, findQuery, findCase]);
+  const hits = useMemo(() => (findOpen ? chatFindHits(rows, findQuery, findCase, showThinking) : []), [findOpen, rows, findQuery, findCase, showThinking]);
   const hitAt = hits.length ? wrapIndex(0, findSteps, hits.length) : -1;
   // Numbers, not the hit object: rows change as the chat grows, and that must not scroll again.
   const hitRow = hitAt >= 0 ? hits[hitAt].row : -1;
@@ -290,13 +291,14 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     const all: Range[] = [];
     let current: Range | null = null;
     for (const el of root.querySelectorAll<HTMLElement>(":scope > [data-index]")) {
-      const ranges = findRanges(el, findQuery, findCase);
+      const row = rows[Number(el.dataset.index)];
+      const ranges = row ? rowFindRanges(el, row.kind, findQuery, findCase, showThinking) : [];
       all.push(...ranges);
       if (Number(el.dataset.index) === hitRow) current = ranges[Math.min(hitNth, ranges.length - 1)] ?? null;
     }
     setHighlight(FIND_ALL, all);
     setHighlight(FIND_CURRENT, current ? [current] : []);
-  }, [findOpen, findQuery, findCase, hitRow, hitNth]);
+  }, [findOpen, findQuery, findCase, hitRow, hitNth, rows, showThinking]);
   // To the current match's row when it changes; paint once it has mounted.
   useEffect(() => {
     if (hitRow >= 0) virtRef.current.scrollToIndex(hitRow, { align: "center" });
@@ -555,7 +557,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                     working={view.status === "working" && row.last}
                     focusCall={pendingCard}
                     onFocusHandled={clearPendingCard}
-                    thinking={view.agent === "claude"}
+                    thinking={showThinking}
                   />
                 ) : (
                   <ChatItemView

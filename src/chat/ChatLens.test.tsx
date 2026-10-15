@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { requestFind } from "../files/findBus";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
@@ -279,6 +279,19 @@ describe("ChatLens", () => {
       show("pi");
       expect(screen.getByText("Done.")).toBeTruthy();
       expect(screen.queryByText("Plan: link to the wallet page")).toBeNull();
+    });
+
+    it("finds in the thinking it shows: Claude's, not pi's", () => {
+      const count = (agent: string) => {
+        show(agent);
+        act(() => requestFind("open"));
+        fireEvent.change(screen.getByPlaceholderText("Find in chat"), { target: { value: "wallet" } });
+        const text = document.querySelector(".files-find-count")!.textContent;
+        cleanup();
+        return text;
+      };
+      expect(count("claude")).toBe("1 / 1");
+      expect(count("pi")).toBe("0 / 0");
     });
   });
 
