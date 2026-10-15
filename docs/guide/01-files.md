@@ -8,7 +8,7 @@ whichever Machine it lives.
 | Open the panel on a Workspace | **Browse files** on its Workspace header, or ⌘E (**Toggle Files panel**: shows it with the tree focused, or hides it; change the key in Settings → Shortcuts) |
 | Find a file by name | ⌘P (**Go to file**) |
 | See what changed | The **CHANGED** group above the tree lists git's changes under the root |
-| Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Copy contents, an Outline for Markdown, and find |
+| Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Reveal in Finder and Open on this Mac (a file on this Mac), Copy contents, an Outline for Markdown, and find |
 | Read a PDF | Click it: it shows in WebKit's PDF viewer (up to 20 MB). Pinch or right-click → **Zoom In** to zoom; ⌘+/⌘− change Drover's font size, not the PDF |
 | Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it. On this Mac, ⌘-click hands it to macOS |
 | Do more with that path | Right-click it: **Open in Files**, **Open on this Mac**, **Reveal in Finder** (the last two on this Mac only), **Copy Path**, and **Copy** when you had selected text |
