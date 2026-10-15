@@ -14,6 +14,9 @@ import { ChatItemContext, ChatPathsContext } from "./pathContext";
 import { pathCandidates } from "./pathHints";
 import { parsePathRef, pathTarget, type PathTarget } from "./pathLinks";
 
+/** The most places one click asks the machine about (`files::first::MAX_CANDIDATES`). */
+const MAX_PLACES = 64;
+
 const message = (e: unknown) => String((e as { message?: string } | null)?.message ?? e);
 
 /**
@@ -52,8 +55,8 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
   /** The first place the machine has a relative path, or null (said in a toast) when none does. */
   const locate = async (): Promise<PathTarget | null> => {
     if (!pane || !ref) return target;
-    const upTo = (item && paths?.order.get(item)) ?? Infinity;
-    const places = pathCandidates(ref.path, paths?.hints ?? [], upTo, { root, home }).slice(0, 64);
+    const { hints, upTo } = paths?.hintsBefore(item) ?? { hints: [], upTo: 0 };
+    const places = pathCandidates(ref.path, hints, upTo, { root, home }, MAX_PLACES);
     let found: string | null;
     try {
       found = await filesFirstFile(pane.machine_id, places);

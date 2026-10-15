@@ -33,11 +33,15 @@ function dirsOf(command: string): string[] {
   return out;
 }
 
-/** Every string inside a tool's input. */
-function strings(v: unknown, out: string[] = []): string[] {
-  if (typeof v === "string") out.push(v);
-  else if (Array.isArray(v)) v.forEach((x) => strings(x, out));
-  else if (v && typeof v === "object") Object.values(v).forEach((x) => strings(x, out));
+/** A tool argument that holds a path by its name: `file_path`, `path`, `paths`, `dir`, `cwd`… */
+const PATH_KEY = /(?:^|_)(?:path|paths|dir|directory|cwd)$/i;
+
+/** The strings under path-named keys anywhere in a tool's input. */
+function pathArgs(v: unknown, named = false, out: string[] = []): string[] {
+  if (typeof v === "string") {
+    if (named) out.push(v);
+  } else if (Array.isArray(v)) v.forEach((x) => pathArgs(x, named, out));
+  else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) pathArgs(x, PATH_KEY.test(k), out);
   return out;
 }
 
@@ -51,15 +55,16 @@ export function pathHints(items: readonly ChatItem[]): PathHint[] {
       seen.add(`${kind}:${path}`);
       hints.push({ at, kind, path });
     };
-    for (const s of strings(it.input)) {
-      if (it.name === "Bash") for (const d of dirsOf(s)) add("dir", d);
-      // A tool's path argument is one path, spaces and all; a Bash command is not.
-      if (it.name !== "Bash" && WHOLE_PATH.test(s)) {
-        add("path", s.trim());
-        continue;
-      }
-      for (const m of s.matchAll(FILE_TOKEN)) add("path", m[1]);
+    if (it.name === "Bash") {
+      const command = (it.input as { command?: unknown } | null)?.command;
+      if (typeof command !== "string") return;
+      for (const d of dirsOf(command)) add("dir", d);
+      for (const m of command.matchAll(FILE_TOKEN)) add("path", m[1]);
+      return;
     }
+    // Another tool's path argument is one path, spaces and all. What it writes (content,
+    // old_string) is text, whose paths may name anything.
+    for (const s of pathArgs(it.input)) if (WHOLE_PATH.test(s)) add("path", s.trim());
   });
   return hints;
 }
@@ -85,9 +90,16 @@ function absolute(path: string, ctx: { root: string | null; home: string | null 
 /**
  * Where the relative path `rel`, written in the item at `before`, may be, most likely first: a
  * file path a tool named that ends in it, then each folder the agent went into, newest first; last
- * the session's folder. Each place once; which one exists is for the machine to say.
+ * the session's folder, which `cap` never drops. Each place once; which one exists is for the
+ * machine to say.
  */
-export function pathCandidates(rel: string, hints: readonly PathHint[], before: number, ctx: { root: string | null; home: string | null }): string[] {
+export function pathCandidates(
+  rel: string,
+  hints: readonly PathHint[],
+  before: number,
+  ctx: { root: string | null; home: string | null },
+  cap = Infinity,
+): string[] {
   const tail = normalize(rel).slice(1);
   const earlier = hints.filter((h) => h.at < before).reverse();
   const out: string[] = [];
@@ -104,6 +116,10 @@ export function pathCandidates(rel: string, hints: readonly PathHint[], before: 
     const dir = absolute(h.path, ctx);
     push(dir && normalize(`${dir}/${tail}`));
   }
-  push(ctx.root && normalize(`${ctx.root}/${tail}`));
-  return out;
+  const own = ctx.root && normalize(`${ctx.root}/${tail}`);
+  push(own);
+  const kept = out.slice(0, cap);
+  // Past the cap, the session's folder takes the last place: it never drops out.
+  if (own && !kept.includes(own)) kept[kept.length - 1] = own;
+  return kept;
 }

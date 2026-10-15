@@ -42,7 +42,7 @@ function show(markdown: string) {
 function showChat(items: ChatItem[]) {
   render(
     <ChatPaneContext.Provider value={pane}>
-      <ChatPathsContext.Provider value={chatPaths(items)}>
+      <ChatPathsContext.Provider value={chatPaths(() => items)}>
         {items.map((it, i) => (it.kind === "assistant_text" ? <ChatItemView key={i} item={it} /> : null))}
       </ChatPathsContext.Provider>
     </ChatPaneContext.Provider>,

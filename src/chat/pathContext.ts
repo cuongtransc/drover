@@ -2,14 +2,24 @@ import { createContext } from "react";
 import type { ChatItem } from "../lib/types";
 import { pathHints, type PathHint } from "./pathHints";
 
-/** What a Chat's tool calls say about where its paths are, and each item's place in it. */
+/**
+ * What a Chat's tool calls say about where its paths are. Read on a click, from the items the Chat
+ * holds then, so the value never changes and no path re-renders as the Chat grows.
+ */
 export interface ChatPaths {
-  hints: PathHint[];
-  order: Map<ChatItem, number>;
+  /** The hints from the items before `item` (all of them when the Chat does not hold it). */
+  hintsBefore(item: ChatItem | null): { hints: PathHint[]; upTo: number };
 }
 
-export function chatPaths(items: readonly ChatItem[]): ChatPaths {
-  return { hints: pathHints(items), order: new Map(items.map((it, i) => [it, i])) };
+export function chatPaths(items: () => readonly ChatItem[]): ChatPaths {
+  return {
+    hintsBefore(item) {
+      const all = items();
+      const at = item ? all.indexOf(item) : -1;
+      const upTo = at < 0 ? all.length : at;
+      return { hints: pathHints(all.slice(0, upTo)), upTo };
+    },
+  };
 }
 
 export const ChatPathsContext = createContext<ChatPaths | null>(null);

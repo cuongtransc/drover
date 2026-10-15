@@ -27,6 +27,14 @@ describe("pathHints", () => {
     ]);
   });
 
+  it("reads no path out of what a tool writes, only from its path arguments and Bash commands", () => {
+    const items = [
+      tool("Write", { file_path: "/w/r/a.md", content: "see /etc/other/x.conf and ~/y/z.ts" }),
+      tool("Edit", { file_path: "/w/r/b.md", old_string: "/a/b/c.ts", new_string: "/d/e/f.ts" }),
+    ];
+    expect(pathHints(items).map((h) => h.path)).toEqual(["/w/r/a.md", "/w/r/b.md"]);
+  });
+
   it("takes a whole tool argument as one path, spaces and all, but not a Bash command", () => {
     const items = [tool("Read", { file_path: "/Users/me/My Docs/a b.md" }), bash("/usr/bin/env python3 x.py")];
     expect(pathHints(items)).toEqual([{ at: 0, kind: "path", path: "/Users/me/My Docs/a b.md" }]);
@@ -64,6 +72,19 @@ describe("pathCandidates", () => {
   it("resolves ./ and ../ and lists each path once", () => {
     const h = pathHints([bash("cd /a/b && cd ../c && cd /a/c")]);
     expect(pathCandidates("./x/y.ts", h, 1, ctx)).toEqual(["/a/c/x/y.ts", "/a/b/x/y.ts", "/Users/me/infra/x/y.ts"]);
+  });
+
+  it("keeps the session's folder when it caps the places to try", () => {
+    const many = pathHints(Array.from({ length: 80 }, (_, i) => bash(`cd /w/d${i}`)));
+    const out = pathCandidates("a/b.ts", many, 80, ctx, 64);
+    expect(out).toHaveLength(64);
+    expect(out[0]).toBe("/w/d79/a/b.ts");
+    expect(out[63]).toBe("/Users/me/infra/a/b.ts");
+  });
+
+  it("leaves the session's folder where the agent last went into it", () => {
+    const h = pathHints([bash("cd /w/old"), bash("cd /Users/me/infra && git pull")]);
+    expect(pathCandidates("a/b.ts", h, 2, ctx, 64)).toEqual(["/Users/me/infra/a/b.ts", "/w/old/a/b.ts"]);
   });
 
   it("without a home, leaves out what starts at ~", () => {

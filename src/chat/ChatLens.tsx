@@ -219,8 +219,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
 
   // Tool results render inside their call; each turn's work folds into one row.
   const { rows, results } = useMemo(() => buildRows(items, state.total - state.items.length), [items, state.total, state.items.length]);
-  // Where the agent worked, for a relative path written in a message.
-  const paths = useMemo(() => chatPaths(items), [items]);
+  // Where the agent worked, for a relative path written in a message: read on a click.
+  const itemsNow = useRef(items);
+  itemsNow.current = items;
+  const paths = useMemo(() => chatPaths(() => itemsNow.current), []);
   const asked = useMemo(() => pendingQuestions(items), [items]);
   // Badges follow the strip's rule: nothing runs once the agent is gone, and a fork's preview
   // of the original transcript must not claim the original's tasks. The value keeps its identity
