@@ -18,6 +18,7 @@ import { createKeyHandler } from "./keyHandler";
 import { disposesOnEvent, endsOpen, initialLensState, lensReducer } from "./lensState";
 import { applyOsc52 } from "./osc52";
 import { applySelectUx, copyText } from "./selectUx";
+import { createInverseRewriter } from "./inverseRewrite";
 import { createOutputBuffer } from "./outputBuffer";
 import { claim, disposeIf, getOrCreate } from "./termCache";
 import { TERM_MIN_CONTRAST } from "./theme";
@@ -148,11 +149,16 @@ export function TerminalLens({ pane, terminalId }: Props) {
       // Only a detach drops output: `held` arrives just before the chunk that carries it.
       let detached = false;
       const acks = createAckBatcher((n) => termAck(key, n));
+      const rewrite = createInverseRewriter();
       const data = new Channel<ArrayBuffer>();
       data.onmessage = (buf) => {
         const bytes = toBytes(buf);
         if (!bytes || detached) return;
-        output.write(bytes, () => acks.add(bytes.byteLength));
+        // Acked by the received length: a CSI held back until the next chunk counts as parsed.
+        const ack = () => acks.add(bytes.byteLength);
+        const out = rewrite(bytes);
+        if (out.byteLength === 0) ack();
+        else output.write(out, ack);
       };
       const events = new Channel<AttachEvent>();
       events.onmessage = (ev) => {
