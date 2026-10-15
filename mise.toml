@@ -52,9 +52,18 @@ description = "Build the release bundle (Drover.app)"
 run = "pnpm tauri build --bundles app"
 
 # The release build minus LTO (src-tauri/Cargo.toml [profile.local]): same behaviour, about 3x
-# faster to rebuild. For the bundle a release ships, use `build`.
+# faster to rebuild. For the bundle a release ships, use `build`. Skipped while no source is
+# newer than the bundle: vite rewrites dist/ on every run, which alone recompiles the drover
+# crate (~40 s). A build input outside `sources` goes unnoticed; `mise run -f` forces a build.
 [tasks."build:local"]
 description = "Build the bundle without LTO (Drover.app under target/local)"
+sources = [
+  "src/**/*", "index.html", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**/*",
+  "tsconfig.json", "tsconfig.node.json", "vite.config.ts", "mise.toml",
+  "src-tauri/src/**/*", "src-tauri/Cargo.toml", "src-tauri/Cargo.lock", "src-tauri/build.rs",
+  "src-tauri/tauri.conf.json", "src-tauri/capabilities/**/*", "src-tauri/icons/**/*",
+]
+outputs = ["src-tauri/target/local/bundle/macos/Drover.app/Contents/MacOS/drover"]
 run = "pnpm tauri build --bundles app -- --profile local"
 
 [tasks.start]
