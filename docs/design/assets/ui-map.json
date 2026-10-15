@@ -1,5 +1,5 @@
 {
- "captured": "2026-10-13",
+ "captured": "2026-10-15",
  "width": 1440,
  "height": 900,
  "parts": [
@@ -140,13 +140,13 @@
    "code": "SessionRow",
    "rect": {
     "x": 8,
-    "y": 144,
+    "y": 206,
     "w": 232,
     "h": 28
    },
    "badge": {
     "x": 130,
-    "y": 158
+    "y": 220
    }
   },
   {
@@ -165,13 +165,13 @@
    "code": "ProjectRows",
    "rect": {
     "x": 32,
-    "y": 173,
+    "y": 235,
     "w": 208,
     "h": 24
    },
    "badge": {
     "x": 152,
-    "y": 185
+    "y": 247
    }
   },
   {
@@ -190,13 +190,13 @@
    "code": ".filter-hidden in GroupTree",
    "rect": {
     "x": 8,
-    "y": 232,
+    "y": 294,
     "w": 232,
     "h": 32.796875
    },
    "badge": {
     "x": 180,
-    "y": 248.3984375
+    "y": 310.3984375
    }
   },
   {
@@ -357,17 +357,17 @@
     96,
     0
    ],
-   "what": "CLOSED and its count: the Session's kept workspaces herdr removed; a click opens one again.",
+   "what": "CLOSED WORKSPACES and its count, docked above Files: the Session's kept workspaces herdr removed; a click opens one again.",
    "code": "src/agents/ClosedSection.tsx",
    "rect": {
     "x": 249,
-    "y": 231,
-    "w": 278,
-    "h": 25
+    "y": 416,
+    "w": 288,
+    "h": 33
    },
    "badge": {
     "x": 345,
-    "y": 243.5
+    "y": 432.5
    }
   },
   {
@@ -682,16 +682,16 @@
     -16,
     0
    ],
-   "what": "/btw (on while the box holds one), Use suggestion (Tab), and Esc sent to the agent as a key.",
+   "what": "/btw (on while the box holds one), Send suggestion (sends it; Tab only fills the box), and Esc sent to the agent as a key.",
    "code": ".composer-keys in Composer",
    "rect": {
-    "x": 1192.25,
+    "x": 1185.5625,
     "y": 761,
-    "w": 196.75,
+    "w": 203.4375,
     "h": 24
    },
    "badge": {
-    "x": 1176.25,
+    "x": 1169.5625,
     "y": 773
    }
   },

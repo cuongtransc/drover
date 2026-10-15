@@ -433,11 +433,16 @@ export function Composer({
               /btw
             </button>
           )}
-          {/* The suggestion already shows in the empty box; this only takes it, as Tab does. Mounted
-              for Claude whether or not one is offered, so the row doesn't shift. */}
+          {/* The suggestion already shows in the empty box; this sends it at once, while Tab only puts
+              it in the box. Mounted for Claude whether or not one is offered, so the row doesn't shift. */}
           {agent === "claude" && (
-            <button className="keycap" title="Put Claude's suggestion in the box (Tab)" disabled={!offered} onClick={() => offered && takeSuggestion(offered)}>
-              Use suggestion
+            <button
+              className="keycap"
+              title={offered ? `Send Claude's suggestion: “${offered}” (Tab only puts it in the box)` : "Send Claude's suggestion, when it offers one"}
+              disabled={!offered || sending}
+              onClick={() => offered && sendQuick(offered)}
+            >
+              Send suggestion
             </button>
           )}
           {KEYS.map((k) => (
