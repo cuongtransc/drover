@@ -295,10 +295,12 @@ describe("paths in chat", () => {
       expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3 now.");
     });
 
-    it("names the keys of a focused path for assistive tech, and lists them in the link's tooltip", () => {
+    // A tooltip is read at a glance: one line, what a click and a ⌘-click do. The keys of a focused
+    // path are for keyboard users, who do not hover: assistive tech and the guide name them.
+    it("names the keys of a focused path for assistive tech; its tooltip is one short line", () => {
       show("Edit `src/a.ts:3` now.");
       const link = screen.getByRole("link", { name: "src/a.ts:3" });
-      expect(link.getAttribute("title")).toContain("⌥⌘R Reveal in Finder");
+      expect(link.getAttribute("title")).toBe("Open in Files · ⌘-click: open on this Mac");
       fireEvent.contextMenu(link);
       const keys = screen.getAllByRole("menuitem").map((b) => b.getAttribute("aria-keyshortcuts"));
       expect(keys).toEqual(["Enter", "Meta+Enter", "Alt+Meta+R", "Alt+Meta+C"]);
