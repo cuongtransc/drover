@@ -10,6 +10,7 @@ import { applyChatFont, useSettings } from "./settings/store";
 import type { ActionId } from "./shortcuts/actions";
 import { actionFor } from "./shortcuts/dispatch";
 import { startMenuSync } from "./shortcuts/menuSync";
+import { startFileMenu } from "./files/fileTarget";
 import { keptByDialog, runAction } from "./shortcuts/run";
 import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
@@ -180,6 +181,8 @@ export default function App() {
 
   // The menu bar carries the user's keys (none while Settings records one).
   useEffect(() => startMenuSync(), []);
+  // File's Reveal in Finder, Open on this Mac and Copy Path: the focused path or the open file.
+  useEffect(() => startFileMenu(), []);
 
   // A menu bar item, chosen or reached by its key: the menu takes its keys before the page (ADR 0010).
   useEffect(() => {

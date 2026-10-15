@@ -122,6 +122,9 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
       <a
         className={plain ? "chat-path chat-path-plain" : "chat-path"}
         href={target.abs}
+        // File's menu bar items act on the focused path (fileTarget).
+        data-abs={target.abs}
+        data-local={local ? "1" : "0"}
         title={
           local
             ? "Open in Files · ⌘-click: open on this Mac"
