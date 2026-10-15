@@ -1971,6 +1971,8 @@ button.composer-model:disabled { cursor: default; }
 .files-image-wrap { flex: 1; min-height: 0; overflow: auto; display: grid; place-items: center; padding: 16px; background: var(--surface-code); }
 .files-image { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; }
 .files-image.actual { max-width: none; max-height: none; object-fit: none; cursor: zoom-out; }
+.files-pdf-stale { display: flex; align-items: center; gap: 12px; }
+.files-pdf-stale button { font-size: 12px; }
 .files-pdf-wrap { flex: 1; min-height: 0; display: flex; background: var(--surface-code); }
 .files-pdf { flex: 1; min-width: 0; border: 0; }
 .chat-tool-badge { flex: none; margin-left: 6px; padding: 0 5px; font-size: 11px; border: 1px solid currentColor; border-radius: var(--r-sm); background: transparent; }

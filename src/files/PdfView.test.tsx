@@ -26,14 +26,31 @@ describe("PdfView", () => {
     expect(vi.mocked(invoke)).toHaveBeenCalledWith("files_pdf", { machineId: "local", root: "/r", rel: "d/a.pdf" });
     expect((vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob).type).toBe("application/pdf");
   });
-  it("fetches again when its mtime changes, and frees the old URL", async () => {
-    const { rerender, findByTitle } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
+  // Reloading a PDF loses the reader's place (WebKit's viewer gives no scroll position), so a
+  // change on disk is said, and the reader reloads when ready.
+  it("keeps the page when the file changes, says so, and reloads on request", async () => {
+    const { rerender, findByTitle, findByRole, queryByRole } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
     await findByTitle("a.pdf");
     rerender(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={2} />);
-    await findByTitle("a.pdf");
-    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(2);
+    const reload = await findByRole("button", { name: "Reload" });
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    fireEvent.click(reload);
+    await waitFor(() => expect(vi.mocked(invoke)).toHaveBeenCalledTimes(2));
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:x");
+    await findByTitle("a.pdf");
+    expect(queryByRole("button", { name: "Reload" })).toBeNull();
   });
+
+  it("opens another file fresh, without a banner", async () => {
+    const { rerender, findByTitle, queryByRole } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
+    await findByTitle("a.pdf");
+    rerender(<PdfView machineId="local" root="/r" rel="b.pdf" mtime={5} />);
+    await findByTitle("b.pdf");
+    expect(vi.mocked(invoke)).toHaveBeenCalledTimes(2);
+    expect(queryByRole("button", { name: "Reload" })).toBeNull();
+  });
+
   it("paints the frame's backdrop with the panel's colour, again when the theme changes", async () => {
     const { container, findByTitle } = render(<PdfView machineId="local" root="/r" rel="a.pdf" mtime={1} />);
     const frame = (await findByTitle("a.pdf")) as HTMLIFrameElement;

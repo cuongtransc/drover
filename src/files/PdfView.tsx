@@ -3,7 +3,9 @@ import { filesPdf } from "../lib/ipc";
 
 /**
  * A PDF from `rel`, shown by WebKit's own PDF viewer in a frame (zoom, text selection, ⌘F).
- * `mtime` changing (the watch reported the file changed) fetches it again.
+ * When `mtime` changes (the watch reported the file changed) the version on screen stays, with a
+ * banner to reload it: reloading starts the viewer at page 1, and it gives no scroll position to
+ * restore.
  */
 export function PdfView({ machineId, root, rel, mtime }: { machineId: string; root: string; rel: string; mtime: number }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -11,6 +13,11 @@ export function PdfView({ machineId, root, rel, mtime }: { machineId: string; ro
   const [loaded, setLoaded] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
+  // The version on screen; another file starts at its own mtime.
+  const file = `${machineId}\u0000${root}\u0000${rel}`;
+  const [shown, setShown] = useState({ file, mtime });
+  if (shown.file !== file) setShown({ file, mtime });
+  const stale = shown.file === file && shown.mtime !== mtime;
 
   useEffect(() => {
     let made: string | null = null;
@@ -33,7 +40,7 @@ export function PdfView({ machineId, root, rel, mtime }: { machineId: string; ro
       gone = true;
       if (made) URL.revokeObjectURL(made);
     };
-  }, [machineId, root, rel, mtime]);
+  }, [machineId, root, rel, shown.mtime]);
 
   // The viewer's document is white around the pages whatever the theme; it is same-origin, so
   // its backdrop takes the panel's colour (the pages stay as the PDF draws them). The theme is
@@ -54,8 +61,18 @@ export function PdfView({ machineId, root, rel, mtime }: { machineId: string; ro
 
   if (error) return <div className="files-notice">{error}</div>;
   return (
-    <div className="files-pdf-wrap" ref={wrap}>
-      {url && <iframe ref={frame} className="files-pdf" src={url} title={rel} onLoad={() => setLoaded(true)} />}
-    </div>
+    <>
+      {stale && (
+        <div className="files-banner files-pdf-stale" role="status">
+          This PDF changed on disk.
+          <button type="button" onClick={() => setShown({ file, mtime })}>
+            Reload
+          </button>
+        </div>
+      )}
+      <div className="files-pdf-wrap" ref={wrap}>
+        {url && <iframe ref={frame} className="files-pdf" src={url} title={rel} onLoad={() => setLoaded(true)} />}
+      </div>
+    </>
   );
 }
