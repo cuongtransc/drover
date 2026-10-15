@@ -2,4 +2,5 @@
 # Runs the gate before every commit. GIT_* vars are unset so tests that call
 # `git -C <tmp>` cannot write to the committing repository.
 for v in $(env | sed -n 's/^\(GIT_[A-Z_]*\)=.*/\1/p'); do unset "$v"; done
-exec mise run ci
+# nice: the gate shares the laptop with the app and other agents' sessions; it waits for them.
+exec nice -n 10 mise run ci
