@@ -775,6 +775,17 @@ describe("Composer quick replies", () => {
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "continue" }).disabled).toBe(false);
   });
 
+  it("puts the Suggestion key first on the left, before the replies, whether they show or not", () => {
+    const { container, unmount } = render(<Composer pane={pane} agent="claude" />);
+    const first = () => container.querySelector(".composer-top")?.firstElementChild;
+    expect(first()?.textContent).toBe("Suggestion");
+    expect(container.querySelector(".composer-keys")?.textContent).not.toContain("Suggestion");
+    unmount();
+    useQuickReplies.setState({ show: false });
+    const again = render(<Composer pane={pane} agent="claude" />);
+    expect(again.container.querySelector(".composer-top")?.firstElementChild?.textContent).toBe("Suggestion");
+  });
+
   it("shows the replies with text only, and none when switched off", () => {
     useQuickReplies.setState({ replies: ["ship it", "  "] });
     const { unmount } = render(<Composer pane={pane} agent="claude" />);

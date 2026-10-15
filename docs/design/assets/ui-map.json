@@ -657,16 +657,16 @@
     19,
     0
    ],
-   "what": "Quick replies above the message box.",
+   "what": "Quick replies above the message box, after Claude's Suggestion key, which sends its suggestion (Tab only fills the box).",
    "code": ".composer-quick in Composer",
    "rect": {
-    "x": 589,
+    "x": 681.046875,
     "y": 761,
     "w": 390.46875,
     "h": 24
    },
    "badge": {
-    "x": 998.46875,
+    "x": 1090.515625,
     "y": 773
    }
   },
@@ -682,16 +682,16 @@
     -16,
     0
    ],
-   "what": "/btw (on while the box holds one), Suggestion (sends it; Tab only fills the box), and Esc sent to the agent as a key.",
+   "what": "/btw (on while the box holds one) and Esc sent to the agent as a key.",
    "code": ".composer-keys in Composer",
    "rect": {
-    "x": 1214.921875,
+    "x": 1300.96875,
     "y": 761,
-    "w": 174.078125,
+    "w": 88.03125,
     "h": 24
    },
    "badge": {
-    "x": 1198.921875,
+    "x": 1284.96875,
     "y": 773
    }
   },
