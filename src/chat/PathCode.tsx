@@ -124,8 +124,8 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
         href={target.abs}
         title={
           local
-            ? "Open in Files · ⌘-click: open on this Mac\nFocused: ⌘↩ on this Mac · ⌥⌘R Reveal in Finder · ⌥⌘C Copy Path · ⇧F10 menu"
-            : `Open in Files, from ${machine?.label ?? pane?.machine_id}\nFocused: ⌥⌘C Copy Path · ⇧F10 menu`
+            ? "Open in Files · ⌘-click: open on this Mac"
+            : `Open in Files, from ${machine?.label ?? pane?.machine_id}`
         }
         onClick={(e) => {
           e.preventDefault();

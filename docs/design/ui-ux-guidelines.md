@@ -227,8 +227,10 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
   not stop it. Save the range on mousedown and put it back before the menu reads it (#166).
 - Each item also has a keyboard path (§2.8). **A context menu never shows keys**: Apple's HIG puts
   them in the main menus, since a context menu is already the shortcut. The keys go in the item's
-  `aria-keyshortcuts`, and on screen in the element's tooltip and in the guide. On a Chat path they
-  work while it is focused (#170): its tooltip lists them.
+  `aria-keyshortcuts` and in the guide. On a Chat path they work while it is focused (#170).
+- **A tooltip is one short line**: what a click does, and a modifier-click if there is one. Keys
+  for keyboard use stay out of it: a keyboard user does not hover, and a mouse user does not read a
+  second line (the Chat path tooltip had one, listing four keys).
 
 ## 5. Accessibility checklist
 
