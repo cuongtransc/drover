@@ -14,12 +14,12 @@ const pane = (id: string, title: string, status: PaneView["status"]): PaneView =
 
 const m: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working",
-  sessions: [{ name: "default", running: true, status: "working", error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status: "working", error: null, workspaces: [
     { workspace_id: "w1", label: "remora", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [pane("p1", "Mermaid diagram", "idle")] } ] },
     { workspace_id: "w2", label: "drover", number: 2, status: "working", tabs: [
       { tab_id: "w2:t1", label: "1", number: 1, status: "working", panes: [pane("p2", "Chat tabs", "working"), pane("p3", "Bug button", "blocked")] } ] },
-  ] }, { name: "pegabot", running: true, status: "idle", error: null, workspaces: [
+  ] }, { name: "pegabot", running: true, loaded: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "bot", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [pane("p1", "Webhook retry", "done")] } ] },
   ] }],

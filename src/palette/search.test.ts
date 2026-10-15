@@ -4,7 +4,7 @@ import type { MachineView } from "../lib/types";
 
 const pane = (id: string, title: string, agent: string | null, status: any, cwd = "/x") => ({ pane_id: id, terminal_id: "t" + id, title, cwd, agent, status });
 const m: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "blocked", sessions: [
-  { name: "default", running: true, status: "blocked", error: null, workspaces: [
+  { name: "default", running: true, loaded: true, status: "blocked", error: null, workspaces: [
     { workspace_id: "w1", label: "drover", number: 1, status: "blocked", tabs: [{ tab_id: "w1:t1", label: "1", number: 1, status: "blocked", panes: [
       pane("w1:p1", "Rewrite UI", "claude", "working"), pane("w1:p2", "review", "pi", "blocked", "/srv/api") ] }] } ] } ] };
 
@@ -31,7 +31,7 @@ describe("palette search", () => {
 
   describe("ranking", () => {
     const session = (name: string, panes: ReturnType<typeof pane>[], ws = "app") => ({
-      name, running: true, status: "idle" as const, error: null,
+      name, running: true, loaded: true, status: "idle" as const, error: null,
       workspaces: [{ workspace_id: name + ":w1", label: ws, number: 1, status: "idle" as const, tabs: [{ tab_id: name + ":t1", label: "1", number: 1, status: "idle" as const, panes }] }],
     });
     const box = (sessions: ReturnType<typeof session>[]): MachineView => ({

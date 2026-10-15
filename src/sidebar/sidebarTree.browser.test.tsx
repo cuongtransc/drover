@@ -24,7 +24,7 @@ const { useSessionFilter, useShowDefault } = await import("./activeFilter");
 
 type St = PaneView["status"];
 const ws = (id: string, label: string, status: St = "idle") => ({ workspace_id: id, label, number: 1, status, tabs: [{ tab_id: id + ":t", label: "1", number: 1, status, panes: [{ pane_id: id + ":p", terminal_id: "t" + id, title: label, cwd: "/x", agent: "claude", status } as PaneView] }] });
-const ses = (name: string, list: ReturnType<typeof ws>[]) => ({ name, running: true, status: "idle" as St, error: null, workspaces: list });
+const ses = (name: string, list: ReturnType<typeof ws>[]) => ({ name, running: true, loaded: true, status: "idle" as St, error: null, workspaces: list });
 const lan: MachineView = { id: "lan", label: "ct-hms-lan", kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [ses("hs-xb", [ws("x1", "xbit-vault-specs")])] };
 const local: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working", sessions: [
   ses("default", []), ses("ca", [ws("c1", "ca-trader")]), ses("ct", [ws("t1", "ct-dotfiles"), ws("t3", "ct-cli", "blocked")]),

@@ -291,6 +291,7 @@ impl Machine {
                     _ => SessionView {
                         name: s.entry.name.clone(),
                         running: s.entry.running,
+                        loaded: false,
                         status: AgentStatus::Unknown,
                         error: None,
                         workspaces: Vec::new(),
@@ -1769,9 +1770,9 @@ mod tests {
         assert_eq!(
             v.sessions
                 .iter()
-                .map(|s| (s.name.as_str(), s.running))
+                .map(|s| (s.name.as_str(), s.running, s.loaded))
                 .collect::<Vec<_>>(),
-            [("default", true), ("old", false)]
+            [("default", true, true), ("old", false, false)]
         );
         assert_eq!(v.sessions[0].workspaces.len(), 2);
         assert_eq!(v.status, crate::herdr::types::AgentStatus::Blocked);

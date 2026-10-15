@@ -17,7 +17,7 @@ const { useSessionFilter, useSessionQuery } = await import("./activeFilter");
 
 const ws = (id: string, label: string) => ({ workspace_id: id, label, number: 1, status: "idle" as const, tabs: [{ tab_id: id + ":t", label: "1", number: 1, status: "idle" as const, panes: [{ pane_id: id + ":p", terminal_id: "t" + id, title: label, cwd: "/x", agent: "claude", status: "idle" } as PaneView] }] });
 const local: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "ca", running: true, status: "idle", error: null, workspaces: [ws("c1", "ca-trader")] }, { name: "w-xb", running: true, status: "idle", error: null, workspaces: [ws("x1", "notes")] }] };
+  sessions: [{ name: "ca", running: true, loaded: true, status: "idle", error: null, workspaces: [ws("c1", "ca-trader")] }, { name: "w-xb", running: true, loaded: true, status: "idle", error: null, workspaces: [ws("x1", "notes")] }] };
 
 beforeEach(async () => {
   document.body.innerHTML = "";

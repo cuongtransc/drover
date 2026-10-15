@@ -11,7 +11,7 @@ vi.mock("@tauri-apps/api/event", async (orig) => ({ ...(await orig<object>()), l
 const { AgentList } = await import("./AgentList");
 
 const session = {
-  name: "ct", running: true, status: "working" as const, error: null,
+  name: "ct", running: true, loaded: true, status: "working" as const, error: null,
   workspaces: [{ workspace_id: "w1", label: "ct-cli", number: 1, status: "working" as const, tabs: [
     { tab_id: "w1:t1", label: "1", number: 1, status: "working" as const, panes: [
       { pane_id: "p1", terminal_id: "t1", title: "CPU load cao", cwd: "/Users/me/ct-cli", agent: "claude", status: "working" as const } ] } ] }],

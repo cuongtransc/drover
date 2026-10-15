@@ -12,7 +12,7 @@ const name = (value: string) => fireEvent.change(screen.getByLabelText("Name"), 
 
 const machine = (id: string, sessions: string[], state: MachineView["state"] = "connected"): MachineView => ({
   id, label: id, kind: "ssh", state, error: null, version: "0.9.3", status: "unknown",
-  sessions: sessions.map((s) => ({ name: s, running: true, status: "unknown", error: null, workspaces: [] })),
+  sessions: sessions.map((s) => ({ name: s, running: true, loaded: true, status: "unknown", error: null, workspaces: [] })),
 });
 const set = (machines: MachineView[]) =>
   useApp.setState({ machines: Object.fromEntries(machines.map((m) => [m.id, m])), order: machines.map((m) => m.id), viewed: null });

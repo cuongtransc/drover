@@ -59,6 +59,8 @@ export interface WorkspaceView {
 export interface SessionView {
   name: string;
   running: boolean;
+  /** The watcher's view arrived: `workspaces` is herdr's list, which can be empty. */
+  loaded: boolean;
   status: AgentStatus;
   error: AppError | null;
   workspaces: WorkspaceView[];

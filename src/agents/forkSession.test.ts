@@ -10,7 +10,7 @@ const claude = (status: PaneView["status"], extra: Partial<PaneView> = {}): Pane
 
 const machine = (forkAgent: string | null): MachineView => ({
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "app", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "orch-app", number: 1, status: "idle", panes: [claude("idle")] },
       { tab_id: "w1:t9", label: "fork", number: 2, status: "idle", panes: [

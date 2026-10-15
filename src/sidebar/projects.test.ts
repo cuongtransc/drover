@@ -9,7 +9,7 @@ const pane = (status: PaneView["status"], agent: string | null = "claude"): Pane
 };
 const tab = (label: string, p: PaneView): TabView => ({ tab_id: label, label, number: 1, status: "idle", panes: [p] });
 const ws = (label: string, tabs: TabView[]): WorkspaceView => ({ workspace_id: label, label, number: 1, status: "idle", tabs });
-const session = (workspaces: WorkspaceView[], running = true): SessionView => ({ name: "s", running, status: "idle", error: null, workspaces });
+const session = (workspaces: WorkspaceView[], running = true): SessionView => ({ name: "s", running, loaded: running, status: "idle", error: null, workspaces });
 const machine = { id: "m", label: "m", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [] } as MachineView;
 const ref = (p: PaneView) => ({ machine_id: "m", session: "s", pane_id: p.pane_id });
 

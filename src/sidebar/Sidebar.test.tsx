@@ -13,11 +13,11 @@ import type { MachineView } from "../lib/types";
 const m: MachineView = {
   id: "box", label: "devtuf", kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "working",
   sessions: [
-    { name: "default", running: true, status: "working", error: null, workspaces: [
+    { name: "default", running: true, loaded: true, status: "working", error: null, workspaces: [
       { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [
         { tab_id: "w1:t1", label: "1", number: 1, status: "working", panes: [
           { pane_id: "w1:p1", terminal_id: "t", title: "Rewrite", cwd: "/x", agent: "claude", status: "working" } ] } ] } ] },
-    { name: "ai-radar", running: false, status: "unknown", error: null, workspaces: [] },
+    { name: "ai-radar", running: false, loaded: false, status: "unknown", error: null, workspaces: [] },
   ],
 };
 const row = (name: string) => screen.getAllByText(name)[0].closest("button")!;
@@ -321,7 +321,7 @@ describe("Sidebar", () => {
     const key = projectKey("box", "default", "old");
     useLayout.setState({ layout: setKept({ tree: [], bookmarks: [key] }, key, "/c/old") });
     const unknown = structuredClone(m);
-    unknown.sessions[0].workspaces = [];
+    unknown.sessions[0] = { ...unknown.sessions[0], loaded: false, workspaces: [] };
     useApp.setState({ machines: { box: unknown } });
     render(<Sidebar />);
     const closed = within(screen.getByRole("region", { name: "Bookmarks" })).getByRole("button", { name: "old, default, closed" });
@@ -478,7 +478,7 @@ describe("Sessions filter", () => {
   const p = (id: string, agent: string | null = "claude") => ({ pane_id: id, terminal_id: "t" + id, title: id, cwd: "/x", agent, status: "idle" as const });
   const ws = (id: string, label: string, agent: string | null = "claude") =>
     ({ workspace_id: id, label, number: 1, status: "idle" as const, tabs: [{ tab_id: id + ":t", label: "1", number: 1, status: "idle" as const, panes: [p(id + "p", agent)] }] });
-  const s = (name: string, workspaces: ReturnType<typeof ws>[]) => ({ name, running: true, status: "idle" as const, error: null, workspaces });
+  const s = (name: string, workspaces: ReturnType<typeof ws>[]) => ({ name, running: true, loaded: true, status: "idle" as const, error: null, workspaces });
   const local: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
     sessions: [s("default", [ws("w0", "~", null)]), s("w-xb", [ws("w1", "notes")]), s("w-wd", [ws("w2", "bmf-oms"), ws("w3", "xbit-specs")])] };
   const dev: MachineView = { ...local, id: "dev", label: "ct-dev", kind: "ssh",

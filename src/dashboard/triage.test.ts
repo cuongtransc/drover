@@ -7,7 +7,7 @@ const pane = (id: string, status: PaneView["status"], agent: string | null = "cl
 });
 const machine = (id: string, panes: PaneView[], over: Partial<MachineView> = {}): MachineView => ({
   id, label: id, kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "s", running: true, status: "idle", error: null, workspaces: [
+  sessions: [{ name: "s", running: true, loaded: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "ws", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes } ] } ] }],
   ...over,

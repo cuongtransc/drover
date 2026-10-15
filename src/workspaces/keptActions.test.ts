@@ -43,7 +43,7 @@ describe("reopenKept pending", () => {
   const closed = { key, label: "infra", folder: "/c/infra" };
   const view = (...labels: string[]): MachineView => {
     const s: SessionView = {
-      name: "ct", running: true, status: "idle", error: null,
+      name: "ct", running: true, loaded: true, status: "idle", error: null,
       workspaces: labels.map((label, i) => ({ workspace_id: "w" + i, label, number: i + 1, status: "idle", tabs: [] })),
     };
     return { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [s] };

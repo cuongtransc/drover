@@ -6,7 +6,7 @@ import type { MachineView } from "../lib/types";
 
 const m: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "blocked",
-  sessions: [{ name: "default", running: true, status: "blocked", error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status: "blocked", error: null, workspaces: [
     { workspace_id: "w1", label: "drover", number: 1, status: "blocked", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "blocked", panes: [
         { pane_id: "w1:p1", terminal_id: "a", title: "Rewrite", cwd: "/x", agent: "claude", status: "blocked" } ] } ] } ] }],

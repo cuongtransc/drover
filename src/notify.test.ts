@@ -32,7 +32,7 @@ describe("notifyPaneStatus", () => {
   const machines = (label: string): Record<string, MachineView> => ({
     local: {
       id: "local", label: "My Mac", kind: "local", state: "connected", error: null, version: "0.9.3", status: "done",
-      sessions: [{ name: "default", running: true, status: "done", error: null, workspaces: [
+      sessions: [{ name: "default", running: true, loaded: true, status: "done", error: null, workspaces: [
         { workspace_id: "w1", label: "work", number: 1, status: "done", tabs: [
           { tab_id: "w1:t1", label, number: 1, status: "done", panes: [
             { pane_id: ref.pane_id, terminal_id: "t1", title: "Rewrite", cwd: "/x", agent: "claude", status: "done" },

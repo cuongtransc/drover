@@ -30,14 +30,14 @@ const pane = (id: string, title: string, agent: string | null, status: PaneView[
 const m: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working",
   sessions: [
-    { name: "default", running: true, status: "working", error: null, workspaces: [
+    { name: "default", running: true, loaded: true, status: "working", error: null, workspaces: [
       { workspace_id: "w1", label: "checkout-api", number: 1, status: "done", tabs: [
         { tab_id: "w1:t1", label: "1", number: 1, status: "done", panes: [pane("p1", "Idempotent payments", "claude", "done")] } ] },
       { workspace_id: "w2", label: "web", number: 2, status: "blocked", tabs: [
         { tab_id: "w2:t1", label: "ui", number: 1, status: "blocked", panes: [pane("p2", "Guard export", "codex", "blocked")] },
         { tab_id: "w2:t2", label: "release", number: 2, status: "idle", panes: [pane("p3", "Tag v1.4.0", null, "unknown"), pane("p4", "Ship flag", "pi", "idle")] } ] },
       { workspace_id: "w3", label: "empty", number: 3, status: "unknown", tabs: [] } ] },
-    { name: "other", running: true, status: "idle", error: null, workspaces: [
+    { name: "other", running: true, loaded: true, status: "idle", error: null, workspaces: [
       { workspace_id: "w9", label: "infra", number: 1, status: "idle", tabs: [
         { tab_id: "w9:t1", label: "1", number: 1, status: "idle", panes: [pane("p9", "Backup", "mystery", "working")] } ] } ] },
   ],
@@ -226,7 +226,7 @@ describe("AgentList", () => {
   });
 
   it("starts a stopped session from the column", () => {
-    useApp.setState({ machines: { local: { ...m, sessions: [{ ...m.sessions[0], running: false, workspaces: [] }] } } });
+    useApp.setState({ machines: { local: { ...m, sessions: [{ ...m.sessions[0], running: false, loaded: false, workspaces: [] }] } } });
     render(<AgentList />);
     expect(screen.getByText("Stopped")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Start default" })).toBeTruthy();
@@ -647,6 +647,28 @@ describe("AgentList", () => {
     expect(screen.queryByRole("region", { name: "Closed workspaces" })).toBeNull();
   });
 
+  // herdr 0.9.1 keeps a Session running after its last Workspace closes.
+  const emptied = (loaded: boolean) => {
+    const e = structuredClone(m);
+    e.sessions[0] = { ...e.sessions[0], loaded, workspaces: [] };
+    useApp.setState({ machines: { local: e } });
+  };
+
+  it("lists the closed workspaces of a running session with no workspace left", () => {
+    keep("agent", "web");
+    emptied(true);
+    render(<AgentList />);
+    expect(screen.getByText("No panes")).toBeTruthy();
+    expect(within(closed()).getByRole("button", { name: /Closed/ }).textContent).toBe("Closed workspaces2");
+  });
+
+  it("shows no Closed section before a running session's first view arrives", () => {
+    keep("agent");
+    emptied(false);
+    render(<AgentList />);
+    expect(screen.queryByRole("region", { name: "Closed workspaces" })).toBeNull();
+  });
+
   it("reopens a closed workspace once, however often it is clicked", async () => {
     keep("agent");
     let done!: (v: unknown) => void;
@@ -840,7 +862,7 @@ describe("AgentList lanes", () => {
   const lanes: MachineView = {
     ...m,
     sessions: [
-      { name: "default", running: true, status: "working", error: null, workspaces: [
+      { name: "default", running: true, loaded: true, status: "working", error: null, workspaces: [
         { workspace_id: "w1", label: "bmf-oms", number: 1, status: "working", tabs: [
           tab("t1", "main-orches", [pane("o", "BMF-OMS review", "claude", "working")]),
           tab("t2", "lane-caps", [pane("l1", "π - lane: caps — Wave 2", "pi", "working")]),
@@ -1025,7 +1047,7 @@ describe("AgentList lanes by owner (ctc lane list)", () => {
   const machine: MachineView = {
     ...m,
     sessions: [
-      { name: "default", running: true, status: "working", error: null, workspaces: [
+      { name: "default", running: true, loaded: true, status: "working", error: null, workspaces: [
         { workspace_id: "w1", label: "vault", number: 1, status: "working", tabs: [
           tab("t1", "orch-xbit-vault-engine", [pane("w1:tP", "Vault rollout", "claude", "working")]),
           tab("t2", "claude", [pane("w1:p8", "Rate limits", "claude", "working")]),

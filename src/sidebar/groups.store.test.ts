@@ -3,7 +3,7 @@ import { EMPTY_LAYOUT, LAYOUT_KEY, initLayout, loadLayout, projectKey, resolve, 
 import type { RNode } from "./groups";
 import type { MachineView, SessionView } from "../lib/types";
 
-const sess = (name: string): SessionView => ({ name, running: true, status: "idle", error: null, workspaces: [] });
+const sess = (name: string): SessionView => ({ name, running: true, loaded: true, status: "idle", error: null, workspaces: [] });
 const mach = (id: string, ...names: string[]): MachineView => ({
   id, label: id, kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: names.map(sess),
 });
