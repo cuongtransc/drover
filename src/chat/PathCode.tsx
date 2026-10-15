@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState, type ReactNode } from "react";
+import { useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openLocalFile, revealLocalFile } from "../lib/ipc";
@@ -27,6 +27,8 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
   const ref = useMemo(() => parsePathRef(text), [text]);
   const machine = useApp((s) => (pane && ref ? s.machines[pane.machine_id] : undefined));
   const [menu, setMenu] = useState<{ x: number; y: number; selected: string } | null>(null);
+  /** The selection when a menu click went down: a range, `null` for none, unset before one. */
+  const before = useRef<Range | null | undefined>(undefined);
   const place = useMemo(() => {
     if (!pane || !ref || !machine) return null;
     const ws = machine.sessions.find((s) => s.name === pane.session)?.workspaces.find((w) => w.tabs.some((t) => t.panes.some((p) => p.pane_id === pane.pane_id)));
@@ -84,10 +86,21 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
           e.preventDefault();
           open(local && e.metaKey);
         }}
+        onMouseDown={(e) => {
+          if (e.button !== 2 && !(e.button === 0 && e.ctrlKey)) return;
+          const sel = window.getSelection();
+          before.current = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
-          // Read now: opening the menu may clear the selection.
-          setMenu({ x: e.clientX, y: e.clientY, selected: window.getSelection()?.toString() ?? "" });
+          // WebKit selects the link between the mousedown and this event; put back what was selected.
+          const sel = window.getSelection();
+          if (sel && before.current !== undefined) {
+            sel.removeAllRanges();
+            if (before.current) sel.addRange(before.current);
+          }
+          before.current = undefined;
+          setMenu({ x: e.clientX, y: e.clientY, selected: sel?.toString() ?? "" });
         }}
       >
         {plain ? children : <code>{children}</code>}
