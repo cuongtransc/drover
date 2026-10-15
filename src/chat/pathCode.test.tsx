@@ -1,14 +1,23 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened"), revealLocalFile: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("../lib/ipc", () => ({
+  chatImage: vi.fn(),
+  openLocalFile: vi.fn().mockResolvedValue("opened"),
+  revealLocalFile: vi.fn().mockResolvedValue(undefined),
+  filesFirstFile: vi.fn(),
+}));
+vi.mock("../ui/Toast", () => ({ showToast: vi.fn() }));
 vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn(async () => {}) }));
-import { openLocalFile, revealLocalFile } from "../lib/ipc";
+import { filesFirstFile, openLocalFile, revealLocalFile } from "../lib/ipc";
+import { showToast } from "../ui/Toast";
+import type { ChatItem } from "../lib/types";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useFilesBus } from "../files/bus";
 import { useApp } from "../store/app";
 import { NO_ITEMS } from "../store/openItems";
 import { ChatItemView } from "./ChatItemView";
 import { ChatPaneContext } from "./images";
+import { ChatPathsContext, chatPaths } from "./pathContext";
 
 const pane = { machine_id: "m1", session: "s", pane_id: "p1" };
 const machine = (kind: string) =>
@@ -29,7 +38,22 @@ function show(markdown: string) {
   );
 }
 
+/** Renders `items` as a chat whose Bash and file tools the paths may be found from. */
+function showChat(items: ChatItem[]) {
+  render(
+    <ChatPaneContext.Provider value={pane}>
+      <ChatPathsContext.Provider value={chatPaths(items)}>
+        {items.map((it, i) => (it.kind === "assistant_text" ? <ChatItemView key={i} item={it} /> : null))}
+      </ChatPathsContext.Provider>
+    </ChatPaneContext.Provider>,
+  );
+}
+const bash = (command: string): ChatItem => ({ kind: "tool_call", id: command, name: "Bash", input_summary: "", input: { command } });
+
 beforeEach(() => {
+  // The machine has the first place tried, unless a test says otherwise.
+  vi.mocked(filesFirstFile).mockReset().mockImplementation(async (_m, paths) => paths[0] ?? null);
+  vi.mocked(showToast).mockClear();
   vi.mocked(openLocalFile).mockClear();
   vi.mocked(revealLocalFile).mockClear();
   vi.mocked(writeText).mockClear();
@@ -38,12 +62,67 @@ beforeEach(() => {
 });
 
 describe("paths in chat", () => {
-  it("opens a path inside the workspace folder in Files, at its line", () => {
+  describe("a relative path not in the session's folder", () => {
+    const items = [
+      bash("cd ~/Dev/other && git worktree add .worktrees/wt && cd .worktrees/wt && cp ~/x.svg profiles/a.svg"),
+      { kind: "assistant_text", markdown: "Saved `profiles/a.svg`." } as ChatItem,
+    ];
+
+    it("opens where the agent worked, the first place the machine has it", async () => {
+      vi.mocked(filesFirstFile).mockResolvedValue("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg");
+      showChat(items);
+      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
+      const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+      await waitFor(() =>
+        expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/Dev/other/.worktrees/wt/profiles", rel: "a.svg" }]),
+      );
+      expect(filesFirstFile).toHaveBeenCalledWith("m1", [
+        "/Users/me/Dev/other/.worktrees/wt/profiles/a.svg",
+        "/Users/me/Dev/other/profiles/a.svg",
+        "/Users/me/app/profiles/a.svg",
+      ]);
+    });
+
+    it("copies and reveals the path found", async () => {
+      vi.mocked(filesFirstFile).mockResolvedValue("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg");
+      showChat(items);
+      fireEvent.contextMenu(screen.getByRole("link", { name: "profiles/a.svg" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Copy Path" }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg"));
+      fireEvent.contextMenu(screen.getByRole("link", { name: "profiles/a.svg" }));
+      fireEvent.click(screen.getByRole("menuitem", { name: "Reveal in Finder" }));
+      await waitFor(() => expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/Dev/other/.worktrees/wt/profiles/a.svg"));
+    });
+
+    it("says so, and opens nothing, when no place has it", async () => {
+      vi.mocked(filesFirstFile).mockResolvedValue(null);
+      showChat(items);
+      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
+      await waitFor(() => expect(showToast).toHaveBeenCalledWith("Not found: profiles/a.svg (looked in 3 places)"));
+      expect(useApp.getState().openItems.items).toEqual([]);
+    });
+
+    it("falls back to the session's folder when the machine cannot be asked", async () => {
+      vi.mocked(filesFirstFile).mockRejectedValue({ code: "unavailable", message: "offline" });
+      showChat(items);
+      fireEvent.click(screen.getByRole("link", { name: "profiles/a.svg" }));
+      const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
+      await waitFor(() => expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "profiles/a.svg" }]));
+    });
+  });
+
+  it("never asks the machine about an absolute path", () => {
+    show("`/Users/me/app/src/a.ts`");
+    fireEvent.click(screen.getByRole("link", { name: "/Users/me/app/src/a.ts" }));
+    expect(filesFirstFile).not.toHaveBeenCalled();
+    expect(useApp.getState().openItems.items).toHaveLength(1);
+  });
+
+  it("opens a path inside the workspace folder in Files, at its line", async () => {
     show("See `src/chat/markdown.tsx:34`.");
     fireEvent.click(screen.getByRole("link", { name: "src/chat/markdown.tsx:34" }));
-    const s = useApp.getState();
     const ws = { machine_id: "m1", session: "s", workspace_id: "w1" };
-    expect(s.openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "src/chat/markdown.tsx" }]);
+    await waitFor(() => expect(useApp.getState().openItems.items).toEqual([{ kind: "file", ws, root: "/Users/me/app", rel: "src/chat/markdown.tsx" }]));
     expect(useFilesBus.getState().jump?.hash).toBe("L34");
     expect(openLocalFile).not.toHaveBeenCalled();
   });
@@ -57,11 +136,11 @@ describe("paths in chat", () => {
     expect(openLocalFile).not.toHaveBeenCalled();
   });
 
-  it("hands a path to macOS on Cmd+click, inside the folder or not", () => {
+  it("hands a path to macOS on Cmd+click, inside the folder or not", async () => {
     show("Saved to `/private/tmp/shots/a.png`, from `src/a.ts`.");
     fireEvent.click(screen.getByRole("link", { name: "/private/tmp/shots/a.png" }), { metaKey: true });
     fireEvent.click(screen.getByRole("link", { name: "src/a.ts" }), { metaKey: true });
-    expect(vi.mocked(openLocalFile).mock.calls).toEqual([["/private/tmp/shots/a.png"], ["/Users/me/app/src/a.ts"]]);
+    await waitFor(() => expect(vi.mocked(openLocalFile).mock.calls).toEqual([["/private/tmp/shots/a.png"], ["/Users/me/app/src/a.ts"]]));
     expect(useApp.getState().openItems.items).toEqual([]);
   });
 
@@ -83,31 +162,31 @@ describe("paths in chat", () => {
       expect(items()).toEqual(["Open in Files", "Open on this Mac", "Reveal in Finder", "Copy Path"]);
     });
 
-    it("reveals the path without its line, and closes", () => {
+    it("reveals the path without its line, and closes", async () => {
       show("Edit `src/a.ts:3`.");
       fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
       pick("Reveal in Finder");
-      expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+      await waitFor(() => expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts"));
       expect(screen.queryByRole("menu")).toBeNull();
       expect(useApp.getState().openItems.items).toEqual([]);
     });
 
-    it("opens in Files at the line, or on this Mac, as a click and a Cmd+click do", () => {
+    it("opens in Files at the line, or on this Mac, as a click and a Cmd+click do", async () => {
       show("Edit `src/a.ts:3`.");
       fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
       pick("Open in Files");
-      expect(useApp.getState().openItems.items).toHaveLength(1);
+      await waitFor(() => expect(useApp.getState().openItems.items).toHaveLength(1));
       expect(useFilesBus.getState().jump?.hash).toBe("L3");
       fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
       pick("Open on this Mac");
-      expect(openLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+      await waitFor(() => expect(openLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts"));
     });
 
-    it("copies the absolute path, without its line", () => {
+    it("copies the absolute path, without its line", async () => {
       show("Edit `src/a.ts:3`.");
       fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
       pick("Copy Path");
-      expect(writeText).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("/Users/me/app/src/a.ts"));
     });
 
     it("copies the text selected when the menu opened", () => {

@@ -9,6 +9,7 @@ import { checklist, checklistSummary, type ChecklistRow } from "./checklist";
 import { BackgroundContext, taskBadge } from "./backgroundTaskState";
 import { ChatImages } from "./images";
 import { SkillChips } from "./skills";
+import { ChatItemContext } from "./pathContext";
 import { toolIcon } from "./toolIcon";
 
 type ToolResult = Extract<ChatItem, { kind: "tool_result" }>;
@@ -135,19 +136,24 @@ function ShellText({ text, error }: { text: string; error?: boolean }) {
   );
 }
 
-/** `copy`: offer a copy button on a user message or an answer (not on narration inside a work block). */
-export const ChatItemView = memo(function ChatItemView({
-  item,
-  result,
-  copy = false,
-  running = false,
-}: {
+interface ItemProps {
   item: ChatItem;
   result?: ToolResult;
   copy?: boolean;
   /** A tool call the live turn is still waiting on: spins at the end of its row. */
   running?: boolean;
-}) {
+}
+
+/** `copy`: offer a copy button on a user message or an answer (not on narration inside a work block). */
+export const ChatItemView = memo(function ChatItemView(props: ItemProps) {
+  return (
+    <ChatItemContext.Provider value={props.item}>
+      <ItemBody {...props} />
+    </ChatItemContext.Provider>
+  );
+});
+
+function ItemBody({ item, result, copy = false, running = false }: ItemProps) {
   const edit = useContext(ChatEditContext);
   switch (item.kind) {
     case "user":
@@ -220,4 +226,4 @@ export const ChatItemView = memo(function ChatItemView({
         </div>
       );
   }
-});
+}

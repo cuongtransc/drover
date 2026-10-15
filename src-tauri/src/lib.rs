@@ -103,6 +103,7 @@ pub fn run() {
             commands::files_write,
             commands::files_image,
             commands::files_pdf,
+            commands::files_first_file,
             commands::files_changed,
             commands::files_watch,
             commands::files_unwatch,

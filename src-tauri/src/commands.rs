@@ -904,6 +904,17 @@ pub async fn files_image(
         .map(tauri::ipc::Response::new)
 }
 
+/// Of the places a path in Chat may be, the first that is a file on the Machine (`files::first`).
+#[tauri::command]
+pub async fn files_first_file(
+    mgr: Mgr<'_>,
+    machine_id: String,
+    paths: Vec<String>,
+) -> Result<Option<String>, AppError> {
+    let t = mgr.transport(&machine_id)?;
+    crate::files::first::first_file(&*t, &paths).await
+}
+
 #[tauri::command]
 pub async fn files_pdf(
     mgr: Mgr<'_>,
