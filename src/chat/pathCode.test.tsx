@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened") }));
-import { openLocalFile } from "../lib/ipc";
+vi.mock("../lib/ipc", () => ({ chatImage: vi.fn(), openLocalFile: vi.fn().mockResolvedValue("opened"), revealLocalFile: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({ writeText: vi.fn(async () => {}) }));
+import { openLocalFile, revealLocalFile } from "../lib/ipc";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useFilesBus } from "../files/bus";
 import { useApp } from "../store/app";
 import { NO_ITEMS } from "../store/openItems";
@@ -29,6 +31,8 @@ function show(markdown: string) {
 
 beforeEach(() => {
   vi.mocked(openLocalFile).mockClear();
+  vi.mocked(revealLocalFile).mockClear();
+  vi.mocked(writeText).mockClear();
   useApp.setState({ machines: { m1: machine("local") }, openItems: NO_ITEMS });
   useFilesBus.setState({ jump: null });
 });
@@ -67,6 +71,61 @@ describe("paths in chat", () => {
     fireEvent.click(screen.getByRole("link", { name: "/tmp/x/a.md" }), { metaKey: true });
     expect(openLocalFile).not.toHaveBeenCalled();
     expect(useApp.getState().openItems.items).toHaveLength(1);
+  });
+
+  describe("right-click menu", () => {
+    const items = () => screen.getAllByRole("menuitem").map((b) => b.textContent);
+    const pick = (name: string) => fireEvent.click(screen.getByRole("menuitem", { name }));
+
+    it("on this Mac: open in Files, open on this Mac, reveal in Finder, copy the path", () => {
+      show("Edit `src/a.ts:3`.");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      expect(items()).toEqual(["Open in Files", "Open on this Mac", "Reveal in Finder", "Copy Path"]);
+    });
+
+    it("reveals the path without its line, and closes", () => {
+      show("Edit `src/a.ts:3`.");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      pick("Reveal in Finder");
+      expect(revealLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(useApp.getState().openItems.items).toEqual([]);
+    });
+
+    it("opens in Files at the line, or on this Mac, as a click and a Cmd+click do", () => {
+      show("Edit `src/a.ts:3`.");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      pick("Open in Files");
+      expect(useApp.getState().openItems.items).toHaveLength(1);
+      expect(useFilesBus.getState().jump?.hash).toBe("L3");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      pick("Open on this Mac");
+      expect(openLocalFile).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+    });
+
+    it("copies the absolute path, without its line", () => {
+      show("Edit `src/a.ts:3`.");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      pick("Copy Path");
+      expect(writeText).toHaveBeenCalledWith("/Users/me/app/src/a.ts");
+    });
+
+    it("copies the text selected when the menu opened", () => {
+      show("Edit `src/a.ts:3` now.");
+      const spy = vi.spyOn(window, "getSelection").mockReturnValue({ toString: () => "Edit src/a.ts:3" } as Selection);
+      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
+      spy.mockRestore();
+      expect(items()).toEqual(["Open in Files", "Open on this Mac", "Reveal in Finder", "Copy Path", "Copy"]);
+      pick("Copy");
+      expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3");
+    });
+
+    it("on another machine: only what does not need this Mac", () => {
+      useApp.setState({ machines: { m1: machine("ssh") } });
+      show("`/tmp/x/a.md`");
+      fireEvent.contextMenu(screen.getByRole("link", { name: "/tmp/x/a.md" }));
+      expect(items()).toEqual(["Open in Files", "Copy Path"]);
+    });
   });
 
   it("opens a path outside the folder on another machine in Files, from its own folder", () => {

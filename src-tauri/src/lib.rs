@@ -79,6 +79,7 @@ pub fn run() {
             commands::notify_pane,
             commands::image_save_temp,
             commands::open_local_file,
+            commands::reveal_local_file,
             commands::term_open,
             commands::term_write,
             commands::term_resize,
