@@ -154,8 +154,15 @@ function sequentialRows(rows: NumberedRow[]): boolean {
   return rows.length > 0 && rows.every((row, index) => row.number === index + 1);
 }
 
-/** 64-bit FNV-1a as hex: a stable id for a card's content, not a security boundary. */
+/** Claude Code's auto-deny timer ("will automatically deny this request in 1:48"), redrawn every second. */
+const DENY_COUNTDOWN_RE = /(automatically deny this request in )\d+(?::\d+)*/gi;
+
+/**
+ * 64-bit FNV-1a as hex: a stable id for a card's content, not a security boundary. The auto-deny
+ * countdown is left out: the prompt is the same while it ticks, and an answer must not go stale.
+ */
 function hashId(text: string): string {
+  text = text.replace(DENY_COUNTDOWN_RE, "$1…");
   let h = 0xcbf29ce484222325n;
   for (const ch of text) {
     h ^= BigInt(ch.codePointAt(0)!);

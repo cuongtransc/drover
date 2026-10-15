@@ -193,6 +193,25 @@ Ready to submit your answers?
  Esc to cancel · Tab to amend
 `);
     expect(mcp).toMatchObject({ kind: "approval", title: "Tool use" });
+    // the auto-deny countdown ticks every second: the same approval keeps its id, so an answer
+    // is not refused as stale, while another command is still another card
+    const ticking = (left: string, command = "rm -f $S/*") => parseInteractivePrompt("claude", `
+────────────────────────────────────────
+ Bash command
+   ${command}
+ Dangerous rm operation on possibly-empty variable path: $S/* in \`rm -f $S/*\`
+ ⚠ Claude Code will automatically deny this request in ${left}, to avoid blocking progress on an unattended session
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. No
+ Esc to cancel · Tab to amend
+`);
+    expect(ticking("1:48")!.body).toContain("deny this request in 1:48");
+    expect(ticking("1:47")!.id).toBe(ticking("1:48")!.id);
+    expect(ticking("0:05")!.id).toBe(ticking("1:48")!.id);
+    expect(ticking("1:47", "rm -f $T/*")!.id).not.toBe(ticking("1:48")!.id);
+    const fallbackTicking = (left: string) => parseFallbackPrompt("codex", `Claude Code will automatically deny this request in ${left}\nProceed? (y/n)`);
+    expect(fallbackTicking("1:47").id).toBe(fallbackTicking("1:48").id);
     expect(answerKeys(bash!, { option_index: 3 })).toEqual([{ keys: ["down"] }, { keys: ["down"] }, { keys: ["down"] }, { keys: ["enter"] }]);
 
     const write = parseInteractivePrompt("claude", `
