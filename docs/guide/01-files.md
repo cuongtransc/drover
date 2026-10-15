@@ -13,6 +13,7 @@ whichever Machine it lives.
 | Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it. On this Mac, ⌘-click hands it to macOS |
 | Do more with that path | Right-click it: **Open in Files**, **Open on this Mac**, **Reveal in Finder** (the last two on this Mac only), **Copy Path**, and **Copy** when you had selected text |
 | Do the same from the keyboard | Tab to the path, then ↩ (Files), ⌘↩ (this Mac), ⌥⌘R (Reveal in Finder), ⌥⌘C (Copy Path), or ⇧F10 for the menu |
+| Find a shortcut | The menu bar: **File**, **View** and **Go** list every action with its key, as set in Settings → Shortcuts. **File → Reveal in Finder / Copy Path** act on the focused path, else on the file open in Files |
 | Open or copy a web link | Click it to open it in the browser; right-click it for **Open in Browser**, **Copy Link**, and **Copy** when you had selected text. A web page never opens inside Drover |
 | Copy a file to the Mac | Right-click → **Download**. It lands in `~/Downloads`; a name already there gets `name (1).ext` |
 | Copy files to the Workspace | Right-click a folder → **Upload Files…** or **Upload Folder…** (the macOS open panel; drag and drop is off) |

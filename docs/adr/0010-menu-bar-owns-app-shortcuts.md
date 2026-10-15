@@ -1,6 +1,6 @@
 # 0010: The menu bar owns the app's ⌘ shortcuts
 
-> Status: Proposed · Date: 2026-10-16
+> Status: Accepted · Date: 2026-10-16
 
 ## Context
 

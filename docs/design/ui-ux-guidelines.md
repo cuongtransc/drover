@@ -171,13 +171,20 @@ blocked rows.
 
 ### 4.1 Shortcut map
 
-| Keys | Action |
+**The macOS menu bar is the map** (ADR 0010): every action with a shortcut is an item of File,
+View or Go carrying the user's key from Settings › Shortcuts, so a key is found where macOS users
+look. The menu takes the key before the page; the webview's own listener only serves outside the
+app (tests, the browser harness).
+
+| Menu | Items |
 |---|---|
-| ⌘K | Jump to any pane (palette) |
-| ⌘J / ⇧⌘J | Next / previous pane that needs you |
-| ⌘B / ⇧⌘B | Hide the sidebar / focus on the main area |
-| ⌘T | New tab with the default agent |
-| ⇧⌘D (proposed, §7.2) | Open the Agent Board |
+| File | New Tab ⌘T · Go to File… ⌘P — Reveal in Finder ⌥⌘R · Open on this Mac · Copy Path ⌥⌘C (the focused Chat path, else the open file) — Remove Item ⌘W |
+| View | Toggle Sidebar ⌘B · Focus Layout ⇧⌘B · Toggle Files Panel ⌘E · Agent Board ⇧⌘D — Bigger / Smaller / Default Font Size ⌘= ⌘− ⌘0 |
+| Go | Jump to Pane… ⌘K · Next / Previous Blocked or Review ⌘J ⇧⌘J — Next / Previous Open Item ⇧⌘] ⇧⌘[ |
+| Help | Drover Guide · Keyboard Shortcuts… (Settings › Shortcuts) |
+
+Find (⌘F, ⌘G, ⇧⌘G) is not on the menu: CodeMirror's search takes those keys while a file is
+edited. A new shortcut goes into `ACTIONS` and `menu_bar::LAYOUT` together.
 
 Reserved for later, in this order: ⌘N (new…), ⌘W (close pane, with confirmation), ⌘1–⌘9 (jump to
 a bookmarked Workspace). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:
@@ -228,8 +235,8 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
 - **What a context menu offers is also in the main interface** (Apple's HIG): the File viewer's
   header has Copy path, Reveal in Finder and Open on this Mac, as Chat's path menu does.
 - Each item also has a keyboard path (§2.8). **A context menu never shows keys**: Apple's HIG puts
-  them in the main menus, since a context menu is already the shortcut. The keys go in the item's
-  `aria-keyshortcuts` and in the guide. On a Chat path they work while it is focused (#170).
+  them in the main menus (§4.1), since a context menu is already the shortcut. The keys go in the
+  item's `aria-keyshortcuts`. On a Chat path they work while it is focused (#170).
 - **A tooltip is one short line**: what a click does, and a modifier-click if there is one. Keys
   for keyboard use stay out of it: a keyboard user does not hover, and a mouse user does not read a
   second line (the Chat path tooltip had one, listing four keys).

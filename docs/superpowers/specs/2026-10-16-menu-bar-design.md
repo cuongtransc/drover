@@ -38,8 +38,9 @@ the menu bar too.
 2. A key equivalent takes the key before the page (ADR 0010) and sends
    `menu://action/<id>`, as `menu://settings` does today.
 3. The frontend runs the same function as today's `run[id]` in `App.tsx`, with today's guards
-   (a dialog keeps `KEPT_BY_DIALOGS` actions). The `keydown` listener skips an action the menu
-   carries.
+   (a dialog keeps `KEPT_BY_DIALOGS` actions). The `keydown` listener stays as the fallback
+   outside the app (tests, the browser harness): in the app the menu takes those keys first, so
+   it never runs them twice.
 4. Settings › Shortcuts: starting to record clears every Drover item's accelerator; saving or
    cancelling sets them from the bindings again.
 5. File items: the frontend reports the target (a path on this Mac, a remote path, or none) as it
