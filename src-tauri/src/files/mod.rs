@@ -6,6 +6,7 @@ pub mod all;
 pub mod changed;
 pub mod cksum;
 pub mod edit;
+pub mod first;
 pub mod list;
 pub mod paths;
 pub mod read;

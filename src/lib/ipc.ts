@@ -172,6 +172,9 @@ export const filesWrite = (machineId: string, root: string, rel: string, text: s
 export const filesChanged = (machineId: string, root: string) => invoke<Changed>("files_changed", { machineId, root });
 export const filesImage = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_image", { machineId, root, rel });
+/** For each group of places, in order, the first that is a file on the Machine, or null. */
+export const filesFirstFiles = (machineId: string, groups: string[][]) =>
+  invoke<(string | null)[]>("files_first_files", { machineId, groups });
 export const filesPdf = (machineId: string, root: string, rel: string) =>
   invoke<ArrayBuffer>("files_pdf", { machineId, root, rel });
 export const filesWatch = (machineId: string, root: string, hidden: string[], events: Channel<WatchEvent>) =>

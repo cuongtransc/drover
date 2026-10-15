@@ -12,6 +12,7 @@ import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
 import { buildRows, liveStart, rowOfCall } from "./workBlocks";
+import { ChatPathsContext, pathResolver } from "./pathResolver";
 import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
 import { Composer } from "./Composer";
@@ -218,6 +219,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
 
   // Tool results render inside their call; each turn's work folds into one row.
   const { rows, results } = useMemo(() => buildRows(items, state.total - state.items.length), [items, state.total, state.items.length]);
+  // Where the paths the Chat names are: asked of its machine as their rows show, once each.
+  const itemsNow = useRef(items);
+  itemsNow.current = items;
+  const paths = useMemo(() => pathResolver(pane.machine_id, () => itemsNow.current), [pane.machine_id]);
   const asked = useMemo(() => pendingQuestions(items), [items]);
   // Badges follow the strip's rule: nothing runs once the agent is gone, and a fork's preview
   // of the original transcript must not claim the original's tasks. The value keeps its identity
@@ -426,6 +431,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
 
   return (
     <ChatPaneContext.Provider value={pane}>
+    <ChatPathsContext.Provider value={paths}>
     <ChatEditContext.Provider value={edit}>
     <ChatOpenContext.Provider value={opened}>
     <BackgroundContext.Provider value={background}>
@@ -505,6 +511,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     </BackgroundContext.Provider>
     </ChatOpenContext.Provider>
     </ChatEditContext.Provider>
+    </ChatPathsContext.Provider>
     </ChatPaneContext.Provider>
   );
 }
