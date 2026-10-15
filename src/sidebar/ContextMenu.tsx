@@ -14,6 +14,15 @@ export interface MenuItem {
   disabled?: boolean;
   /** Says why the item is disabled, under it. */
   note?: string;
+  /** Keys that do the same, shown at the item's end in macOS symbols (`⌥⌘R`, `↩`). */
+  keys?: string;
+}
+
+const KEY_NAMES: Record<string, string> = { "⌃": "Control", "⌥": "Alt", "⇧": "Shift", "⌘": "Meta", "↩": "Enter" };
+
+/** `⌥⌘R` as `aria-keyshortcuts` wants it: `Alt+Meta+R`. */
+export function ariaKeys(keys: string): string {
+  return [...keys].map((k) => KEY_NAMES[k] ?? k).join("+");
 }
 
 /** A menu row, or "sep": a line between groups. */
@@ -70,6 +79,7 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
             <button
               role={it.checked === undefined ? "menuitem" : "menuitemcheckbox"}
               aria-checked={it.checked}
+              aria-keyshortcuts={it.keys ? ariaKeys(it.keys) : undefined}
               disabled={it.disabled}
               onClick={() => {
                 onClose();
@@ -79,6 +89,11 @@ export function ContextMenu({ x, y, items, onClose }: { x: number; y: number; it
               <it.icon />
               {it.label}
               {it.checked && <CheckIcon className="icon ctx-check" />}
+              {it.keys && (
+                <span className="ctx-keys" aria-hidden="true">
+                  {it.keys}
+                </span>
+              )}
             </button>
             {it.note && <div className="ctx-note">{it.note}</div>}
           </li>

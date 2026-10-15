@@ -14,6 +14,14 @@ describe("ContextMenu", () => {
     expect(kinds).toEqual(["A", "sep", "B"]);
   });
 
+  it("shows an item's keys at its end, and none for an item without", () => {
+    render(<ContextMenu x={0} y={0} items={[{ ...item("A"), keys: "⌥⌘R" }, item("B")]} onClose={() => {}} />);
+    const [a, b] = screen.getAllByRole("menuitem");
+    expect(a.querySelector(".ctx-keys")?.textContent).toBe("⌥⌘R");
+    expect(b.querySelector(".ctx-keys")).toBeNull();
+    expect(a).toHaveProperty("textContent", "A⌥⌘R");
+  });
+
   describe("near the window's edges", () => {
     // jsdom lays nothing out: the menu is 200×150 in an 800×600 window.
     beforeEach(() => {
