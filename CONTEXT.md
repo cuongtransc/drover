@@ -151,7 +151,8 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Session row** | A Session in the Sidebar | `SessionRow` |
 | **Workspace row** | A Workspace with agent work, under its Session row | `ProjectRows` (`src/sidebar/ProjectRows.tsx`), `sessionProjects` |
 | **Sessions filter** | All \| Active on the Sessions header | `useSessionFilter` (`src/sidebar/activeFilter.ts`) |
-| **Fold line** | "N hidden · idle or stopped" with Show, under what the Active filter keeps | `.filter-hidden` in `GroupTree` |
+| **Fold line** | "N hidden · idle or stopped" with Show, under what the Active filter keeps; Show also opens every Stopped fold | `.filter-hidden` in `GroupTree` |
+| **Stopped fold** | "N stopped · names" at the end of a tree level (a group, or the top) holding its two or more stopped Sessions, folded by default; a lone stopped Session is a row of its own, last. The viewed Session keeps its place; words in the Sessions filter show stopped Sessions as rows; a stopped Session moved into a level opens its fold | `StoppedFold` in `GroupTree`, `src/sidebar/stoppedFold.ts` |
 | **Agents column** | The middle column, headed by the Session name and PANES (its rows are Panes: agents and shells) | `src/agents/AgentList.tsx` |
 | **Workspace header** | A Workspace's name over its Pane rows; + starts an agent in it | `.ws-head` in `AgentList.tsx` |
 | **Pane row** | A Pane in the Agents column | `AgentCard` |

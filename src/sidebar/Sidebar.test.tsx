@@ -105,6 +105,8 @@ describe("Sidebar", () => {
     expect(bm.getAttribute("aria-current")).toBeNull();
   });
   it("lists sessions no group holds before the groups", () => {
+    // A running one: a stopped Session goes last (stoppedFold.ts).
+    useApp.setState({ machines: { box: { ...m, sessions: [m.sessions[0], { ...m.sessions[1], running: true }] } } });
     useLayout.setState({ layout: { tree: [work], bookmarks: [] } });
     render(<Sidebar />);
     const labels = [...within(screen.getByRole("region", { name: "Sessions" })).getAllByRole("list")[0].children].map((li) => li.textContent);
@@ -236,7 +238,8 @@ describe("Sidebar", () => {
   it("leaves both Sessions' kept entries and Bookmarks unchanged when renaming into an existing Session fails", async () => {
     const destination = { ...m.sessions[1], name: "radar" };
     const machine = { ...m, sessions: [...m.sessions, destination] };
-    useApp.setState({ machines: { box: machine } });
+    // Two stopped Sessions fold into one row: open it, for ai-radar's row.
+    useApp.setState({ machines: { box: machine }, expanded: { "stopped:root": true } });
     const layout = {
       tree: [],
       bookmarks: ["box/ai-radar/app", "box/ai-radar/source", "box/radar/app", "box/radar/destination"],
@@ -552,5 +555,86 @@ describe("Sessions filter", () => {
     fireEvent.click(sessions().getByRole("button", { name: "ct-dev" }));
     fireEvent.change(input(), { target: { value: "vault" } });
     expect(sessions().getByText('No session on ct-dev matches "vault"')).toBeTruthy();
+  });
+});
+
+describe("Stopped Sessions fold", () => {
+  const stopped = (name: string) => ({ name, running: false, status: "unknown" as const, error: null, workspaces: [] });
+  const box: MachineView = { ...m, sessions: [m.sessions[0], stopped("old-a"), stopped("old-b"), stopped("old-c")] };
+  const sessions = () => within(screen.getByRole("region", { name: "Sessions" }));
+  const S = (name: string) => ({ kind: "session" as const, key: sessionKey("box", name) });
+
+  beforeEach(() => {
+    localStorage.clear();
+    useApp.setState({ machines: { box }, order: ["box"], selected: null, viewed: null, expanded: {} });
+    useLayout.setState({ layout: EMPTY_LAYOUT });
+    useSessionFilter.setState({ filter: "all" });
+    useSessionQuery.setState({ query: "", machine: null });
+  });
+
+  it("folds two or more stopped Sessions into one row that names them, and a click opens it", () => {
+    render(<Sidebar />);
+    const fold = sessions().getByRole("button", { name: "3 stopped · old-a, old-b, old-c" });
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(sessions().queryByText("old-a")).toBeNull();
+    fireEvent.click(fold);
+    expect(useApp.getState().expanded["stopped:root"]).toBe(true);
+    const open = sessions().getByRole("button", { name: "3 stopped" });
+    expect(open.getAttribute("aria-expanded")).toBe("true");
+    expect(row("old-a")).toBeTruthy();
+  });
+
+  it("folds each group's stopped Sessions on their own, and leaves a lone one as a row, last", () => {
+    useLayout.setState({ layout: { bookmarks: [], tree: [
+      S("old-c"),
+      { kind: "group", id: "g1", label: "Work", children: [S("old-a"), S("default"), S("old-b")] },
+    ] } });
+    render(<Sidebar />);
+    expect(sessions().getByRole("button", { name: "2 stopped · old-a, old-b" })).toBeTruthy();
+    // old-c is the root's only stopped Session: a row of its own, after the Work group
+    const rows = [...screen.getByRole("region", { name: "Sessions" }).querySelectorAll(".group > .row .label, .tree > li.session > .row .label")];
+    expect(rows.map((r) => r.textContent)).toEqual(["Work", "old-c"]);
+    fireEvent.click(sessions().getByRole("button", { name: "2 stopped · old-a, old-b" }));
+    expect(useApp.getState().expanded["stopped:g1"]).toBe(true);
+  });
+
+  it("keeps the viewed Session in its place", () => {
+    useApp.setState({ viewed: { machine_id: "box", session: "old-b" } });
+    render(<Sidebar />);
+    expect(row("old-b")).toBeTruthy();
+    expect(sessions().getByRole("button", { name: "2 stopped · old-a, old-c" })).toBeTruthy();
+  });
+
+  it("shows stopped Sessions the words find as rows, not folded", () => {
+    useSessionQuery.setState({ query: "old" });
+    render(<Sidebar />);
+    expect(sessions().queryByRole("button", { name: /stopped/ })).toBeNull();
+    expect(row("old-a")).toBeTruthy();
+  });
+
+  it("Show under Active opens the folds it brings back", () => {
+    useLayout.setState({ layout: { bookmarks: [], tree: [{ kind: "group", id: "g1", label: "Work", children: [S("old-a"), S("old-b")] }] } });
+    useSessionFilter.setState({ filter: "active" });
+    render(<Sidebar />);
+    fireEvent.click(sessions().getByRole("button", { name: "Show" }));
+    expect(sessions().getByRole("button", { name: "2 stopped" }).getAttribute("aria-expanded")).toBe("true");
+    expect(row("old-a")).toBeTruthy();
+  });
+
+  it("opens a fold that a stopped Session was just moved into", () => {
+    useLayout.setState({ layout: { bookmarks: [], tree: [S("old-c"), { kind: "group", id: "g1", label: "Work", children: [S("old-a"), S("old-b")] }] } });
+    render(<Sidebar />);
+    expect(sessions().getByRole("button", { name: "2 stopped · old-a, old-b" })).toBeTruthy();
+    act(() => useLayout.setState({ layout: { bookmarks: [], tree: [{ kind: "group", id: "g1", label: "Work", children: [S("old-a"), S("old-b"), S("old-c")] }] } }));
+    expect(sessions().getByRole("button", { name: "3 stopped" }).getAttribute("aria-expanded")).toBe("true");
+    expect(row("old-c")).toBeTruthy();
+  });
+
+  it("does not open a fold when a Session stops where it is", () => {
+    const running = { ...box, sessions: [m.sessions[0], stopped("old-a"), stopped("old-b"), { ...stopped("old-c"), running: true, status: "idle" as const }] };
+    useApp.setState({ machines: { box: running } });
+    render(<Sidebar />);
+    act(() => useApp.setState({ machines: { box } }));
+    expect(sessions().getByRole("button", { name: "3 stopped · old-a, old-b, old-c" }).getAttribute("aria-expanded")).toBe("false");
   });
 });

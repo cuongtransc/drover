@@ -496,6 +496,10 @@ kbd {
   color: var(--fg-2); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; text-align: left;
 }
 .session.stopped .row { color: var(--fg-3); }
+/* A level's stopped Sessions folded into one row: quieter than a Session row, so it is not read as one. */
+.stopped-fold > .row { height: 24px; color: var(--fg-3); font-size: var(--fs-s); }
+.stopped-fold > .row:hover { color: var(--fg); }
+.stopped-fold > .row .label { flex: 1; }
 .error { margin: 0; padding: 2px 8px 6px 28px; color: var(--err); font-size: 11.5px; line-height: 1.4; }
 
 .machine-actions { display: flex; align-items: center; gap: 6px; padding: 0 8px 6px 28px; }
