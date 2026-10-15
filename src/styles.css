@@ -1233,6 +1233,8 @@ kbd {
 .chat-work-title { font-weight: 600; }
 .chat-work-rows { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--line-2); }
 .chat-work-rows .chat-row { padding: 3px 0; max-width: none; }
+.chat-work-thinking { display: flex; gap: 6px; padding: 3px 0; color: var(--fg-3); font-size: 12.5px; line-height: 1.5; font-style: italic; overflow-wrap: anywhere; white-space: pre-wrap; }
+.chat-work-thinking .chat-thinking-icon { margin-top: 2px; }
 .chat-narration .chat-assistant { color: var(--fg-3); font-size: 12.5px; line-height: 1.5; }
 .diff-del { color: var(--diff-del); background: color-mix(in srgb, var(--err) 10%, transparent); margin: 0 -10px; padding: 0 10px; }
 .diff-add { color: var(--diff-add); background: color-mix(in srgb, var(--green) 10%, transparent); margin: 0 -10px; padding: 0 10px; }

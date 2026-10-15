@@ -198,14 +198,48 @@ describe("paths in chat", () => {
       await waitFor(() => expect(writeText).toHaveBeenCalledWith("/Users/me/app/src/a.ts"));
     });
 
-    it("copies the text selected when the menu opened", () => {
+    // WebKit on macOS selects the link under the pointer between a right (or Ctrl+) mousedown and
+    // the contextmenu event, whatever the page prevents (seen in a WKWebView, 2026-10-15).
+    const webkitSelects = (link: HTMLElement) => {
+      const range = document.createRange();
+      range.selectNodeContents(link);
+      getSelection()!.removeAllRanges();
+      getSelection()!.addRange(range);
+    };
+    const rightClick = (link: HTMLElement, init: MouseEventInit = { button: 2 }) => {
+      fireEvent.mouseDown(link, init);
+      webkitSelects(link);
+      fireEvent.contextMenu(link);
+    };
+
+    it("leaves nothing selected and offers no Copy when nothing was selected before", () => {
+      getSelection()!.removeAllRanges();
       show("Edit `src/a.ts:3` now.");
-      const spy = vi.spyOn(window, "getSelection").mockReturnValue({ toString: () => "Edit src/a.ts:3" } as Selection);
-      fireEvent.contextMenu(screen.getByRole("link", { name: "src/a.ts:3" }));
-      spy.mockRestore();
-      expect(items()).toEqual(["Open in Files", "Open on this Mac", "Reveal in Finder", "Copy Path", "Copy"]);
+      const link = screen.getByRole("link", { name: "src/a.ts:3" });
+      rightClick(link);
+      expect(getSelection()!.toString()).toBe("");
+      expect(items()).not.toContain("Copy");
+    });
+
+    it("does the same for a Ctrl+click, which also opens the menu", () => {
+      getSelection()!.removeAllRanges();
+      show("Edit `src/a.ts:3` now.");
+      rightClick(screen.getByRole("link", { name: "src/a.ts:3" }), { button: 0, ctrlKey: true });
+      expect(getSelection()!.toString()).toBe("");
+      expect(items()).not.toContain("Copy");
+    });
+
+    it("keeps the selection made before, and copies that", () => {
+      show("Edit `src/a.ts:3` now.");
+      const link = screen.getByRole("link", { name: "src/a.ts:3" });
+      const range = document.createRange();
+      range.selectNodeContents(link.parentElement!);
+      getSelection()!.removeAllRanges();
+      getSelection()!.addRange(range);
+      rightClick(link);
+      expect(getSelection()!.toString()).toBe("Edit src/a.ts:3 now.");
       pick("Copy");
-      expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3");
+      expect(writeText).toHaveBeenCalledWith("Edit src/a.ts:3 now.");
     });
 
     it("on another machine: only what does not need this Mac", () => {

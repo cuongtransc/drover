@@ -189,7 +189,8 @@ function ItemBody({ item, result, copy = false, running = false }: ItemProps) {
       );
     case "thinking":
       return (
-        <details className="chat-row chat-thinking">
+        // Open by default: the folded Work block shows this text, so opening it must not hide it.
+        <details className="chat-row chat-thinking" open>
           <summary><BrainIcon className="icon chat-thinking-icon" />Thinking…</summary>
           <div className="chat-dim">{item.text}</div>
         </details>
