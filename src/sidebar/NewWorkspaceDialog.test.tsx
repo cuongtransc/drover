@@ -12,7 +12,7 @@ import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
 const reportAgent = (paneId: string, kind: string) =>
   useApp.getState().upsertMachine({
     id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-    sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+    sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
       { workspace_id: "w0", label: "x", number: 1, status: "idle", tabs: [
         { tab_id: "w0:t1", label: "1", number: 1, status: "idle", panes: [
           { pane_id: paneId, terminal_id: "t0", title: kind, cwd: null, agent: kind, status: "idle" } ] } ] } ] }],

@@ -10,7 +10,7 @@ const { useDockBadge } = await import("./dockBadge");
 const pane = (id: string, status: PaneView["status"]): PaneView => ({ pane_id: id, terminal_id: "t" + id, title: id, cwd: "/x", agent: "claude", status });
 const machine = (panes: PaneView[]): MachineView => ({
   id: "a", label: "a", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "s", running: true, status: "idle", error: null, workspaces: [
+  sessions: [{ name: "s", running: true, loaded: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "ws", number: 1, status: "idle", tabs: [{ tab_id: "t1", label: "1", number: 1, status: "idle", panes }] }] }],
 });
 function Host() {

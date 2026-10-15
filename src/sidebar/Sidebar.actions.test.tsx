@@ -17,7 +17,7 @@ import type { MachineView } from "../lib/types";
 
 const local: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "unknown",
-  sessions: [{ name: "x", running: false, status: "unknown", error: null, workspaces: [] }],
+  sessions: [{ name: "x", running: false, loaded: false, status: "unknown", error: null, workspaces: [] }],
 };
 const set = (machines: MachineView[]) => {
   useLayout.setState({ layout: EMPTY_LAYOUT });
@@ -114,7 +114,7 @@ describe("Sidebar machine actions", () => {
     expect(useLayout.getState().layout.bookmarks).toEqual([]);
   });
   it("offers no Delete for a running session", () => {
-    set([{ ...local, sessions: [{ name: "x", running: true, status: "idle", error: null, workspaces: [] }] }]);
+    set([{ ...local, sessions: [{ name: "x", running: true, loaded: true, status: "idle", error: null, workspaces: [] }] }]);
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByText("x"));
     expect(screen.queryByRole("menuitem", { name: "Delete session…" })).toBeNull();
@@ -152,8 +152,8 @@ describe("Sidebar machine actions", () => {
   });
   it("offers no Rename for a running session or the default one", () => {
     set([{ ...local, sessions: [
-      { name: "x", running: true, status: "idle", error: null, workspaces: [] },
-      { name: "default", running: false, status: "unknown", error: null, workspaces: [] },
+      { name: "x", running: true, loaded: true, status: "idle", error: null, workspaces: [] },
+      { name: "default", running: false, loaded: false, status: "unknown", error: null, workspaces: [] },
     ] }]);
     render(<Sidebar />);
     fireEvent.contextMenu(screen.getByText("x"));
@@ -163,7 +163,7 @@ describe("Sidebar machine actions", () => {
     expect(screen.queryByRole("menuitem", { name: "Rename session…" })).toBeNull();
   });
   it("bookmarks a project from its row's menu, unbookmarks it from Bookmarks; a Session has no Bookmark item", () => {
-    set([{ ...local, sessions: [{ name: "x", running: true, status: "working", error: null, workspaces: [
+    set([{ ...local, sessions: [{ name: "x", running: true, loaded: true, status: "working", error: null, workspaces: [
       { workspace_id: "w1", label: "app", number: 1, status: "working", tabs: [{ tab_id: "t", label: "1", number: 1, status: "working", panes: [
         { pane_id: "p", terminal_id: "t", title: "p", cwd: "/x", agent: "claude", status: "working" }] }] }] }] }]);
     render(<Sidebar />);

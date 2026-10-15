@@ -9,7 +9,7 @@ import { openNewTabHere } from "./newTabShortcut";
 
 const machine: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
     { workspace_id: "w1", label: "api", number: 1, status: "idle", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [
         { pane_id: "w1:p1", terminal_id: "t1", title: "claude", cwd: "/srv/api/sub", agent: "claude", status: "idle" },

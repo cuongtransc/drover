@@ -27,6 +27,7 @@ const machine = (id: string, kind: string): MachineView => ({
     {
       name: "s",
       running: true,
+      loaded: true,
       status: "idle",
       error: null,
       workspaces: [

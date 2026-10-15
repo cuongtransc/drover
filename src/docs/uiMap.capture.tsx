@@ -16,14 +16,14 @@ const pane = (id: string, title: string, agent: string | null, status: PaneView[
 const local: MachineView = {
   id: "local", label: "MacBook Pro", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working",
   sessions: [
-    { name: "ct", running: true, status: "working", error: null, workspaces: [
+    { name: "ct", running: true, loaded: true, status: "working", error: null, workspaces: [
       { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [
         { tab_id: "w1:t1", label: "orch-ui", number: 1, status: "working", panes: [pane("p1", "Compact tab bar", "claude", "working")] },
         { tab_id: "w1:t2", label: "lane-docs", number: 2, status: "blocked", panes: [pane("p2", "UI map doc", "pi", "blocked")] },
         { tab_id: "w1:t3", label: "dev", number: 3, status: "idle", panes: [pane("p3", "zsh", null, "idle")] } ] },
       { workspace_id: "w2", label: "ct-cli", number: 2, status: "done", tabs: [
         { tab_id: "w2:t1", label: "1", number: 1, status: "done", panes: [pane("p4", "ct mr edit", "claude", "done", "/Users/me/ct-cli")] } ] } ] },
-    { name: "ca", running: true, status: "idle", error: null, workspaces: [
+    { name: "ca", running: true, loaded: true, status: "idle", error: null, workspaces: [
       { workspace_id: "w9", label: "ca-trader", number: 1, status: "idle", tabs: [
         { tab_id: "w9:t1", label: "1", number: 1, status: "idle", panes: [pane("p9", "Backtest", "codex", "idle", "/Users/me/ca-trader")] } ] } ] },
   ],

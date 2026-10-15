@@ -7,7 +7,7 @@ const ws = (id: string, label: string): WorkspaceView => ({
   workspace_id: id, label, number: 1, status: "idle",
   tabs: [{ tab_id: id + ":t", label: "1", number: 1, status: "idle", panes: [{ pane_id: id + ":p", terminal_id: "t", title: "zsh", cwd: "/c/" + label, agent: null, status: "idle" }] }],
 });
-const session = (name: string, running: boolean, ...w: WorkspaceView[]): SessionView => ({ name, running, status: "idle", error: null, workspaces: w });
+const session = (name: string, running: boolean, ...w: WorkspaceView[]): SessionView => ({ name, running, loaded: running, status: "idle", error: null, workspaces: w });
 const machine = (state: MachineView["state"], ...s: SessionView[]): MachineView => ({
   id: "local", label: "local", kind: "local", state, error: null, version: "0.9.3", status: "idle", sessions: s,
 });
@@ -43,8 +43,12 @@ describe("closedKept", () => {
     expect(closedKept(layout, machine("probing", s), s)).toEqual([]);
   });
   it("lists nothing for a running Session whose first view has not arrived (no workspaces yet)", () => {
-    const s = session("ct", true);
+    const s = { ...session("ct", true), loaded: false };
     expect(closedKept(layout, machine("connected", s), s)).toEqual([]);
+  });
+  it("lists every kept workspace of a running Session whose last workspace closed", () => {
+    const s = session("ct", true);
+    expect(closedKept(layout, machine("connected", s), s).map((c) => c.label)).toEqual(["agent", "infra", "zeta"]);
   });
   it("lists nothing for a Session with an error", () => {
     const s = { ...session("ct", true, ws("w1", "infra")), error: { code: "io", message: "boom" } };

@@ -12,7 +12,7 @@ import type { MachineView, PaneView } from "../lib/types";
 const pane = (id: string, title: string): PaneView => ({ pane_id: id, terminal_id: "t" + id, title, cwd: "/x", agent: "claude", status: "working" });
 const m: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "working",
-  sessions: [{ name: "ct", running: true, status: "working", error: null, workspaces: [
+  sessions: [{ name: "ct", running: true, loaded: true, status: "working", error: null, workspaces: [
     { workspace_id: "w1", label: "drover", number: 1, status: "working", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "working", panes: [pane("p1", "Compact tab bar"), pane("p2", "UI map doc")] } ] } ] }],
 };

@@ -7,7 +7,7 @@ const pane = (id: string, status: PaneView["status"], agent: string | null = "cl
   pane_id: id, terminal_id: "t" + id, title: id, cwd: "/x", agent, status,
 });
 const session = (name: string, panes: PaneView[], running = true): SessionView => ({
-  name, running, status: "idle", error: null,
+  name, running, loaded: running, status: "idle", error: null,
   workspaces: [{ workspace_id: "w1", label: "ws", number: 1, status: "idle", tabs: [{ tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes }] }],
 });
 const machine = { id: "m", label: "m", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [] } as MachineView;

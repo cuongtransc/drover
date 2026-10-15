@@ -62,6 +62,7 @@ function view({ other = "idle", selected = "idle", extraTab = false }: { other?:
       {
         name: "default",
         running: true,
+        loaded: true,
         status: "idle",
         error: null,
         workspaces: [

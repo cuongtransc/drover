@@ -9,7 +9,7 @@ const ws = (id: string, ...cwds: (string | null)[][]): WorkspaceView => ({
   workspace_id: id, label: id, number: 1, status: "idle",
   tabs: cwds.map((cs, i) => ({ tab_id: `${id}:t${i}`, label: String(i), number: i + 1, status: "idle", panes: cs.map((c, j) => pane(`${id}:p${i}${j}`, c)) })),
 });
-const session = (over: Partial<SessionView>): SessionView => ({ name: "default", running: true, status: "idle", error: null, workspaces: [ws("w1", ["/a"])], ...over });
+const session = (over: Partial<SessionView>): SessionView => ({ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [ws("w1", ["/a"])], ...over });
 
 describe("workspace folder", () => {
   beforeEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
@@ -51,12 +51,18 @@ describe("workspace folder", () => {
     setFolder({ ...ref, session: "other", workspace_id: "w2" }, "/c");
     pruneFolders("local", session({ running: false, workspaces: [] }));
     pruneFolders("local", session({ error: { code: "io", message: "x" }, workspaces: [ws("w1", ["/a"])] }));
-    pruneFolders("local", session({ workspaces: [] }));
+    pruneFolders("local", session({ loaded: false, workspaces: [] }));
     expect(getFolder({ ...ref, workspace_id: "w2" })).toBe("/b");
     pruneFolders("local", session({}));
     expect(getFolder(ref)).toBe("/a");
     expect(getFolder({ ...ref, workspace_id: "w2" })).toBeNull();
     expect(getFolder({ ...ref, session: "other", workspace_id: "w2" })).toBe("/c");
+  });
+
+  it("prunes every folder of a running session whose last workspace closed", () => {
+    setFolder(ref, "/a");
+    pruneFolders("local", session({ workspaces: [] }));
+    expect(getFolder(ref)).toBeNull();
   });
 
   it("with a valid previous view prunes only workspaces that left since then", () => {

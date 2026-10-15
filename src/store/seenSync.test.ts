@@ -5,7 +5,7 @@ import type { MachineView } from "../lib/types";
 
 const machine = (status: "done" | "idle"): MachineView => ({
   id: "devtuf", label: "devtuf", kind: "ssh", state: "connected", error: null, version: "0.9.3", status,
-  sessions: [{ name: "default", running: true, status, error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status, error: null, workspaces: [
     { workspace_id: "w1", label: "x", number: 1, status, tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status, panes: [
         { pane_id: "w1:p1", terminal_id: "t", title: "a", cwd: "/x", agent: "claude", status },

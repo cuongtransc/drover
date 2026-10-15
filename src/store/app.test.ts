@@ -10,7 +10,7 @@ import { useLensSettings } from "../settings/lens";
 
 const machine: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "blocked",
-  sessions: [{ name: "default", running: true, status: "blocked", error: null, workspaces: [
+  sessions: [{ name: "default", running: true, loaded: true, status: "blocked", error: null, workspaces: [
     { workspace_id: "w1", label: "drover", number: 1, status: "blocked", tabs: [
       { tab_id: "w1:t1", label: "1", number: 1, status: "blocked", panes: [
         { pane_id: "w1:p1", terminal_id: "term_a", title: "Rewrite", cwd: "/x", agent: "claude", status: "working" },
@@ -238,7 +238,7 @@ describe("status-change times", () => {
 });
 
 describe("layout pruning", () => {
-  const sess = (name: string) => ({ name, running: false, status: "unknown" as const, error: null, workspaces: [] });
+  const sess = (name: string) => ({ name, running: false, loaded: false, status: "unknown" as const, error: null, workspaces: [] });
   const box = (state: MachineView["state"], ...names: string[]): MachineView => ({
     id: "box", label: "box", kind: "ssh", state, error: null, version: "0.9.3", status: "unknown", sessions: names.map(sess),
   });

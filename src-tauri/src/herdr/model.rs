@@ -214,6 +214,7 @@ pub fn session_view(
     SessionView {
         name: name.to_string(),
         running: true,
+        loaded: true,
         status: AgentStatus::rollup(workspaces.iter().map(|w| w.status)),
         error: None,
         workspaces,
@@ -289,6 +290,7 @@ mod tests {
         );
         assert_eq!(v.name, "default");
         assert!(v.running);
+        assert!(v.loaded, "a watcher view is herdr's list");
         assert_eq!(v.status, AgentStatus::Blocked);
         assert_eq!(
             v.workspaces

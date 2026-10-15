@@ -6,7 +6,7 @@ import { isIdleDefault, matchSession, queryResolved, queryWords } from "./sessio
 const pane = (agent: string | null): PaneView => ({ pane_id: "p", terminal_id: "t", title: "zsh", cwd: "/x", agent, status: "idle" });
 const ws = (id: string, label: string, agent: string | null = "claude") =>
   ({ workspace_id: id, label, number: 1, status: "idle" as const, tabs: [{ tab_id: id + ":t", label: "1", number: 1, status: "idle" as const, panes: [pane(agent)] }] });
-const session = (name: string, workspaces = [ws("w1", "drover")], running = true): SessionView => ({ name, running, status: "idle", error: null, workspaces });
+const session = (name: string, workspaces = [ws("w1", "drover")], running = true): SessionView => ({ name, running, loaded: running, status: "idle", error: null, workspaces });
 const dev = { id: "dev", label: "ct-dev", kind: "ssh", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [] } as MachineView;
 const local = { ...dev, id: "local", label: "local", kind: "local" } as MachineView;
 

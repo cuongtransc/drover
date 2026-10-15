@@ -33,6 +33,8 @@ pub struct MachineView {
 pub struct SessionView {
     pub name: String,
     pub running: bool,
+    /// The watcher's view arrived: `workspaces` is herdr's list, which can be empty, not a placeholder.
+    pub loaded: bool,
     pub status: AgentStatus,
     pub error: Option<AppError>,
     pub workspaces: Vec<WorkspaceView>,

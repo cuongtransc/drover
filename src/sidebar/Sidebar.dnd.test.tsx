@@ -8,7 +8,7 @@ import type { GroupNode } from "./groups";
 import { Sidebar } from "./Sidebar";
 import type { MachineView } from "../lib/types";
 
-const sess = (name: string) => ({ name, running: true, status: "idle" as const, error: null, workspaces: [] });
+const sess = (name: string) => ({ name, running: true, loaded: true, status: "idle" as const, error: null, workspaces: [] });
 const local: MachineView = { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle", sessions: [sess("x"), sess("y")] };
 const kx = sessionKey("local", "x"), ky = sessionKey("local", "y");
 const dt = () => {

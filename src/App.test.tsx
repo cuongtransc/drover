@@ -45,7 +45,7 @@ describe("App shell", () => {
   it("offers to start the default session when local has none running", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     (invoke as any).mockResolvedValueOnce([{ id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "unknown",
-      sessions: [{ name: "default", running: false, status: "unknown", error: null, workspaces: [] }] }]);
+      sessions: [{ name: "default", running: false, loaded: false, status: "unknown", error: null, workspaces: [] }] }]);
     render(<App />);
     expect(await screen.findByRole("button", { name: "Start default session" })).toBeTruthy();
   });
@@ -53,7 +53,7 @@ describe("App shell", () => {
   it("shows a toast when starting the default session fails", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     (invoke as any).mockResolvedValueOnce([{ id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "unknown",
-      sessions: [{ name: "default", running: false, status: "unknown", error: null, workspaces: [] }] }]);
+      sessions: [{ name: "default", running: false, loaded: false, status: "unknown", error: null, workspaces: [] }] }]);
     render(<App />);
     const start = await screen.findByRole("button", { name: "Start default session" });
     (invoke as any).mockImplementation((cmd: string) => (cmd === "session_start" ? Promise.reject({ code: "timeout", message: "did not start" }) : Promise.resolve([])));
@@ -92,7 +92,7 @@ describe("App shell", () => {
     useSettings.setState({ ...FONT_DEFAULTS });
     useApp.setState({
       machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-        sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+        sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
           { workspace_id: "w1", label: "x", number: 1, status: "idle", tabs: [
             { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [
               { pane_id: "w1:p7", terminal_id: "t7", title: "sh", cwd: null, agent: null, status: "idle" } ] } ] } ] }] } },
@@ -123,7 +123,7 @@ describe("App shell", () => {
     const pane = { machine_id: "local", session: "default", pane_id: "w1:p7" };
     useApp.setState({
       machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-        sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+        sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
           { workspace_id: "w1", label: "x", number: 1, status: "idle", tabs: [
             { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes: [
               { pane_id: "w1:p7", terminal_id: "t7", title: "sh", cwd: null, agent: null, status: "unknown" } ] } ] } ] }] } },
@@ -148,7 +148,7 @@ describe("App shell", () => {
     const ref = { machine_id: "local", session: "default", pane_id: "w1:p1" };
     const machine = (status: "working" | "done") => ({
       id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status,
-      sessions: [{ name: "default", running: true, status, error: null, workspaces: [
+      sessions: [{ name: "default", running: true, loaded: true, status, error: null, workspaces: [
         { workspace_id: "w1", label: "app", number: 1, status, tabs: [
           { tab_id: "w1:t1", label: "agent", number: 1, status, panes: [
             { pane_id: "w1:p1", terminal_id: "t1", title: "agent", cwd: "/r", agent: "claude", status },
@@ -205,7 +205,7 @@ describe("App shell", () => {
   describe("layout", () => {
     const blockedMachine = {
       id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "blocked" as const,
-      sessions: [{ name: "default", running: true, status: "blocked" as const, error: null, workspaces: [
+      sessions: [{ name: "default", running: true, loaded: true, status: "blocked" as const, error: null, workspaces: [
         { workspace_id: "w1", label: "x", number: 1, status: "blocked" as const, tabs: [
           { tab_id: "w1:t1", label: "1", number: 1, status: "blocked" as const, panes: [
             { pane_id: "w1:p1", terminal_id: "t1", title: "fix", cwd: null, agent: "claude", status: "blocked" as const } ] } ] } ] }],
@@ -255,7 +255,7 @@ describe("App shell", () => {
       ({ pane_id: id, terminal_id: "t" + id, title: "pane " + id, cwd: null, agent: "claude", status });
     const m = (id: string, panes: ReturnType<typeof p>[]) => ({
       id, label: id, kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "idle" as const,
-      sessions: [{ name: "s", running: true, status: "idle" as const, error: null, workspaces: [
+      sessions: [{ name: "s", running: true, loaded: true, status: "idle" as const, error: null, workspaces: [
         { workspace_id: "w1", label: "ws", number: 1, status: "idle" as const, tabs: [
           { tab_id: "w1:t1", label: "1", number: 1, status: "idle" as const, panes } ] } ] }],
     });
@@ -293,7 +293,7 @@ describe("App shell", () => {
   describe("Board", () => {
     const blockedMachine = {
       id: "local", label: "local", kind: "local" as const, state: "connected" as const, error: null, version: "0.9.3", status: "blocked" as const,
-      sessions: [{ name: "default", running: true, status: "blocked" as const, error: null, workspaces: [
+      sessions: [{ name: "default", running: true, loaded: true, status: "blocked" as const, error: null, workspaces: [
         { workspace_id: "w1", label: "x", number: 1, status: "blocked" as const, tabs: [
           { tab_id: "w1:t1", label: "1", number: 1, status: "blocked" as const, panes: [
             { pane_id: "w1:p1", terminal_id: "t1", title: "fix", cwd: null, agent: "claude", status: "blocked" as const } ] } ] } ] }],
@@ -346,7 +346,7 @@ describe("App shell", () => {
         Promise.resolve(cmd === "files_list_all" ? { paths: [], capped: false, refused: false } : cmd === "files_read" ? { kind: "text", text: "x", truncated: false, size: 1, mtime: 1, cksum: null, editable: false } : cmd === "files_watch" ? 1 : []),
       );
       useApp.setState({
-        machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, status: "idle", error: null, workspaces: [
+        machines: { local: { id: "local", label: "local", kind: "local", state: "connected", error: null, version: null, status: "idle", sessions: [{ name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
           { workspace_id: "w1", label: "app", number: 1, status: "idle", tabs: [{ tab_id: "t1", label: "t", panes: [{ pane_id: "p1", cwd: "/r", agent: "claude", title: "a", status: "idle", terminal_id: "x" }] }] },
         ] }] } } as never,
         order: ["local"],

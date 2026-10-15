@@ -10,10 +10,10 @@ const pane = (id: string, status: PaneView["status"], extra: Partial<PaneView> =
 const machine = (id: string, panes: PaneView[], over: Partial<MachineView> = {}): MachineView => ({
   id, label: id + "-label", kind: id === "local" ? "local" : "ssh", state: "connected", error: null, version: "0.9.3", status: "idle",
   sessions: [
-    { name: "default", running: true, status: "idle", error: null, workspaces: [
+    { name: "default", running: true, loaded: true, status: "idle", error: null, workspaces: [
       { workspace_id: "w1", label: "drover", number: 1, status: "idle", tabs: [
         { tab_id: "w1:t1", label: "1", number: 1, status: "idle", panes } ] } ] },
-    { name: "old", running: false, status: "unknown", error: null, workspaces: [
+    { name: "old", running: false, loaded: false, status: "unknown", error: null, workspaces: [
       { workspace_id: "w9", label: "stale", number: 1, status: "idle", tabs: [
         { tab_id: "w9:t1", label: "1", number: 1, status: "idle", panes: [pane("z", "blocked")] } ] } ] },
   ],

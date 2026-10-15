@@ -7,7 +7,7 @@ import type { MachineView } from "../lib/types";
 
 const local: MachineView = {
   id: "local", label: "local", kind: "local", state: "connected", error: null, version: "0.9.3", status: "idle",
-  sessions: [{ name: "x", running: true, status: "idle", error: null, workspaces: [] }, { name: "y", running: true, status: "idle", error: null, workspaces: [] }],
+  sessions: [{ name: "x", running: true, loaded: true, status: "idle", error: null, workspaces: [] }, { name: "y", running: true, loaded: true, status: "idle", error: null, workspaces: [] }],
 };
 const kx = sessionKey("local", "x");
 
