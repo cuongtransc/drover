@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import "./fonts/fonts.css";
 import "./styles.css";
-import { appQuit, appSetUnsaved, destroyWindow, machinesList, onMachine, onMenuAction, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
+import { appQuit, appSetUnsaved, destroyWindow, machinesList, onMachine, onMenuAction, onMenuFind, onMenuSettings, onNotifyActivate, onPaneStatus, onQuitRequested, onWindowCloseRequested, sessionStart } from "./lib/ipc";
 import { notifyPaneStatus } from "./notify";
 import { syncUnsaved } from "./files/unsavedSync";
 import { Palette } from "./palette/Palette";
@@ -10,6 +10,7 @@ import { applyChatFont, useSettings } from "./settings/store";
 import { actionFor } from "./shortcuts/dispatch";
 import { startMenuSync } from "./shortcuts/menuSync";
 import { startFileMenu } from "./files/fileTarget";
+import { requestFind } from "./files/findBus";
 import { keptByDialog, REPEATS, runAction, runMenuAction } from "./shortcuts/run";
 import { useShortcutLabel, useShortcuts } from "./shortcuts/store";
 import { applyTheme, useTheme } from "./settings/theme";
@@ -178,6 +179,11 @@ export default function App() {
 
   // The menu bar carries the user's keys (none while Settings records one).
   useEffect(() => startMenuSync(), []);
+  // Edit's Find…, Find Next, Find Previous: the open file's find bar, or its editor's search.
+  useEffect(() => {
+    const off = onMenuFind((what) => requestFind(what));
+    return () => void off.then((f) => f()).catch(() => {});
+  }, []);
   // File's Reveal in Finder, Open on this Mac and Copy Path: the focused path or the open file.
   useEffect(() => startFileMenu(), []);
 

@@ -12,6 +12,15 @@ import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
 import { buildRows, liveStart, rowOfCall } from "./workBlocks";
+import { chatFindHits, rowFindRanges } from "./chatFind";
+import { FindBar } from "../files/FindBar";
+import { clearHighlights, setHighlight } from "../files/domFind";
+import { wrapIndex } from "../files/find";
+import { type FindRequest, onFindRequest } from "../files/findBus";
+
+/** The highlights the File viewer's find paints, so Chat's look the same (styles.css). */
+const FIND_ALL = "files-find";
+const FIND_CURRENT = "files-find-current";
 import { ChatPathsContext, pathResolver } from "./pathResolver";
 import { ChatOutline } from "./ChatOutline";
 import { currentEntry, outline } from "./outline";
@@ -246,6 +255,14 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const live = view.status === "working" || view.status === "blocked";
   const start = useMemo(() => liveStart(rows), [rows]);
 
+  // Find (Edit › Find…, ⌘F): what the loaded rows show: your messages, the answers, thinking, an open Work block (chatFind).
+  const showThinking = view.agent === "claude";
+  const [findOpen, setFindOpen] = useState(false);
+  const [findFocus, setFindFocus] = useState(0);
+  const [findQuery, setFindQuery] = useState("");
+  const [findCase, setFindCase] = useState(false);
+  const [findSteps, setFindSteps] = useState(0);
+
   const virt = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
@@ -254,6 +271,52 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     getItemKey: (i) => rows[i].key,
   });
 
+  const hits = useMemo(
+    () => (findOpen ? chatFindHits(rows, findQuery, findCase, { thinking: showThinking, isOpen: (id) => chosenOpen.get(id) ?? false }) : []),
+    [findOpen, rows, findQuery, findCase, showThinking, chosenOpen],
+  );
+  const hitAt = hits.length ? wrapIndex(0, findSteps, hits.length) : -1;
+  // Numbers, not the hit object: rows change as the chat grows, and that must not scroll again.
+  const hitRow = hitAt >= 0 ? hits[hitAt].row : -1;
+  const hitNth = hitAt >= 0 ? hits[hitAt].nth : -1;
+  const findRef = useRef<(what: FindRequest) => void>(() => {});
+  findRef.current = (what) => {
+    if (what === "open") {
+      setFindOpen(true);
+      setFindFocus((n) => n + 1);
+    } else if (findOpen && hits.length) setFindSteps((n) => n + (what === "prev" ? -1 : 1));
+  };
+  useEffect(() => onFindRequest((what) => findRef.current(what)), []);
+  /** Paints the matches in the rows on screen, and the current one; the list mounts rows as they show. */
+  const paintFind = useCallback(() => {
+    const root = contentRef.current;
+    if (!root || !findOpen || !findQuery) return clearHighlights(FIND_ALL, FIND_CURRENT);
+    const all: Range[] = [];
+    let current: Range | null = null;
+    for (const el of root.querySelectorAll<HTMLElement>(":scope > [data-index]")) {
+      const row = rows[Number(el.dataset.index)];
+      const ranges = row ? rowFindRanges(el, row.kind, findQuery, findCase, showThinking) : [];
+      all.push(...ranges);
+      if (Number(el.dataset.index) === hitRow) current = ranges[Math.min(hitNth, ranges.length - 1)] ?? null;
+    }
+    setHighlight(FIND_ALL, all);
+    setHighlight(FIND_CURRENT, current ? [current] : []);
+  }, [findOpen, findQuery, findCase, hitRow, hitNth, rows, showThinking]);
+  // To the current match's row when the reader moves it (types, steps); not when the matches
+  // shift under it (the chat grows, a Work block opens). Paint once it has mounted.
+  const hitRowRef = useRef(hitRow);
+  hitRowRef.current = hitRow;
+  useEffect(() => {
+    if (hitRowRef.current >= 0) virtRef.current.scrollToIndex(hitRowRef.current, { align: "center" });
+  }, [findQuery, findCase, findSteps]);
+  useEffect(() => {
+    const f = requestAnimationFrame(paintFind);
+    return () => cancelAnimationFrame(f);
+  }, [paintFind]);
+  useEffect(() => () => clearHighlights(FIND_ALL, FIND_CURRENT), []);
+
+  const virtRef = useRef(virt);
+  virtRef.current = virt;
   const prevRows = useRef(0);
   const prevItems = useRef(0);
   useLayoutEffect(() => {
@@ -455,7 +518,30 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
         <div className="chat-notice neutral">History copied from {forkOf.from} up to the fork. Your first message starts the fork's own transcript.</div>
       )}
       {!loaded && loadingShown && !pending && !err && <div className="chat-notice neutral">Loading transcript…</div>}
-      <div className="chat-scroll" ref={scrollRef} onScroll={onScroll} onWheel={unpick} onPointerDown={unpick} onKeyDown={unpick}>
+      {findOpen && (
+        <FindBar
+          placeholder="Find in chat"
+          focusKey={findFocus}
+          query={findQuery}
+          matchCase={findCase}
+          count={hits.length}
+          index={Math.max(hitAt, 0)}
+          onQuery={(q) => {
+            setFindQuery(q);
+            setFindSteps(0);
+          }}
+          onMatchCase={(on) => {
+            setFindCase(on);
+            setFindSteps(0);
+          }}
+          onStep={(d) => setFindSteps((n) => n + d)}
+          onClose={() => setFindOpen(false)}
+        />
+      )}
+      <div className="chat-scroll" ref={scrollRef} onScroll={() => {
+          onScroll();
+          if (findOpen) paintFind();
+        }} onWheel={unpick} onPointerDown={unpick} onKeyDown={unpick}>
         <div ref={contentRef} style={{ height: virt.getTotalSize(), position: "relative" }}>
           {virt.getVirtualItems().map((v) => {
             const row = rows[v.index];
@@ -477,7 +563,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
                     working={view.status === "working" && row.last}
                     focusCall={pendingCard}
                     onFocusHandled={clearPendingCard}
-                    thinking={view.agent === "claude"}
+                    thinking={showThinking}
                   />
                 ) : (
                   <ChatItemView

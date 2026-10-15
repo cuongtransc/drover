@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { requestFind } from "../files/findBus";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn().mockResolvedValue([]), Channel: class {} }));
 vi.mock("../lib/ipc", () => ({
   herdrCall: vi.fn(),
@@ -14,12 +15,14 @@ vi.mock("../lib/ipc", () => ({
 // jsdom lays nothing out, so the virtualizer renders no rows. A test that needs rows sets
 // `viewport.on`, giving the scroll element a size; the others keep the real (empty) measuring.
 const viewport = vi.hoisted(() => ({ on: false }));
+/** Rows the list was asked to scroll to (Find), in order. */
+const scrolledTo = vi.hoisted(() => [] as number[]);
 vi.mock("@tanstack/react-virtual", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-virtual")>();
   return {
     ...actual,
-    useVirtualizer: (opts: Parameters<typeof actual.useVirtualizer>[0]) =>
-      actual.useVirtualizer({
+    useVirtualizer: (opts: Parameters<typeof actual.useVirtualizer>[0]) => {
+      const v = actual.useVirtualizer({
         ...opts,
         ...(viewport.on && {
           observeElementRect: (_v: unknown, cb: (rect: { width: number; height: number }) => void) => {
@@ -27,7 +30,14 @@ vi.mock("@tanstack/react-virtual", async (importOriginal) => {
             return () => {};
           },
         }),
-      }),
+      });
+      const scroll = v.scrollToIndex.bind(v);
+      v.scrollToIndex = (i, o) => {
+        scrolledTo.push(i);
+        scroll(i, o);
+      };
+      return v;
+    },
   };
 });
 let opened: Promise<unknown> = new Promise(() => {});
@@ -191,6 +201,71 @@ describe("ChatLens", () => {
     expect(screen.queryByText("Loading transcript…")).toBeNull();
   });
 
+  // Edit › Find… (⌘F; the menu bar takes the key, ADR 0010) finds in your messages and the answers.
+  it("finds in the loaded messages and answers from Edit › Find, and steps with Find Next", async () => {
+    render(<ChatLens pane={pane} view={idlePi} />);
+    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
+    act(() =>
+      channels[channels.length - 1].onmessage({
+        type: "reset",
+        items: [
+          { kind: "user", text: "fix the parser" },
+          { kind: "assistant_text", markdown: "The **parser** is fixed; the parser tests pass." },
+        ],
+        total: 2,
+      }),
+    );
+    act(() => requestFind("open"));
+    const input = screen.getByPlaceholderText("Find in chat");
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "parser" } });
+    const count = () => document.querySelector(".files-find-count")!.textContent;
+    expect(count()).toBe("1 / 3");
+    act(() => requestFind("next"));
+    expect(count()).toBe("2 / 3");
+    act(() => requestFind("prev"));
+    act(() => requestFind("prev"));
+    expect(count()).toBe("3 / 3");
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByPlaceholderText("Find in chat")).toBeNull();
+  });
+
+  it("scrolls to a match once, not again as the chat grows while Find is open", async () => {
+    render(<ChatLens pane={pane} view={idlePi} />);
+    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
+    const ch = channels[channels.length - 1];
+    act(() => ch.onmessage({ type: "reset", items: [{ kind: "user", text: "fix the parser" }], total: 1 }));
+    act(() => requestFind("open"));
+    fireEvent.change(screen.getByPlaceholderText("Find in chat"), { target: { value: "parser" } });
+    const after = scrolledTo.filter((i) => i === 0).length;
+    expect(after).toBeGreaterThan(0);
+    act(() => ch.onmessage({ type: "append", items: [{ kind: "assistant_text", markdown: "working on it" }] }));
+    act(() => ch.onmessage({ type: "append", items: [{ kind: "assistant_text", markdown: "still working" }] }));
+    expect(scrolledTo.filter((i) => i === 0).length).toBe(after);
+  });
+
+  it("finds in a Work block once it is opened, without moving the view to another match", async () => {
+    viewport.on = true;
+    render(<ChatLens pane={pane} view={idlePi} />);
+    await waitFor(() => expect(channels.length).toBeGreaterThan(0));
+    const items = [
+      { kind: "user", text: "run ls", ts: "2026-10-16T01:00:00Z" },
+      { kind: "tool_call", id: "c1", name: "Bash", input_summary: "ls -la", input: { command: "ls -la" }, ts: "2026-10-16T01:00:01Z" },
+      { kind: "tool_result", call_id: "c1", output: "ls output", is_error: false, ts: "2026-10-16T01:00:02Z" },
+      { kind: "assistant_text", markdown: "Done.", ts: "2026-10-16T01:00:03Z" },
+    ];
+    act(() => channels[channels.length - 1].onmessage({ type: "reset", items, total: items.length }));
+    act(() => requestFind("open"));
+    fireEvent.change(screen.getByPlaceholderText("Find in chat"), { target: { value: "ls" } });
+    const count = () => document.querySelector(".files-find-count")!.textContent;
+    expect(count()).toBe("1 / 1");
+    act(() => requestFind("next"));
+    const before = scrolledTo.length;
+    fireEvent.click(document.querySelector(".chat-work-head")!);
+    expect(count()).toBe("2 / 2");
+    expect(scrolledTo.slice(before)).not.toContain(1);
+  });
+
   it("says the transcript is loading until the first reset or error", async () => {
     const { unmount } = render(<ChatLens pane={pane} view={idlePi} />);
     expect(screen.queryByText("Loading transcript…")).toBeNull();
@@ -226,6 +301,19 @@ describe("ChatLens", () => {
       show("pi");
       expect(screen.getByText("Done.")).toBeTruthy();
       expect(screen.queryByText("Plan: link to the wallet page")).toBeNull();
+    });
+
+    it("finds in the thinking it shows: Claude's, not pi's", () => {
+      const count = (agent: string) => {
+        show(agent);
+        act(() => requestFind("open"));
+        fireEvent.change(screen.getByPlaceholderText("Find in chat"), { target: { value: "wallet" } });
+        const text = document.querySelector(".files-find-count")!.textContent;
+        cleanup();
+        return text;
+      };
+      expect(count("claude")).toBe("1 / 1");
+      expect(count("pi")).toBe("0 / 0");
     });
   });
 

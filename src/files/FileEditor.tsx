@@ -1,5 +1,7 @@
 import type { LanguageSupport } from "@codemirror/language";
+import { findNext, findPrevious, openSearchPanel } from "@codemirror/search";
 import { EditorView } from "@codemirror/view";
+import { onFindRequest } from "./findBus";
 import { useEffect, useRef } from "react";
 import { useDrafts } from "./drafts";
 import { languageFor, languageSlot } from "./editorSetup";
@@ -55,9 +57,17 @@ export function FileEditor({ draftKey }: { draftKey: string }) {
 
     view.focus();
     fillLanguage();
+    // Edit › Find…, Find Next, Find Previous: the menu bar takes ⌘F/⌘G before this editor's keymap.
+    const offFind = onFindRequest((what) => {
+      if (what === "open") openSearchPanel(view);
+      else if (what === "next") findNext(view);
+      else findPrevious(view);
+    });
+
     return () => {
       alive = false;
       unsubscribe();
+      offFind();
       view.destroy();
     };
   }, [draftKey]);

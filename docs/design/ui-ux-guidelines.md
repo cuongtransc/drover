@@ -179,12 +179,13 @@ app (tests, the browser harness).
 | Menu | Items |
 |---|---|
 | File | New Tab ⌘T · Go to File… ⌘P — Reveal in Finder ⌥⌘R · Open on this Mac · Copy Path ⌥⌘C (the focused Chat path, else the open file) — Remove Item ⌘W |
+| Edit | macOS's Undo … Select All — Find… ⌘F · Find Next ⌘G · Find Previous ⇧⌘G (the open file's find bar; its editor's search while it is edited; in Chat, what the loaded rows show: your messages, the answers, the thinking shown, and an open Work block’s narration and command lines, not the output folded in a card) |
 | View | Toggle Sidebar ⌘B · Focus Layout ⇧⌘B · Toggle Files Panel ⌘E · Agent Board ⇧⌘D — Bigger / Smaller / Default Font Size ⌘= ⌘− ⌘0 |
 | Go | Jump to Pane… ⌘K · Next / Previous Blocked or Review ⌘J ⇧⌘J — Next / Previous Open Item ⇧⌘] ⇧⌘[ |
 | Help | Drover Guide · Keyboard Shortcuts… (Settings › Shortcuts) |
 
-Find (⌘F, ⌘G, ⇧⌘G) is not on the menu: CodeMirror's search takes those keys while a file is
-edited. A new shortcut goes into `ACTIONS` and `menu_bar::LAYOUT` together.
+A new shortcut goes into `ACTIONS` and `menu_bar::LAYOUT` together; a fixed key (File's, Find's)
+goes into `menu_bar::FIXED_KEYS` and `RESERVED` in `chord.ts`.
 
 Reserved for later, in this order: ⌘N (new…), ⌘W (close pane, with confirmation), ⌘1–⌘9 (jump to
 a bookmarked Workspace). **Never** bind bare letters, Ctrl-, Alt- or Esc at `window` level:

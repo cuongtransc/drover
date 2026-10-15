@@ -14,6 +14,7 @@ import { canEdit, createEditorState, diskVersion, roundTrips } from "./editorSet
 import { FileEditor } from "./FileEditor";
 import type { FindStatus } from "./find";
 import { FindBar } from "./FindBar";
+import { type FindRequest, onFindRequest } from "./findBus";
 import { FolderView } from "./FolderView";
 import { FileView, type FileMode } from "./FileView";
 import { latestOnly, STALE } from "./latest";
@@ -232,6 +233,16 @@ export function FileViewer({ item, online }: Props) {
   // The Draft is dirty here, so closing asks first.
   const close = () => void closeItemsGuarded(draftId, "one");
 
+  /** ⌘F / ⌘G / ⇧⌘G, or their Edit menu items: open the find bar, step to the next or previous match. */
+  const find = (what: FindRequest) => {
+    if (draft || !searchable) return;
+    if (what === "open") {
+      setFindOpen(true);
+      setFindFocus((n) => n + 1);
+    }
+    // Not wrapped here: the view wraps it, and each step re-scrolls even onto the same match.
+    else if (findOpen && count > 0) setIndex((i) => i + (what === "prev" ? -1 : 1));
+  };
   const keys = (e: KeyboardEvent) => {
     // A dialog over the file (Change folder…, Unsaved Changes) keeps its keys.
     if (document.querySelector(".overlay")) return;
@@ -256,13 +267,10 @@ export function FileViewer({ item, online }: Props) {
       return;
     } else if (!e.shiftKey && k === "f") {
       e.preventDefault();
-      if (!searchable) return;
-      setFindOpen(true);
-      setFindFocus((n) => n + 1);
+      find("open");
     } else if (k === "g") {
       e.preventDefault();
-      // Not wrapped here: the view wraps it, and each step re-scrolls even onto the same match.
-      if (findOpen && searchable && count > 0) setIndex((i) => i + (e.shiftKey ? -1 : 1));
+      find(e.shiftKey ? "prev" : "next");
     } else if (!e.shiftKey && k === "r") {
       e.preventDefault();
       useFilesBus.getState().reload(key);
@@ -275,6 +283,11 @@ export function FileViewer({ item, online }: Props) {
     window.addEventListener("keydown", h, false);
     return () => window.removeEventListener("keydown", h, false);
   }, []);
+  // Edit › Find…, Find Next, Find Previous: the menu bar takes ⌘F/⌘G in the app (ADR 0010).
+  // While editing, the editor's own search answers them (FileEditor).
+  const findRef = useRef(find);
+  findRef.current = find;
+  useEffect(() => onFindRequest((what) => findRef.current(what)), []);
 
   const fullPath = absPath(root, rel);
   // On this Mac, what Chat's path menu offers is here too (Apple's HIG: a context menu's items are

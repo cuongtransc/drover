@@ -19,6 +19,7 @@ import { useApp } from "../store/app";
 import { itemKey } from "../store/openItems";
 import { useFilesBus } from "./bus";
 import { useDrafts } from "./drafts";
+import { requestFind } from "./findBus";
 import { FileViewer } from "./FileViewer";
 import { filesKey, useFiles } from "./store";
 import { UnsavedDialog } from "./unsaved";
@@ -91,6 +92,15 @@ describe("FileViewer edit mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() => expect(document.querySelector(".cm-editor")).toBeNull());
     expect(useDrafts.getState().drafts[key]).toBeUndefined();
+  });
+
+  it("Edit › Find… opens the editor's own search while editing, not the viewer's find bar", async () => {
+    render(<FileViewer item={item} online />);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    await waitFor(() => expect(document.querySelector(".cm-editor")).not.toBeNull());
+    act(() => requestFind("open"));
+    await waitFor(() => expect(document.querySelector(".cm-search")).not.toBeNull());
+    expect(screen.queryByPlaceholderText("Find in file")).toBeNull();
   });
 
   it("hides Outline, Render/Source and the find bar while a Draft exists", async () => {

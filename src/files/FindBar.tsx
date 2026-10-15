@@ -10,6 +10,7 @@ export function FindBar({
   onMatchCase,
   onStep,
   onClose,
+  placeholder = "Find in file",
 }: {
   count: number;
   index: number;
@@ -21,6 +22,7 @@ export function FindBar({
   onMatchCase(on: boolean): void;
   onStep(delta: 1 | -1): void;
   onClose(): void;
+  placeholder?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -46,7 +48,7 @@ export function FindBar({
         ref={input}
         className="files-find-input"
         value={query}
-        placeholder="Find in file"
+        placeholder={placeholder}
         spellCheck={false}
         onChange={(e) => onQuery(e.target.value)}
         onKeyDown={onKeyDown}
