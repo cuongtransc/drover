@@ -56,6 +56,34 @@ describe("WorkBlockView", () => {
     expect(screen.getByRole("button", { name: /pnpm build/ }).querySelector(".spin")).toBeNull();
   });
 
+  describe("thinking", () => {
+    const thought = "Linking to /wallets/<id>/ is enough; no new detail page.";
+    const withThinking: WorkBlock = {
+      ...block,
+      items: [{ kind: "thinking", text: `${thought}\n\n` }, { kind: "thinking", text: "  \n" }, ...block.items],
+    };
+
+    it("shows its text under the folded header, without the narration", () => {
+      const { container } = render(<WorkBlockView block={withThinking} results={results} open={false} onToggle={() => {}} live={false} />);
+      // Trimmed: the line keeps newlines inside the text, so a trailing one would add a blank line.
+      expect(container.querySelector(".chat-work-thinking span")?.textContent).toBe(thought);
+      expect(screen.queryByText("Checking the files.")).toBeNull();
+      // A thinking block with no text of its own has no line.
+      expect(container.querySelectorAll(".chat-work-thinking")).toHaveLength(1);
+    });
+
+    it("keeps its text shown once, in its place, when the block opens", () => {
+      render(<WorkBlockView block={withThinking} results={results} open onToggle={() => {}} live={false} />);
+      expect(screen.getAllByText(thought)).toHaveLength(1);
+      expect(screen.getByText(thought).closest("details")?.open).toBe(true);
+    });
+
+    it("adds no lines when the turn has none", () => {
+      const { container } = render(<WorkBlockView block={block} results={results} open={false} onToggle={() => {}} live={false} />);
+      expect(container.querySelector(".chat-work-thinking")).toBeNull();
+    });
+  });
+
   it("reads Worked when the span is unknown", () => {
     const untimed: WorkBlock = { ...block, start: null };
     render(<WorkBlockView block={untimed} results={results} open={false} onToggle={() => {}} live={false} />);

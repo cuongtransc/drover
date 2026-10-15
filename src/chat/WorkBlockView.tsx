@@ -1,5 +1,6 @@
 import { memo, useEffect, useRef } from "react";
-import { ChevronIcon } from "../ui/icons";
+import type { ChatItem } from "../lib/types";
+import { BrainIcon, ChevronIcon } from "../ui/icons";
 import { ChatItemView } from "./ChatItemView";
 import { SkillChips, turnSkills } from "./skills";
 import { formatWorkDuration, workSummary, type ToolResult, type WorkBlock } from "./workBlocks";
@@ -58,6 +59,7 @@ export const WorkBlockView = memo(function WorkBlockView({
         )}
       </button>
       <SkillChips chips={turnSkills(block.items, results)} />
+      {!open && <ThinkingLines items={block.items} />}
       {open && (
         <div className="chat-work-rows" ref={rowsRef}>
           {block.items.map((it, i) => (
@@ -74,3 +76,22 @@ export const WorkBlockView = memo(function WorkBlockView({
     </div>
   );
 });
+
+/**
+ * The turn's thinking under the folded header: where Claude settles a decision it may not repeat
+ * in its answer. Narration stays folded; it is mostly progress the answer sums up.
+ */
+function ThinkingLines({ items }: { items: ChatItem[] }) {
+  const texts = items.flatMap((it) => (it.kind === "thinking" && it.text.trim() ? [it.text.trim()] : []));
+  if (texts.length === 0) return null;
+  return (
+    <div className="chat-work-rows">
+      {texts.map((text, i) => (
+        <div key={i} className="chat-work-thinking">
+          <BrainIcon className="icon chat-thinking-icon" />
+          <span>{text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
