@@ -23,8 +23,8 @@ Source: [design spec](../superpowers/specs/2026-10-03-security-hardening-design.
 `src-tauri/tauri.conf.json`, `app.security`:
 
 ```json
-"csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
-"devCsp": "default-src 'self'; script-src 'self' http://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; img-src 'self' blob: data: http://localhost:1420; font-src 'self' data: http://localhost:1420; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+"csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src blob:; base-uri 'self'; form-action 'none'; frame-ancestors tauri://localhost",
+"devCsp": "default-src 'self'; script-src 'self' http://localhost:1420; style-src 'self' 'unsafe-inline' http://localhost:1420; img-src 'self' blob: data: http://localhost:1420; font-src 'self' data: http://localhost:1420; connect-src ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; object-src 'none'; frame-src blob:; base-uri 'self'; form-action 'none'; frame-ancestors http://localhost:1420",
 "dangerousDisableAssetCspModification": ["style-src"]
 ```
 
@@ -39,9 +39,10 @@ Why each source is there:
 | `font-src` | `'self' data:` | Vite inlines the two smallest JetBrains Mono subsets (the Vietnamese ones, under 4 KiB) into the CSS as `url(data:font/woff2…)`. Without `data:` they are blocked. Fonts installed on the Mac go through `new FontFace(name, bytes)`, which is not a URL load. |
 | `connect-src` | `ipc: http://ipc.localhost` | Tauri IPC (`invoke`): tauri `scripts/core.js` builds the URL with `convertFileSrc(cmd, 'ipc')`, which is `ipc://localhost/<cmd>` on macOS and `http://ipc.localhost/<cmd>` on Windows. The frontend makes no other `fetch`, XHR or WebSocket calls. The only other `fetch` in the bundle is Vite's modulepreload polyfill. It returns early when `relList.supports('modulepreload')` is true, which it is on WebKit with modulepreload support (Safari 17+), so it never runs here. If it did run, `connect-src` (which has no `'self'`) would block it, and a blocked preload is harmless because the module still loads under `script-src`. That is why `connect-src` needs no `'self'`. Note: when CSP blocks the `ipc:` fetch, Tauri's IPC falls back to postMessage without an error (tauri `scripts/ipc-protocol.js` ~58-67, "IPC custom protocol failed… will now use the postMessage interface"). A wrong `connect-src` would therefore not show up as broken IPC. That is why the `ipc:` source was checked against `scripts/core.js` rather than observed. |
 | `object-src` | `'none'` | No plugins or embeds. |
+| `frame-src` | `blob:` | Files shows a PDF as a `blob:` frame drawn by WebKit's viewer (#160, 2026-10-15). Only frames the app makes from bytes it read; no `http:`/`https:` frame. |
 | `base-uri` | `'self'` | An injected `<base>` cannot redirect relative URLs. |
 | `form-action` | `'none'` | The app submits no forms. |
-| `frame-ancestors` | `'none'` | Nothing frames the app. This only works because Tauri sends the policy as a response header on macOS (a `<meta>` policy ignores it). |
+| `frame-ancestors` | `tauri://localhost` (dev `http://localhost:1420`) | Only the app's own origin may frame its pages. Amended 2026-10-15 (#160): it was `'none'`, but a `blob:` frame inherits the page's policy, and `'none'` or `'self'` left the PDF frame blank, while the named origin draws. This only works because Tauri sends the policy as a response header on macOS (a `<meta>` policy ignores it), so a `<meta>` test passes either way: checked in a WKWebView that serves the page from a `tauri://` scheme handler with the policy as a header, then counts the colours of `takeSnapshot` (1 = blank). |
 
 `devCsp` is the same policy with `http://localhost:1420` (Vite) added to the directives that load
 from it, and `ws://localhost:1420` for HMR. Anything only Vite dev needs goes in `devCsp`, never

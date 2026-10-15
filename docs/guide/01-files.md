@@ -9,7 +9,9 @@ whichever Machine it lives.
 | Find a file by name | ⌘P (**Go to file**) |
 | See what changed | The **CHANGED** group above the tree lists git's changes under the root |
 | Read a file | Click it: it opens as an item in the **Open strip**, next to the open agents. The **File viewer** has Copy path, Copy contents, an Outline for Markdown, and find |
-| Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it |
+| Read a PDF | Click it: it shows in WebKit's PDF viewer (up to 20 MB). Pinch or right-click → **Zoom In** to zoom; ⌘+/⌘− change Drover's font size, not the PDF |
+| Open a path an agent wrote | Click it in the Chat lens: a file opens in the File viewer (at its `:line`), a folder opens as a list of what is in it, hidden folders too; click a name to open it. On this Mac, ⌘-click hands it to macOS |
+| Do more with that path | Right-click it: **Open in Files**, **Open on this Mac**, **Reveal in Finder** (the last two on this Mac only), **Copy Path**, and **Copy** when you had selected text |
 | Copy a file to the Mac | Right-click → **Download**. It lands in `~/Downloads`; a name already there gets `name (1).ext` |
 | Copy files to the Workspace | Right-click a folder → **Upload Files…** or **Upload Folder…** (the macOS open panel; drag and drop is off) |
 | Read the tree again | ⌘R. On the local Mac it also happens by itself when Drover gets the focus back and when an agent of the Workspace stops working: macOS can drop file events while a build churns files, so the tree may miss a change until then |
@@ -34,7 +36,11 @@ pane changed the file, a banner says **File changed on disk** with **Reload** (d
 the disk version) and **Overwrite** (keep yours). If the file was deleted, the banner says
 **File was deleted** with **Save again** and **Close**. Your edits stay as a Draft until you choose.
 
-Not editable (no Edit button): images, binary files, truncated files (over 2 MB), files that are not
+A path in Chat is a link only when the file is there. A relative path is looked for first where the
+agent worked before that message (the files its tools named, the folders it `cd`'d into), then in the
+session's folder. One that is nowhere stays plain text.
+
+Not editable (no Edit button): images, PDFs, binary files, truncated files (over 2 MB), files that are not
 valid UTF-8, and files that mix line endings.
 
 Drover still never renames, deletes or moves a file in a Workspace. An upload whose name is taken gets the

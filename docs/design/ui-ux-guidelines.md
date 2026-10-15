@@ -56,6 +56,14 @@ and by how calm it is when nothing needs the user.
    contrast or `opacity`.
 10. **Quiet when nothing needs you.** The all-clear state is designed: no pill, no tint, calm
     columns. The end of the loop is the goal, not an empty screen.
+11. **A link is a promise.** Text looks clickable (link colour, underline, pointer) only when a
+    click does something. While that is not known yet, or when there is nothing to open, it reads
+    as plain text. *Don't* make text a link because of how it looks: Chat paths did, and a path to a
+    file in another repo or a removed worktree looked clickable but opened nothing (#167).
+12. **Replacing a platform default keeps what it gave.** Before Drover draws its own version of
+    something WebKit or macOS provides (a context menu, a viewer), list what the default offered
+    and keep every item that still makes sense. Drop only the ones that do harm. *Don't*: the first
+    Chat path menu offered only Reveal in Finder and lost Copy and Copy Link (#164).
 
 ## 3. Visual system
 
@@ -204,6 +212,19 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
   step to the next one (in the session, for the column head), as ⌘J does.
 - Working/done/idle counts live in the Board's column heads, labelled.
 
+### 4.5 Context menus
+
+- **The menu is drawn by `ContextMenu`**: it opens at the pointer, or ending at it when it would
+  cross the window's right or bottom edge, and always stays 8px inside the window (#165).
+- **A menu that replaces WebKit's** (a right-click on a Chat path) keeps what WebKit's menu gave:
+  **Copy** when text was selected, and **Copy Path** in place of Copy Link. It leaves out
+  **Open Link**, which would load the target into the app's own webview (§2.12).
+- **A right-click never changes the selection.** On macOS, WebKit selects the link under the
+  pointer between the right (or Ctrl+) mousedown and `contextmenu`, and `preventDefault()` does
+  not stop it. Save the range on mousedown and put it back before the menu reads it (#166).
+- Each item also has a keyboard path (§2.8). **Known gap**: the Chat path menu's Reveal in Finder
+  and Copy Path have none yet; Tab to the link and Enter opens it in Files.
+
 ## 5. Accessibility checklist
 
 - Every row has an explicit `aria-label`: "Fix login flow, claude, needs input" (not the concatenated
@@ -231,6 +252,14 @@ command); the dialog names those panes and Cancel is the default. Stopping a Ses
   `dashboard/triage.ts`; level 2 reuses them.
 - **Tests address controls by role and name.** Renaming a control or a row's accessible name updates
   its tests in the same change.
+- **Check a render by its pixels.** For a frame, a canvas or a plugin, finding the element in the DOM
+  proves nothing. Snapshot what was drawn, under the policy as the app sends it: Tauri sends the CSP
+  as a header, and `frame-ancestors` is ignored in a `<meta>` policy. The PDF frame passed a DOM and
+  `<meta>` check and was blank in the installed app (#160; harness in ADR 0004).
+- **Ask the machine in batches.** UI that needs the Machine per row (does this file exist?) asks once
+  for the rows that mount together, keeps each answer for its row, and logs the timing:
+  `files_first_files`, `chat paths: <machine>: N paths, M places, X ms` (#167). One call costs
+  ~6 ms locally and ~25 ms over ssh, almost all process start, so batching is what keeps it cheap.
 
 ## 7. Applying it: decisions for the current UI
 
@@ -355,6 +384,39 @@ trail after the last (possibly nested) Group with no header, reading as its chil
 - A click opens the **Quota panel** beside the strip: accounts by window (5 hours, Week, Month,
   Other), each trouble row saying what failed, when, and how to fix it; Providers not signed in
   fold into one line at its foot.
+
+### 7.4 Paths in Chat
+
+A file path an agent wrote (in backticks, or a bare `/…` or `~/…` path in prose) is a way to the
+file. Applied 2026-10-14/15 (#155, #157, #164–#167); the user guide is
+[01 · Files](../guide/01-files.md).
+
+| Input | Does |
+|---|---|
+| Click | Opens it in Files at its `:line`, on any Machine (a folder shows its listing) |
+| ⌘-click, this Mac | Hands it to macOS: the default app for a viewable kind, otherwise Reveal in Finder |
+| Right-click | Open in Files · Open on this Mac · Reveal in Finder (this Mac only) — Copy Path · Copy (a selection) |
+
+- **Where a relative path is**: the places the agent used before that message come first: file
+  paths its tools named that end in it, then the folders its Bash commands went into (`cd`,
+  `pushd`, `git -C`), newest first. The session's folder comes last. A replay over 1653 transcripts
+  found 785 paths that the session's folder alone sent to a missing file.
+- **It links only when the Machine has the file** (§2.11): plain code while the Machine is asked,
+  a link to the file it found, and plain code when no place has it. If the Machine cannot answer
+  (offline), the path links as written, as before.
+
+### 7.5 Embedded viewers
+
+A PDF opens in Files in WebKit's own viewer, in a `blob:` frame (#160). It is native and adds
+nothing to the bundle. That has a cost, accepted on 2026-10-15 over pdf.js (+1.7 MB):
+
+- its zoom HUD floats over the pages and cannot be moved;
+- ⌘+/⌘− stay Drover's font zoom: the viewer has no zoom API. Pinch and its right-click menu zoom;
+- a PDF that changes on disk reloads at page 1.
+
+The viewer's backdrop is white in both themes, so Files paints it with the panel's colour and
+follows `data-theme`. A checklist or guide never promises what the viewer itself does not do (the
+first PDF checklist promised ⌘+ zoom).
 
 ## 8. Decisions where the review disagreed
 
