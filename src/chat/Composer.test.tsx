@@ -516,29 +516,29 @@ describe("Composer suggestion", () => {
     await act(async () => finish());
   });
 
-  it("has a Use suggestion key that puts the suggestion in the box without sending, and no copy of its text", async () => {
+  it("has a Suggestion key that sends the suggestion at once, and no copy of its text", async () => {
     render(<Composer pane={pane} agent="claude" status="done" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    const tab = screen.getByRole("button", { name: "Use suggestion" }) as HTMLButtonElement;
-    await waitFor(() => expect(tab.disabled).toBe(false));
-    expect(tab.title).toBe("Put Claude's suggestion in the box (Tab)");
+    const key = screen.getByRole("button", { name: "Suggestion" }) as HTMLButtonElement;
+    await waitFor(() => expect(key.disabled).toBe(false));
+    expect(key.title).toBe("Send Claude's suggestion: “run the tests again” (Tab only puts it in the box)");
     expect(screen.queryByRole("button", { name: "run the tests again" })).toBeNull();
-    fireEvent.click(tab);
-    expect(box.value).toBe("run the tests again");
-    expect(document.activeElement).toBe(box);
-    expect(vi.mocked(herdrCall).mock.calls.map((c) => c[2])).not.toContain("agent.prompt");
-    expect(tab.disabled).toBe(true);
+    fireEvent.click(key);
+    const prompts = vi.mocked(herdrCall).mock.calls.filter((c) => c[2] === "agent.prompt");
+    expect(prompts.map((c) => c[3])).toEqual([{ target: pane.pane_id, text: "run the tests again" }]);
+    expect(box.value).toBe("");
+    expect(key.disabled).toBe(true);
   });
 
-  it("disables the Use suggestion key while something is typed, and has none for other agents", async () => {
+  it("disables the Suggestion key while something is typed, and has none for other agents", async () => {
     const { rerender } = render(<Composer pane={pane} agent="claude" status="idle" />);
     const box = screen.getByRole("textbox") as HTMLTextAreaElement;
-    const tab = screen.getByRole("button", { name: "Use suggestion" }) as HTMLButtonElement;
+    const tab = screen.getByRole("button", { name: "Suggestion" }) as HTMLButtonElement;
     await waitFor(() => expect(tab.disabled).toBe(false));
     fireEvent.change(box, { target: { value: "my own" } });
     expect(tab.disabled).toBe(true);
     rerender(<Composer pane={pane} agent="codex" status="idle" />);
-    expect(screen.queryByRole("button", { name: "Use suggestion" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Suggestion" })).toBeNull();
   });
 
   it("leaves Tab alone while something is typed", async () => {
