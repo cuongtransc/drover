@@ -52,8 +52,8 @@ export function PathCode({ text, children, plain }: { text: string; children?: R
   /** The first place the machine has a relative path, or null (said in a toast) when none does. */
   const locate = async (): Promise<PathTarget | null> => {
     if (!pane || !ref) return target;
-    const before = (item && paths?.order.get(item)) ?? Infinity;
-    const places = pathCandidates(ref.path, paths?.hints ?? [], before, { root, home }).slice(0, 64);
+    const upTo = (item && paths?.order.get(item)) ?? Infinity;
+    const places = pathCandidates(ref.path, paths?.hints ?? [], upTo, { root, home }).slice(0, 64);
     let found: string | null;
     try {
       found = await filesFirstFile(pane.machine_id, places);
