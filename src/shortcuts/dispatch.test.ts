@@ -23,9 +23,9 @@ describe("actionFor", () => {
     expect(actionFor(ev("u", "KeyU"), moved)).toBe("font.bigger");
   });
   it("follows a rebinding and a None", () => {
-    const b = { ...DEFAULT_BINDINGS, "files.toggle": c("KeyL"), jump: null };
+    const b = { ...DEFAULT_BINDINGS, "files.toggle": c("KeyY"), jump: null };
     expect(actionFor(ev("e", "KeyE"), b)).toBeNull();
-    expect(actionFor(ev("l", "KeyL"), b)).toBe("files.toggle");
+    expect(actionFor(ev("y", "KeyY"), b)).toBe("files.toggle");
     expect(actionFor(ev("k", "KeyK"), b)).toBeNull();
   });
   it("falls back to the character when the physical key means nothing: numpad, German ⌘+", () => {

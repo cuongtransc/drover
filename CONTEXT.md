@@ -171,7 +171,7 @@ rules and previews: the [Herdr Design System](https://claude.ai/artifact/4xbvNjC
 | **Go to file** / **Files tree** | ⌘P's box and the folders under the Files panel's root | `src/files/GoToFile.tsx`, `src/files/FileTree.tsx` |
 | **Top bar** | The main area's one bar, as tall as the columns' heads: the Open strip, then the Lens switch while a Pane fills the main area. It replaced the Header (Breadcrumb, Status pill) on 2026-10-10 | `src/main/TopBar.tsx` |
 | **Open strip** | The Open items: the Agents and files you opened; two of one name say where they live (`zsh · drover`), the tooltip the whole path | `src/main/OpenStrip.tsx`, `src/store/openItems.ts` |
-| **Lens switch** | Terminal \| Chat as two icons at the Top bar's end | `src/main/LensSwitch.tsx` |
+| **Lens switch** | Terminal \| Chat as two icons at the Top bar's end; ⌘L flips it (Shortcut `lens.toggle`) | `src/main/LensSwitch.tsx` |
 | **File viewer** | The main area while a file's Open item is active | `src/files/FileViewer.tsx` |
 | **CHANGED group** | Git's changes under the root, above the Files tree | `ChangedList`, `useChanged`, `files_changed` |
 | **Chat lens** / **Terminal lens** | The main area, as a conversation or the raw terminal | `src/chat/ChatLens.tsx`, `src/terminal/TerminalLens.tsx` |

@@ -13,7 +13,7 @@ describe("startMenuSync", () => {
   it("sends the bindings at start and on every change", () => {
     const stop = startMenuSync();
     expect(menuSetShortcuts).toHaveBeenLastCalledWith(DEFAULT_BINDINGS, true);
-    const next = { ...DEFAULT_BINDINGS, jump: { code: "KeyL", shift: false, alt: false, ctrl: false } };
+    const next = { ...DEFAULT_BINDINGS, jump: { code: "KeyY", shift: false, alt: false, ctrl: false } };
     useShortcuts.setState({ bindings: next });
     expect(menuSetShortcuts).toHaveBeenLastCalledWith(next, true);
     stop();

@@ -349,10 +349,10 @@ describe("Settings → Shortcuts", () => {
     expect(useShortcuts.getState().recording).toBe(true);
     fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "Meta", code: "MetaLeft", metaKey: true });
     expect(useShortcuts.getState().recording).toBe(true);
-    fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "l", code: "KeyL", metaKey: true });
-    expect(useShortcuts.getState().bindings["files.toggle"]).toEqual({ code: "KeyL", shift: false, alt: false, ctrl: false });
+    fireEvent.keyDown(keyBtn(/^Toggle Files panel/), { key: "y", code: "KeyY", metaKey: true });
+    expect(useShortcuts.getState().bindings["files.toggle"]).toEqual({ code: "KeyY", shift: false, alt: false, ctrl: false });
     expect(useShortcuts.getState().recording).toBe(false);
-    expect(keyBtn(/^Toggle Files panel: ⌘L$/)).toBeTruthy();
+    expect(keyBtn(/^Toggle Files panel: ⌘Y$/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reset Toggle Files panel" }));
     expect(keyBtn(/^Toggle Files panel: ⌘E$/)).toBeTruthy();
   });

@@ -150,13 +150,13 @@ describe("AgentDashboard", () => {
   it("focuses its search with the Jump key, rebound or not", () => {
     localStorage.clear();
     useShortcuts.setState({ bindings: loadBindings(), recording: false });
-    act(() => useShortcuts.getState().set("jump", { code: "KeyL", shift: false, alt: false, ctrl: false }));
+    act(() => useShortcuts.getState().set("jump", { code: "KeyY", shift: false, alt: false, ctrl: false }));
     render(<AgentDashboard />);
     const search = screen.getByPlaceholderText(/search/i);
     (document.activeElement as HTMLElement | null)?.blur();
     fireEvent.keyDown(window, { key: "k", code: "KeyK", metaKey: true });
     expect(document.activeElement).not.toBe(search);
-    fireEvent.keyDown(window, { key: "l", code: "KeyL", metaKey: true });
+    fireEvent.keyDown(window, { key: "y", code: "KeyY", metaKey: true });
     expect(document.activeElement).toBe(search);
   });
 });

@@ -7,6 +7,7 @@ export type ActionId =
   | "board"
   | "layout.sidebar"
   | "layout.focus"
+  | "lens.toggle"
   | "tabs.new"
   | "files.toggle"
   | "files.goto"
@@ -31,6 +32,7 @@ export const ACTIONS: readonly { id: ActionId; label: string; group: ActionGroup
   { id: "tabs.new", label: "New tab", group: "Agents", default: key("KeyT") },
   { id: "layout.sidebar", label: "Toggle sidebar", group: "Layout", default: key("KeyB") },
   { id: "layout.focus", label: "Focus layout", group: "Layout", default: key("KeyB", true) },
+  { id: "lens.toggle", label: "Toggle Terminal/Chat", group: "Layout", default: key("KeyL") },
   { id: "files.toggle", label: "Toggle Files panel", group: "Files", default: key("KeyE") },
   { id: "files.goto", label: "Go to file", group: "Files", default: key("KeyP") },
   { id: "item.prev", label: "Previous Open item", group: "Open items", default: key("BracketLeft", true) },

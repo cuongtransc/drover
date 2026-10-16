@@ -16,7 +16,7 @@ beforeEach(() => {
 describe("shortcuts store", () => {
   it("defaults to the spec's keys", () => {
     expect(ACTIONS.map((a) => a.id)).toEqual([
-      "jump", "triage.next", "triage.prev", "board", "tabs.new", "layout.sidebar", "layout.focus",
+      "jump", "triage.next", "triage.prev", "board", "tabs.new", "layout.sidebar", "layout.focus", "lens.toggle",
       "files.toggle", "files.goto", "item.prev", "item.next", "item.remove", "font.bigger", "font.smaller", "font.reset",
     ]);
     expect(DEFAULT_BINDINGS["files.toggle"]).toEqual(c("KeyE"));
@@ -27,11 +27,11 @@ describe("shortcuts store", () => {
 
   it("saves only what differs from the defaults, next to the other settings", () => {
     localStorage.setItem(KEY, JSON.stringify({ hiddenFolders: ["out"] }));
-    s().set("files.toggle", c("KeyL"));
+    s().set("files.toggle", c("KeyY"));
     s().set("board", null);
     const saved = JSON.parse(localStorage.getItem(KEY)!);
     expect(saved.hiddenFolders).toEqual(["out"]);
-    expect(saved.shortcuts).toEqual({ "files.toggle": c("KeyL"), board: null });
+    expect(saved.shortcuts).toEqual({ "files.toggle": c("KeyY"), board: null });
     s().set("files.toggle", c("KeyE"));
     expect(JSON.parse(localStorage.getItem(KEY)!).shortcuts).toEqual({ board: null });
     expect(loadBindings().board).toBeNull();
@@ -39,18 +39,18 @@ describe("shortcuts store", () => {
 
   it("drops unknown ids, broken and reserved chords, and later duplicates on load", () => {
     localStorage.setItem(KEY, JSON.stringify({ shortcuts: {
-      nope: c("KeyL"),
+      nope: c("KeyY"),
       board: { code: 7 },
       "tabs.new": c("KeyQ"),
-      "files.goto": c("KeyL"),
-      "files.toggle": c("KeyL"),
+      "files.goto": c("KeyY"),
+      "files.toggle": c("KeyY"),
       "layout.sidebar": c("KeyE"),
     } }));
     const b = loadBindings();
     expect(b.board).toEqual(DEFAULT_BINDINGS.board);
     expect(b["tabs.new"]).toEqual(DEFAULT_BINDINGS["tabs.new"]);
-    // files.toggle comes before files.goto in the table: it keeps ⌘L, files.goto keeps its default.
-    expect(b["files.toggle"]).toEqual(c("KeyL"));
+    // files.toggle comes before files.goto in the table: it keeps ⌘Y, files.goto keeps its default.
+    expect(b["files.toggle"]).toEqual(c("KeyY"));
     expect(b["files.goto"]).toEqual(DEFAULT_BINDINGS["files.goto"]);
     expect(b["layout.sidebar"]).toEqual(c("KeyE"));
     expect(Object.values(b).filter((x) => x?.code === "KeyE")).toHaveLength(1);
@@ -66,7 +66,7 @@ describe("shortcuts store", () => {
     expect(checkChord(c("KeyQ"), b, "files.toggle")).toEqual({ refused: "Reserved by macOS" });
     expect(checkChord(c("KeyK"), b, "files.toggle")).toEqual({ usedBy: "jump" });
     expect(checkChord(c("KeyE"), b, "files.toggle")).toEqual({ ok: true });
-    expect(checkChord(c("KeyL"), b, "files.toggle")).toEqual({ ok: true });
+    expect(checkChord(c("KeyY"), b, "files.toggle")).toEqual({ ok: true });
   });
 
   it("replace moves the chord and leaves the other action on None", () => {
