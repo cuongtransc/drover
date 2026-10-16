@@ -29,6 +29,15 @@ const zoom = (z: FontZoom) => {
   zoomFont(defaultLens(open, chosenLens(s, paneKey(s.selected))), z);
   return true;
 };
+// The other lens of the selected pane; a pane with no agent has no Chat lens.
+const toggleLens = () => {
+  const s = useApp.getState();
+  const open = s.selected ? selectedPane(s)?.pane : null;
+  if (!open?.agent || !s.selected) return false;
+  const key = paneKey(s.selected);
+  s.setLens(key, defaultLens(open, chosenLens(s, key)) === "chat" ? "terminal" : "chat");
+  return true;
+};
 const leaveFocus = () => {
   if (useLayout.getState().layout === "focus") useLayout.getState().toggle("focus");
 };
@@ -51,6 +60,7 @@ export function runAction(id: ActionId, opts: { setPaletteOpen: (f: (open: boole
     board: () => useApp.getState().setDashboardOpen(!useApp.getState().dashboardOpen),
     "layout.sidebar": () => useLayout.getState().toggle("sidebar"),
     "layout.focus": () => useLayout.getState().toggle("focus"),
+    "lens.toggle": toggleLens,
     "tabs.new": () =>
       void openNewTabHere().catch((err: unknown) =>
         showToast(`Could not open a new tab: ${(err as { message?: string } | null)?.message ?? String(err)}`),

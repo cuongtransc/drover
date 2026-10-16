@@ -70,6 +70,7 @@ pub const LAYOUT: &[(&str, &[Entry])] = &[
         &[
             item("action:layout.sidebar", "Toggle Sidebar"),
             item("action:layout.focus", "Focus Layout"),
+            item("action:lens.toggle", "Toggle Terminal/Chat"),
             item("action:files.toggle", "Toggle Files Panel"),
             item("action:board", "Agent Board"),
             Entry::Sep,
@@ -299,6 +300,7 @@ mod tests {
             "board",
             "layout.sidebar",
             "layout.focus",
+            "lens.toggle",
             "tabs.new",
             "files.toggle",
             "files.goto",

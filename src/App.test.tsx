@@ -447,11 +447,11 @@ describe("App shell", () => {
 
     it("runs the action on its new key, and the old key does nothing", () => {
       useLayout.setState({ layout: "normal" });
-      act(() => useShortcuts.getState().set("layout.sidebar", { code: "KeyL", shift: false, alt: false, ctrl: false }));
+      act(() => useShortcuts.getState().set("layout.sidebar", { code: "KeyY", shift: false, alt: false, ctrl: false }));
       render(<App />);
       key("b", "KeyB");
       expect(useLayout.getState().layout).toBe("normal");
-      key("l", "KeyL");
+      key("y", "KeyY");
       expect(useLayout.getState().layout).toBe("sidebar-hidden");
     });
 

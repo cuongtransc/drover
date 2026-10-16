@@ -30,9 +30,9 @@ describe("LayoutControls", () => {
 
   it("names the sidebar keys from the bindings, and none when unbound", () => {
     useLayout.setState({ layout: "normal" });
-    act(() => useShortcuts.getState().set("layout.sidebar", { code: "KeyL", shift: false, alt: false, ctrl: false }));
+    act(() => useShortcuts.getState().set("layout.sidebar", { code: "KeyY", shift: false, alt: false, ctrl: false }));
     render(<LayoutControls />);
-    expect(screen.getByRole("button", { name: "Hide sidebar" }).getAttribute("title")).toBe("Hide sidebar (⌘L) · Focus (⇧⌘B)");
+    expect(screen.getByRole("button", { name: "Hide sidebar" }).getAttribute("title")).toBe("Hide sidebar (⌘Y) · Focus (⇧⌘B)");
     act(() => {
       useShortcuts.getState().set("layout.sidebar", null);
       useShortcuts.getState().set("layout.focus", null);
