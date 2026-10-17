@@ -78,6 +78,8 @@ interface Props {
   find: FindQuery | null;
   /** Told the match count and the current match whenever either changes. */
   onFindStatus?(status: FindStatus): void;
+  /** Long lines wrap at the view's width; each row is then measured instead of one line high. */
+  wrap?: boolean;
 }
 
 /** One mount per file, so the virtualizer starts at the file's own offset. */
@@ -85,7 +87,7 @@ export function TextView(props: Props) {
   return <FileText key={props.path} {...props} />;
 }
 
-function FileText({ text, path, initialScroll, initialLine, saveScroll, find, onFindStatus }: Props) {
+function FileText({ text, path, initialScroll, initialLine, saveScroll, find, onFindStatus, wrap = false }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lines = useMemo(() => highlightLines(text, path), [text, path]);
   const plain = useMemo(() => splitLines(text), [text]);
@@ -102,21 +104,6 @@ function FileText({ text, path, initialScroll, initialLine, saveScroll, find, on
     return map;
   }, [matches]);
   const [rowH, setRowH] = useState(DEFAULT_LINE_H);
-  // A new search starts at the first match whose line is wholly on screen, so it begins where
-  // you are reading; the start then stays put while you scroll and step.
-  const start = useRef({ key: "", base: 0 });
-  const searchKey = query ? `${matchCase ? 1 : 0}${query}` : "";
-  if (start.current.key !== searchKey) {
-    const top = Math.ceil((scrollRef.current?.scrollTop ?? 0) / rowH);
-    const at = matches.findIndex((m) => m.line >= top);
-    start.current = { key: searchKey, base: at < 0 ? 0 : at };
-  }
-  const currentIndex = find && matches.length > 0 ? wrapIndex(start.current.base, find.index, matches.length) : 0;
-  const current = find && matches.length > 0 ? matches[currentIndex] : null;
-  const report = useRef(onFindStatus);
-  report.current = onFindStatus;
-  useEffect(() => report.current?.({ count: matches.length, index: currentIndex }), [matches.length, currentIndex]);
-
   // The ref is only attached after the first render, so the CSS var is read here.
   useLayoutEffect(() => setRowH(lineHeight(scrollRef.current)), []);
   const virt = useVirtualizer({
@@ -128,8 +115,29 @@ function FileText({ text, path, initialScroll, initialLine, saveScroll, find, on
     initialOffset: initialScroll,
   });
 
-  // estimateSize is not part of the virtualizer's measurement cache key, so re-measure on change.
-  useLayoutEffect(() => virt.measure(), [rowH]);
+  // estimateSize is not part of the virtualizer's measurement cache key, so re-measure on change;
+  // turning wrap off drops the measured heights too.
+  useLayoutEffect(() => virt.measure(), [rowH, wrap]);
+
+  // A new search starts at the first match whose line is wholly on screen, so it begins where
+  // you are reading; the start then stays put while you scroll and step.
+  const start = useRef({ key: "", base: 0 });
+  const searchKey = query ? `${matchCase ? 1 : 0}${query}` : "";
+  if (start.current.key !== searchKey) {
+    const scrollTop = scrollRef.current?.scrollTop ?? 0;
+    // Wrapped rows differ in height: the first row starting at or below the top is the one wholly on screen.
+    const top = wrap
+      ? (virt.getVirtualItems().find((r) => r.start >= scrollTop)?.index ?? lines.length)
+      : Math.ceil(scrollTop / rowH);
+    const at = matches.findIndex((m) => m.line >= top);
+    start.current = { key: searchKey, base: at < 0 ? 0 : at };
+  }
+  const currentIndex = find && matches.length > 0 ? wrapIndex(start.current.base, find.index, matches.length) : 0;
+  const current = find && matches.length > 0 ? matches[currentIndex] : null;
+  const report = useRef(onFindStatus);
+  report.current = onFindStatus;
+  useEffect(() => report.current?.({ count: matches.length, index: currentIndex }), [matches.length, currentIndex]);
+
 
   const onScroll = useScrollMemory(path, initialScroll, saveScroll);
   // The element itself starts at the top; move it to where the virtualizer already is.
@@ -150,13 +158,15 @@ function FileText({ text, path, initialScroll, initialLine, saveScroll, find, on
   const gutter = `${String(lines.length).length + 1}ch`;
 
   return (
-    <div ref={scrollRef} className="files-text" onScroll={onScroll}>
+    <div ref={scrollRef} className={wrap ? "files-text wrap" : "files-text"} onScroll={onScroll}>
       <div className="files-text-body" style={{ height: virt.getTotalSize(), position: "relative" }}>
         {virt.getVirtualItems().map((row) => (
           <div
             key={row.index}
             className="files-line"
-            style={{ position: "absolute", top: 0, left: 0, height: rowH, transform: `translateY(${row.start}px)` }}
+            data-index={row.index}
+            ref={wrap ? virt.measureElement : undefined}
+            style={{ position: "absolute", top: 0, left: 0, height: wrap ? undefined : rowH, transform: `translateY(${row.start}px)` }}
           >
             <span className="files-gutter" style={{ minWidth: gutter }} data-line={row.index + 1} />
             <span className="files-code">

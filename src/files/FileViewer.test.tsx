@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 /** File texts that files_read answers with, by rel ("x" otherwise). */
@@ -34,6 +34,7 @@ import { FileViewer } from "./FileViewer";
 import { requestFind } from "./findBus";
 import { HIGHLIGHT_LIMIT } from "./limits";
 import { filesKey, useFiles } from "./store";
+import { useWrap } from "./wrapStore";
 
 const ref = { machine_id: "local", session: "default", workspace_id: "w1" };
 const key = filesKey(ref, "/r");
@@ -109,6 +110,32 @@ describe("FileViewer", () => {
     input.blur();
     press("f");
     expect(document.activeElement).toBe(input);
+  });
+
+  it("Wrap lines and ⌥Z wrap a text file, not rendered markdown, and leave the find field's keys alone", async () => {
+    useWrap.setState({ on: false });
+    texts["doc.md"] = "# Doc";
+    const { rerender } = render(<FileViewer item={file("doc.md")} online />);
+    await screen.findByRole("heading", { name: "Doc" });
+    expect(screen.queryByRole("button", { name: "Wrap lines" })).toBeNull();
+    fireEvent.keyDown(window, { key: "Ω", code: "KeyZ", altKey: true });
+    expect(useWrap.getState().on).toBe(false);
+    rerender(<FileViewer item={file("a.txt")} online />);
+    await waitFor(() => expect(document.querySelector(".files-text")).not.toBeNull());
+    const btn = screen.getByRole("button", { name: "Wrap lines" });
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btn);
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector(".files-text.wrap")).not.toBeNull();
+    const ev = createEvent.keyDown(window, { key: "Ω", code: "KeyZ", altKey: true });
+    act(() => {
+      fireEvent(window, ev);
+    });
+    expect(ev.defaultPrevented).toBe(true);
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    press("f");
+    fireEvent.keyDown(screen.getByPlaceholderText("Find in file"), { key: "Ω", code: "KeyZ", altKey: true });
+    expect(useWrap.getState().on).toBe(false);
   });
 
   // In the app the menu bar takes ⌘F and ⌘G (Edit › Find…, Find Next, Find Previous; ADR 0010).

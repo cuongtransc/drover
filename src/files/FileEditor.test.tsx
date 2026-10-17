@@ -28,6 +28,18 @@ describe("FileEditor", () => {
     expect(useDrafts.getState().drafts[key].state.sliceDoc()).toBe("// hi\nconst a = 1;\n");
   });
 
+  it("wraps long lines when told, keeps it over a reload from the store, and leaves the draft clean", () => {
+    open("x\n");
+    const { container, rerender } = render(<FileEditor draftKey={key} wrap />);
+    const wraps = () => container.querySelector(".cm-content")!.classList.contains("cm-lineWrapping");
+    expect(wraps()).toBe(true);
+    act(() => open("from disk\n"));
+    expect(wraps()).toBe(true);
+    rerender(<FileEditor draftKey={key} wrap={false} />);
+    expect(wraps()).toBe(false);
+    expect(useDrafts.getState().drafts[key]).toMatchObject({ dirty: false });
+  });
+
   it("keeps the undo history across a remount and follows a reload from the store", () => {
     open("x\n");
     const first = render(<FileEditor draftKey={key} />);

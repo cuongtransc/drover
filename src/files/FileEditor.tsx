@@ -4,16 +4,26 @@ import { EditorView } from "@codemirror/view";
 import { onFindRequest } from "./findBus";
 import { useEffect, useRef } from "react";
 import { useDrafts } from "./drafts";
-import { languageFor, languageSlot } from "./editorSetup";
+import { languageFor, languageSlot, wrapSlot } from "./editorSetup";
 
 const isEmpty = (v: EditorView) => {
   const ext = languageSlot.get(v.state);
   return Array.isArray(ext) && ext.length === 0;
 };
 
+const wrapping = (on: boolean) => (on ? EditorView.lineWrapping : []);
+
+/** Puts the wrap setting into the view's state, which `open` and `rebase` build without it. */
+function setWrap(view: EditorView, on: boolean) {
+  if ((wrapSlot.get(view.state) === EditorView.lineWrapping) !== on) view.dispatch({ effects: wrapSlot.reconfigure(wrapping(on)) });
+}
+
 /** One CodeMirror view over the Draft stored under `draftKey`; the store holds the state, the view shows it. */
-export function FileEditor({ draftKey }: { draftKey: string }) {
+export function FileEditor({ draftKey, wrap = false }: { draftKey: string; wrap?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const wrapRef = useRef(wrap);
+  wrapRef.current = wrap;
 
   useEffect(() => {
     const draft = useDrafts.getState().drafts[draftKey];
@@ -53,8 +63,11 @@ export function FileEditor({ draftKey }: { draftKey: string }) {
       if (!next || next === view.state) return;
       view.setState(next);
       fillLanguage();
+      setWrap(view, wrapRef.current);
     });
 
+    viewRef.current = view;
+    setWrap(view, wrapRef.current);
     view.focus();
     fillLanguage();
     // Edit › Find…, Find Next, Find Previous: the menu bar takes ⌘F/⌘G before this editor's keymap.
@@ -66,11 +79,16 @@ export function FileEditor({ draftKey }: { draftKey: string }) {
 
     return () => {
       alive = false;
+      viewRef.current = null;
       unsubscribe();
       offFind();
       view.destroy();
     };
   }, [draftKey]);
+
+  useEffect(() => {
+    if (viewRef.current) setWrap(viewRef.current, wrap);
+  }, [wrap]);
 
   return <div className="files-editor" ref={host} />;
 }
