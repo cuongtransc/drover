@@ -22,13 +22,13 @@ function save(patch: Record<string, unknown>): void {
 }
 
 interface WrapStore {
-  /** Whether the Files viewer and editor wrap long lines; one setting for every file. */
+  /** Whether the Files viewer and editor wrap long lines; one setting for every file, on by default. */
   on: boolean;
   toggle: () => void;
 }
 
 export const useWrap = create<WrapStore>((setState, get) => ({
-  on: readRaw().filesWrap === true,
+  on: readRaw().filesWrap !== false,
   toggle: () => {
     const on = !get().on;
     save({ filesWrap: on });
