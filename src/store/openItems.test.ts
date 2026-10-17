@@ -71,9 +71,19 @@ describe("open items", () => {
   });
 
   it("prunes gone panes and gone workspaces of that machine only", () => {
-    const v = { id: "local", sessions: [{ name: "s", workspaces: [{ workspace_id: "w1", tabs: [{ panes: [{ pane_id: "p1" }] }] }] }] } as unknown as MachineView;
+    const v = { id: "local", sessions: [{ name: "s", running: true, loaded: true, error: null, workspaces: [{ workspace_id: "w1", tabs: [{ panes: [{ pane_id: "p1" }] }] }] }] } as unknown as MachineView;
     const s = of([a("p1"), a("p2"), f("x", ws("w1")), f("y", ws("w2")), a("p9", "s", "devtuf"), f("z", ws("w2", "s", "devtuf"))], null, f("y", ws("w2")));
     expect(pruneItems(s, v)).toEqual(of([a("p1"), f("x", ws("w1")), a("p9", "s", "devtuf"), f("z", ws("w2", "s", "devtuf"))]));
+  });
+
+  it("keeps the items of a running session whose view has not arrived or failed, and prunes a stopped one's", () => {
+    const session = (name: string, more: object) => ({ name, running: true, loaded: true, error: null, workspaces: [], ...more });
+    const v = {
+      id: "local",
+      sessions: [session("loading", { loaded: false }), session("failed", { error: { code: "x", message: "x" } }), session("stopped", { running: false })],
+    } as unknown as MachineView;
+    const s = of([a("p1", "loading"), f("x", ws("w1", "loading")), a("p2", "failed"), a("p3", "stopped"), f("y", ws("w1", "stopped"))]);
+    expect(pruneItems(s, v)).toEqual(of([a("p1", "loading"), f("x", ws("w1", "loading")), a("p2", "failed")]));
   });
 
   it("dropItems keeps the same object when nothing matches", () => {

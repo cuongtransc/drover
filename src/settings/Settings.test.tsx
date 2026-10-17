@@ -14,6 +14,7 @@ import { DEFAULTS, loadFonts, useSettings } from "./store";
 import { useTheme } from "./theme";
 import { useActiveWindow } from "../agents/paneFilter";
 import { useShowDefault } from "../sidebar/activeFilter";
+import { loadReopenItems, useReopenItems } from "./reopen";
 import { loadBindings, useShortcuts } from "../shortcuts/store";
 
 beforeEach(() => {
@@ -82,6 +83,18 @@ describe("Settings dialog", () => {
     fireEvent.click(sw);
     expect(useShowDefault.getState().show).toBe(true);
     expect(JSON.parse(localStorage.getItem("drover:settings")!).showDefaultSession).toBe(true);
+  });
+
+  it("reopens open items on launch by default, and remembers when switched off", () => {
+    useReopenItems.setState({ on: loadReopenItems() });
+    render(<Settings />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const sw = screen.getByRole<HTMLInputElement>("switch", { name: "Reopen open items on launch" });
+    expect(sw.checked).toBe(true);
+    fireEvent.click(sw);
+    expect(useReopenItems.getState().on).toBe(false);
+    expect(JSON.parse(localStorage.getItem("drover:settings")!).reopenItems).toBe(false);
+    expect(loadReopenItems()).toBe(false);
   });
 
   it("opens as a dialog on the General section and switches sections", () => {

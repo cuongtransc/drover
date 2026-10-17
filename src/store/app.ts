@@ -6,6 +6,8 @@ import { shareEqual } from "./share";
 import { forgetMachine, forgetSessions, sessionKey, useLayout, type SessionKey } from "../sidebar/groups";
 import { backfillKept } from "../workspaces/kept";
 import { newAgentOnTerminal } from "../settings/lens";
+import { loadReopenItems } from "../settings/reopen";
+import { loadOpenItems, saveOpenItems } from "./openItemsSaved";
 import { useFiles, filesKey } from "../files/store";
 import {
   closeItems,
@@ -145,7 +147,7 @@ export const useApp = create<AppState>((set, get) => ({
   dashboardOpen: false,
   doneSeen: {},
   statusSince: {},
-  openItems: NO_ITEMS,
+  openItems: loadReopenItems() ? loadOpenItems() : NO_ITEMS,
   ...load(),
   // Closing returns to the selected pane, so a done one counts as seen then.
   setDashboardOpen: (open) =>
@@ -295,6 +297,13 @@ export const useApp = create<AppState>((set, get) => ({
     save(get());
   },
 }));
+
+// Saved whether or not they reopen at launch, so switching the setting on brings back the last ones.
+useApp.subscribe((s, prev) => {
+  if (s.openItems !== prev.openItems) saveOpenItems(s.openItems);
+});
+// A reopened agent item that was active shows its Pane again.
+selectIfAgent(useApp.getState(), useApp.getState().openItems);
 
 /** The item being shown above the lens, if any. */
 export function activeItem(s: Pick<AppState, "openItems">): OpenItem | null {
