@@ -11,6 +11,7 @@ import { emptyChat, prepend, reduce, type ChatState } from "./chatStore";
 import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
+import { keepPlace, placeOf, type ChatPlace } from "./scrollMemory";
 import { buildRows, liveStart, rowOfCall } from "./workBlocks";
 import { chatFindHits, rowFindRanges } from "./chatFind";
 import { FindBar } from "../files/FindBar";
@@ -67,6 +68,10 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const loadingOlder = useRef(false);
   const anchor = useRef<number | null>(null);
   const forceBottom = useRef(true);
+  // Where this pane's Chat was left, taken once at mount; the first Reset that loads its row goes back there.
+  const restore = useRef<ChatPlace | undefined>(placeOf(key));
+  // Where the view is, kept as it scrolls: on unmount the scroll box is already gone.
+  const place = useRef<ChatPlace | null>(restore.current ?? null);
   const generation = useRef(0);
   const handle = useRef<{ close: () => void } | null>(null);
   // Bumped on each `reset`: thumbnails that failed while the tail was gone ask again.
@@ -180,6 +185,8 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     setLocated(null);
     open(rememberedTranscript(key));
     return () => {
+      // At the end (pinned there, maybe with no scroll event since) it comes back to the end.
+      keepPlace(key, atBottom.current ? null : place.current);
       generation.current++;
       handle.current?.close();
       handle.current = null;
@@ -327,6 +334,27 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       const added = rows.length - prevRows.current;
       virt.scrollToIndex(Math.max(0, added), { align: "start" });
       anchor.current = null;
+    } else if (forceBottom.current && restore.current && rows.length > 0) {
+      // Back to where the pane was left; gone from the loaded window, to the end as before.
+      const { row, offset, total: totalThen } = restore.current;
+      restore.current = undefined;
+      const at = rows.findIndex((r) => r.key === row);
+      if (at < 0) {
+        virt.scrollToIndex(rows.length - 1, { align: "end" });
+        atBottom.current = true;
+      } else {
+        atBottom.current = false;
+        virt.scrollToIndex(at, { align: "start" });
+        // Once the rows around it are measured, put the view's top where it was inside that row.
+        requestAnimationFrame(() => {
+          const el = scrollRef.current;
+          const m = virtRef.current.measurementsCache[at];
+          if (el && m && !atBottom.current) el.scrollTop = m.start + offset;
+        });
+        // What arrived while the pane was away is below.
+        setUnseen(state.total > totalThen);
+      }
+      forceBottom.current = false;
     } else if (forceBottom.current || (grew && atBottom.current)) {
       if (rows.length > 0) virt.scrollToIndex(rows.length - 1, { align: "end" });
       forceBottom.current = rows.length === 0;
@@ -357,6 +385,11 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     const el = scrollRef.current;
     if (!el) return;
     atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 40;
+    // Not before the first rows came: a place still to go back to stays.
+    if (rows.length > 0 && !restore.current) {
+      const top = atBottom.current ? undefined : virt.getVirtualItems().find((v) => v.end > el.scrollTop);
+      place.current = top ? { row: rows[top.index].key, offset: el.scrollTop - top.start, total: state.total } : null;
+    }
     if (atBottom.current) setUnseen(false);
     if (el.scrollTop <= 0 && !loadingOlder.current) {
       const before = state.total - state.items.length;
