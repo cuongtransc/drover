@@ -390,7 +390,42 @@ impl ClaudeParser {
         ParserOutput::Append(items)
     }
 
-    /// What the agent a message goes to was asked to do: `to` is its id, or the short id
+    /// The line shown for a hidden user record that opens a turn, None for one that does not.
+    fn system_prompt_line(&self, v: &Value) -> Option<String> {
+        let origin = v.get("origin");
+        let kind = origin.and_then(|o| o.get("kind")).and_then(Value::as_str);
+        if kind == Some("peer") {
+            let name = origin
+                .and_then(|o| o.get("from"))
+                .and_then(Value::as_str)
+                .and_then(|id| self.agents.get(id))
+                .map(String::as_str)
+                .or_else(|| origin.and_then(|o| o.get("name")).and_then(Value::as_str))
+                .unwrap_or("subagent");
+            return Some(format!("Agent \"{name}\" reported back"));
+        }
+        if v.get("promptSource").and_then(Value::as_str) != Some("system") {
+            return None;
+        }
+        if kind == Some("auto-continuation") {
+            return Some("Usage limit reset, continuing".into());
+        }
+        let text = v.pointer("/message/content").and_then(Value::as_str)?;
+        let first = text.lines().map(str::trim).find(|l| !l.is_empty())?;
+        let mut head: String = first.chars().take(80).collect();
+        if head.len() < first.len() {
+            head.push('…');
+        }
+        let scheduled = v.get("scheduledTaskId").is_some()
+            || v.get("turnOrigin").and_then(Value::as_str) == Some("scheduled");
+        Some(if scheduled {
+            format!("Scheduled: {head}")
+        } else {
+            format!("Prompt from Claude Code: {head}")
+        })
+    }
+
+    /// What the agent a message goes to was asked to do:`to` is its id, or the short id
     /// Claude quotes. A name with no agent known goes as it is.
     fn agent_description(&self, to: &str) -> String {
         self.agents
@@ -543,23 +578,15 @@ impl ClaudeParser {
                 if let Some(text) = v.pointer("/message/content").and_then(Value::as_str) {
                     self.leave_queue(text);
                 }
-                // A subagent's hand-back starts a turn: its line keeps that turn apart from the last.
-                let origin = v.get("origin");
-                if origin.and_then(|o| o.get("kind")).and_then(Value::as_str) == Some("peer") {
-                    let from = origin
-                        .and_then(|o| o.get("from"))
-                        .and_then(Value::as_str)
-                        .and_then(|id| self.agents.get(id))
-                        .map(String::as_str);
-                    let name = from
-                        .or_else(|| origin.and_then(|o| o.get("name")).and_then(Value::as_str))
-                        .unwrap_or("subagent");
+                // A prompt Claude Code sends itself (a subagent's hand-back, a scheduled tick,
+                // a usage-limit resume) starts a turn: its line keeps that turn apart from the last.
+                if let Some(text) = self.system_prompt_line(&v) {
                     return ParserOutput::Append(vec![ChatItem::System {
                         ts: v
                             .get("timestamp")
                             .and_then(Value::as_str)
                             .map(str::to_string),
-                        text: format!("Agent \"{name}\" reported back"),
+                        text,
                         task: None,
                     }]);
                 }
@@ -1959,6 +1986,53 @@ mod tests {
             run(&handback("a0")),
             vec![system("Agent \"general-purpose\" reported back")]
         );
+    }
+
+    fn system_prompt(extra: serde_json::Value, text: &str) -> String {
+        let mut v = serde_json::json!({"type":"user","isMeta":true,"promptSource":"system","timestamp":"2026-10-10T17:20:00.000Z","message":{"content":text}});
+        for (k, x) in extra.as_object().into_iter().flatten() {
+            v[k] = x.clone();
+        }
+        v.to_string()
+    }
+
+    #[test]
+    fn a_prompt_claude_code_sends_itself_opens_a_turn() {
+        let system = |text: &str| {
+            vec![System {
+                ts: Some("2026-10-10T17:20:00.000Z".into()),
+                text: text.into(),
+                task: None,
+            }]
+        };
+        let tick = system_prompt(
+            serde_json::json!({"scheduledTaskId":"c1","turnOrigin":"scheduled"}),
+            "\n# Autonomous loop check\n\nYou're being invoked on a timer.",
+        );
+        assert_eq!(run(&tick), system("Scheduled: # Autonomous loop check"));
+        let long = "x".repeat(100);
+        assert_eq!(
+            run(&system_prompt(
+                serde_json::json!({"turnOrigin":"scheduled"}),
+                &long
+            )),
+            system(&format!("Scheduled: {}…", "x".repeat(80)))
+        );
+        let resumed = system_prompt(
+            serde_json::json!({"origin":{"kind":"auto-continuation"}}),
+            "Your claude.ai usage limit has reset. Continue the task.",
+        );
+        assert_eq!(run(&resumed), system("Usage limit reset, continuing"));
+        assert_eq!(
+            run(&system_prompt(
+                serde_json::json!({}),
+                "Fallback check on lane x\nmore"
+            )),
+            system("Prompt from Claude Code: Fallback check on lane x")
+        );
+        // The CLI's other hidden records (a command's caveat, a skill's body) stay hidden.
+        let caveat = serde_json::json!({"type":"user","isMeta":true,"message":{"content":"<local-command-caveat>x</local-command-caveat>"}});
+        assert_eq!(run(&caveat.to_string()), vec![]);
     }
 
     const STILL_RUNNING: &str ="This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports.";
