@@ -60,6 +60,7 @@ import { useForks } from "../agents/forkSession";
 import { paneKey } from "../lib/types";
 import { useApp } from "../store/app";
 import { useBtw } from "./btw";
+import { forgetChatMemory } from "./scrollMemory";
 
 const pane = { machine_id: "devtuf", session: "default", pane_id: "w1:p1" };
 const idlePi = { status: "idle", agent: "pi", title: "pi" } as PaneView;
@@ -77,6 +78,7 @@ const picker = `
 let shown = "";
 
 beforeEach(() => {
+  forgetChatMemory();
   viewport.on = false;
   localStorage.clear();
   opened = new Promise(() => {});
