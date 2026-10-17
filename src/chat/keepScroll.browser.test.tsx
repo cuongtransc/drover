@@ -27,8 +27,7 @@ vi.mock("./chatSession", () => ({
 }));
 import type { PaneView } from "../lib/types";
 import { ChatLens } from "./ChatLens";
-import { keepPlace } from "./scrollMemory";
-import { paneKey } from "../lib/types";
+import { forgetChatMemory } from "./scrollMemory";
 
 const paneA = { machine_id: "local", session: "default", pane_id: "w1:p1" };
 const paneB = { machine_id: "local", session: "default", pane_id: "w1:p2" };
@@ -40,6 +39,19 @@ function transcript(n: number, from = 0): unknown[] {
     const ts = new Date(Date.UTC(2026, 9, 10, 0, k)).toISOString();
     out.push({ kind: "user", text: `turn ${k}`, ts });
     out.push({ kind: "assistant_text", markdown: `Reply ${k}.\n\nLine two.\n\nLine three.`, ts });
+  }
+  return out;
+}
+
+/** Turns whose work (a Bash call and its result) folds into a Work block above the reply. */
+function withWork(n: number): unknown[] {
+  const out: unknown[] = [];
+  for (let k = 0; k < n; k++) {
+    const ts = new Date(Date.UTC(2026, 9, 10, 0, k)).toISOString();
+    out.push({ kind: "user", text: `turn ${k}`, ts });
+    out.push({ kind: "tool_call", id: `t${k}`, name: "Bash", input_summary: `run ${k}`, input: { command: `echo ${k}` }, ts });
+    out.push({ kind: "tool_result", call_id: `t${k}`, output: Array.from({ length: 12 }, (_, i) => `out ${k}.${i}`).join("\n"), is_error: false, ts });
+    out.push({ kind: "assistant_text", markdown: `Reply ${k}.`, ts });
   }
   return out;
 }
@@ -77,8 +89,7 @@ beforeEach(() => {
   channels.length = 0;
   rerender = undefined as never;
   // Places live for the app's run, so one test's would carry into the next.
-  keepPlace(paneKey(paneA), null);
-  keepPlace(paneKey(paneB), null);
+  forgetChatMemory();
 });
 
 it("coming back to a pane keeps where its chat was scrolled", async () => {
@@ -112,6 +123,44 @@ it("keeps the place when messages arrived meanwhile, and says there are new ones
   await show(paneA, transcript(110));
   expect(firstBubble(host)).toEqual(before);
   expect(host.querySelector(".chat-new")).not.toBeNull();
+});
+
+it("⌘L to the Terminal and back keeps the place, as another pane does", async () => {
+  const a = transcript(100);
+  await show(paneA, a);
+  box(host).scrollTop = 2000;
+  await settle(100);
+  const before = firstBubble(host);
+  // App renders the Terminal lens in ChatLens's place: the Chat unmounts.
+  rerender(<div className="terminal-lens" />);
+  await settle(50);
+  await show(paneA, a);
+  expect(firstBubble(host)).toEqual(before);
+});
+
+it("keeps the Work blocks opened by hand, and the place below one", async () => {
+  const a = withWork(60);
+  await show(paneA, a);
+  const head = (k: number) =>
+    [...host.querySelectorAll<HTMLButtonElement>(".chat-work-head")].find((b) => b.closest("[data-index]")?.nextElementSibling?.textContent?.includes(`Reply ${k}.`));
+  // Open turn 40's block, then read a little below it.
+  const bubble = () => [...host.querySelectorAll<HTMLElement>(".chat-bubble")].find((b) => b.textContent === "turn 40");
+  // Up a screen at a time until the virtual list mounts it.
+  for (let i = 0; i < 40 && !bubble(); i++) {
+    box(host).scrollTop -= 500;
+    await settle(50);
+  }
+  bubble()!.scrollIntoView({ block: "start" });
+  await settle(100);
+  act(() => head(40)!.click());
+  await settle(100);
+  box(host).scrollTop += 300;
+  await settle(100);
+  const before = firstBubble(host);
+  await show(paneB, transcript(10));
+  await show(paneA, a);
+  expect(head(40)?.getAttribute("aria-expanded")).toBe("true");
+  expect(firstBubble(host)).toEqual(before);
 });
 
 it("goes to the end when the row it was at is no longer loaded", async () => {

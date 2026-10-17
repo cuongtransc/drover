@@ -11,7 +11,7 @@ import { emptyChat, prepend, reduce, type ChatState } from "./chatStore";
 import { ChatItemView } from "./ChatItemView";
 import { ChatOpenContext, ChatPaneContext, revokeChatImages } from "./images";
 import { WorkBlockView } from "./WorkBlockView";
-import { keepPlace, placeOf, type ChatPlace } from "./scrollMemory";
+import { chosenOf, keepChosen, keepPlace, placeOf, type ChatPlace } from "./scrollMemory";
 import { buildRows, liveStart, rowOfCall } from "./workBlocks";
 import { chatFindHits, rowFindRanges } from "./chatFind";
 import { FindBar } from "../files/FindBar";
@@ -83,7 +83,9 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   const [loadingShown, setLoadingShown] = useState(false);
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Work blocks the user opened or closed, by block id: a virtualized row forgets its own state.
-  const [chosenOpen, setChosenOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const [chosenOpen, setChosenOpen] = useState<ReadonlyMap<string, boolean>>(() => chosenOf(key));
+  const chosenNow = useRef(chosenOpen);
+  chosenNow.current = chosenOpen;
   // A jumped-to call whose card is not rendered yet (its Work block only opens on this render):
   // the block scrolls it into view when it mounts or opens, then calls `clearPendingCard`.
   const [pendingCard, setPendingCard] = useState<string | null>(null);
@@ -177,7 +179,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
   }, [machineState]);
 
   useEffect(() => {
-    setChosenOpen(new Map());
+    setChosenOpen(chosenOf(key));
     setPendingCard(null);
     setPendingJump(null);
     setJumpNotice(null);
@@ -187,6 +189,7 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
     return () => {
       // At the end (pinned there, maybe with no scroll event since) it comes back to the end.
       keepPlace(key, atBottom.current ? null : place.current);
+      keepChosen(key, chosenNow.current);
       generation.current++;
       handle.current?.close();
       handle.current = null;
@@ -345,12 +348,20 @@ export function ChatLens({ pane, view }: { pane: PaneRef; view: PaneView }) {
       } else {
         atBottom.current = false;
         virt.scrollToIndex(at, { align: "start" });
-        // Once the rows around it are measured, put the view's top where it was inside that row.
-        requestAnimationFrame(() => {
+        // scrollToIndex keeps aligning the row to the top while the rows above it are measured:
+        // once its start holds still for a frame, put the view's top where it was inside that row.
+        let last = NaN;
+        let frames = 0;
+        const settle = () => {
           const el = scrollRef.current;
           const m = virtRef.current.measurementsCache[at];
-          if (el && m && !atBottom.current) el.scrollTop = m.start + offset;
-        });
+          if (!el || !m || atBottom.current) return;
+          if (m.start !== last && ++frames < 30) {
+            last = m.start;
+            requestAnimationFrame(settle);
+          } else el.scrollTop = m.start + offset;
+        };
+        requestAnimationFrame(settle);
         // What arrived while the pane was away is below.
         setUnseen(state.total > totalThen);
       }
