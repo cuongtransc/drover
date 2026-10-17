@@ -543,6 +543,26 @@ impl ClaudeParser {
                 if let Some(text) = v.pointer("/message/content").and_then(Value::as_str) {
                     self.leave_queue(text);
                 }
+                // A subagent's hand-back starts a turn: its line keeps that turn apart from the last.
+                let origin = v.get("origin");
+                if origin.and_then(|o| o.get("kind")).and_then(Value::as_str) == Some("peer") {
+                    let from = origin
+                        .and_then(|o| o.get("from"))
+                        .and_then(Value::as_str)
+                        .and_then(|id| self.agents.get(id))
+                        .map(String::as_str);
+                    let name = from
+                        .or_else(|| origin.and_then(|o| o.get("name")).and_then(Value::as_str))
+                        .unwrap_or("subagent");
+                    return ParserOutput::Append(vec![ChatItem::System {
+                        ts: v
+                            .get("timestamp")
+                            .and_then(Value::as_str)
+                            .map(str::to_string),
+                        text: format!("Agent \"{name}\" reported back"),
+                        task: None,
+                    }]);
+                }
             }
             tracing::trace!(record_type = kind, reason, "skipping transcript record");
             return ParserOutput::None;
@@ -1916,7 +1936,32 @@ mod tests {
     fn agent_note(status: &str, note: &str) -> String {
         format!("<task-notification>\n<task-id>{AGENT_ID}</task-id>\n<tool-use-id>a1</tool-use-id>\n<status>{status}</status>\n<summary>Agent \"Whole-branch review\" finished</summary>\n<note>{note}</note>\n</task-notification>")
     }
-    const STILL_RUNNING: &str = "This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports.";
+    fn handback(from: &str) -> String {
+        serde_json::json!({"type":"user","isMeta":true,"timestamp":"2026-10-10T17:20:00.000Z","origin":{"kind":"peer","from":from,"name":"general-purpose","handback":true},"message":{"content":"Another Claude session sent a message:\n<agent-message from=\"x\">report</agent-message>"}}).to_string()
+    }
+
+    #[test]
+    fn a_subagent_hand_back_opens_a_turn() {
+        // The hand-back wakes the agent before its task-notification lands: without a row of
+        // its own, the next turn's calls join the last one and fold its answer away.
+        let (_, _, mut p) = run_with(&finished_agent()[..2].join("\n"));
+        let system = |text: &str| System {
+            ts: Some("2026-10-10T17:20:00.000Z".into()),
+            text: text.into(),
+            task: None,
+        };
+        assert_eq!(
+            push(&mut p, &handback(AGENT_ID)),
+            vec![system("Agent \"Whole-branch review\" reported back")]
+        );
+        // An agent started before the loaded part of the transcript goes by its type.
+        assert_eq!(
+            run(&handback("a0")),
+            vec![system("Agent \"general-purpose\" reported back")]
+        );
+    }
+
+    const STILL_RUNNING: &str ="This agent stopped with background work of its own still running. It may resume on its own when that work completes or reports.";
 
     #[test]
     fn an_agent_waiting_on_its_own_background_work_stays_until_it_ends() {
