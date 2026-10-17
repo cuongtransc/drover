@@ -37,6 +37,22 @@ describe("open items across launches", () => {
     expect(JSON.parse(localStorage.getItem("drover:open-items")!).items).toHaveLength(1);
   });
 
+  it("drop reopened items of a machine no longer configured, once the machine list is known", async () => {
+    const remote: OpenItem = { kind: "agent", ref: { machine_id: "devtuf", session: "s", pane_id: "p9" } };
+    localStorage.setItem(
+      "drover:open-items",
+      JSON.stringify({ items: [agent, remote, file], preview: null, active: itemKey(remote) }),
+    );
+    const app = await launch();
+    expect(app.getState().openItems.items).toHaveLength(3);
+    app.getState().keepMachines([]);
+    expect(app.getState().openItems.items).toHaveLength(3);
+    app.getState().keepMachines(["local"]);
+    expect(app.getState().openItems).toEqual({ items: [agent, file], preview: null, active: null });
+    // The reopened active item had selected its pane; that machine is gone too.
+    expect(app.getState().selected).toBeNull();
+  });
+
   it("save every change to the open items", async () => {
     const app = await launch();
     app.getState().openFile(file.kind === "file" ? file.ws : (null as never), "/r", "a.ts", { pin: false });
