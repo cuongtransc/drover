@@ -86,12 +86,14 @@ run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scr
 # Ad-hoc signed builds get a new identity each time, so macOS asks again for every permission.
 # Before the first Drover install: Drover's identifier starts with empty folders. app:install
 # runs it while Drover has no state yet, so a reinstall never does.
+# Copies the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders.
 [tasks."app:migrate-id"]
-description = "One-time: copy the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders"
+description = "One-time: copy the old Herdr state to Drover's folders"
 run = "scripts/migrate-id.sh"
 
+# The identity app:install signs Drover.app with.
 [tasks."sign:setup"]
-description = "One-time: create the local signing identity app:install signs Drover.app with"
+description = "One-time: create the local identity that signs Drover.app"
 run = "scripts/sign-setup.sh"
 
 # Call it `mise run fmt`: bare `mise fmt` is mise's own mise.toml formatter.
@@ -128,8 +130,9 @@ run = "pnpm test"
 description = "Frontend tests that need a real browser (*.browser.test.tsx)"
 run = "pnpm vitest run --config vitest.browser.config.ts"
 
+# Redraws docs/design/ui-map.html and the README screenshots from the real App.
 [tasks."docs:ui-map"]
-description = "Redraw docs/design/ui-map.html and the README screenshots from the real App (after a UI change)"
+description = "Redraw the UI map and README screenshots after a UI change"
 run = [
   "pnpm vitest run --config vitest.uimap.config.ts",
   "node scripts/ui-map.mjs",
@@ -170,8 +173,9 @@ depends = ["test:frontend", "test:backend", "test:sign", "test:migrate", "test:c
 
 # fmt, clippy and cargo test, only when src-tauri/ differs from origin/main (scripts/rust-changed.sh):
 # two PRs in three leave the backend alone, and a fresh worktree compiled it for 13 minutes each time.
+# CI_RUST=1 forces it.
 [tasks."ci:backend"]
-description = "The backend part of ci, skipped when src-tauri/ is unchanged (CI_RUST=1 forces it)"
+description = "Backend part of ci; skipped when src-tauri/ is unchanged"
 run = "if scripts/rust-changed.sh; then mise run fmt:check ::: lint ::: test:backend; fi"
 
 # Starts isolated `drover-test-*` sessions on the local herdr and always
@@ -184,8 +188,9 @@ run = "cargo test -- --ignored --test-threads=1"
 # Read-only, runs on pre-commit (.githooks/pre-commit).
 # Warns, never fails: words the glossaries list under _Avoid_ in living docs and UI strings
 # (specs/plans under docs/superpowers and the ADRs are history and left out).
+# Words: Agent Dashboard, Project row, session orchestrator, Herdr.
 [tasks."lint:terms"]
-description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator, Herdr)"
+description = "Warn where docs or UI strings use a word CONTEXT.md avoids"
 run = """
 hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' -e '^CONTEXT.md$' | grep -v -F '.test.' \\
   | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project|\\bHerdr\\b' | grep -v 'named Herdr' || true)
