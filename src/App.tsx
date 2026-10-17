@@ -151,7 +151,9 @@ export default function App() {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
     void machinesList().then((ms) => {
-      if (!cancelled) ms.forEach(upsert);
+      if (cancelled) return;
+      ms.forEach(upsert);
+      useApp.getState().keepMachines(ms.map((m) => m.id));
     }).catch((e) => console.error("machines_list failed", e));
     void onMachine(upsert).then((u) => {
       if (cancelled) u();

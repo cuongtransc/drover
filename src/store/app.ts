@@ -125,6 +125,9 @@ export interface AppState {
   moveItem: (from: string, to: string, side: "before" | "after") => void;
   upsertMachine: (v: MachineView) => void;
   removeMachine: (id: string) => void;
+  /** The configured machines, all of them (`machines_list`): drops the Open items and the
+   *  selection of any other, as reopened at launch for a machine removed meanwhile. */
+  keepMachines: (ids: string[]) => void;
   select: (ref: PaneRef | null) => void;
   acknowledgeSelectedDone: () => void;
   view: (ref: SessionRef | null) => void;
@@ -191,6 +194,15 @@ export const useApp = create<AppState>((set, get) => ({
         openItems,
       };
     });
+  },
+  keepMachines: (ids) => {
+    // The local machine is always listed: an empty list is no list, and says nothing.
+    if (ids.length === 0) return;
+    const known = new Set(ids);
+    set((s) => ({
+      openItems: dropItems(s.openItems, (i) => !known.has((i.kind === "agent" ? i.ref : i.ws).machine_id)),
+      selected: s.selected && !known.has(s.selected.machine_id) ? null : s.selected,
+    }));
   },
   removeMachine: (id) => {
     useLayout.getState().update((l) => forgetMachine(l, id));
