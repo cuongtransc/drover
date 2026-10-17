@@ -8,16 +8,16 @@ const fresh = async () => {
 describe("Files word wrap setting", () => {
   beforeEach(() => localStorage.clear());
 
-  it("is off the first time", async () => {
-    expect((await fresh()).getState().on).toBe(false);
+  it("is on the first time", async () => {
+    expect((await fresh()).getState().on).toBe(true);
   });
 
   it("remembers the toggle across launches, beside the other settings", async () => {
     localStorage.setItem("drover:settings", JSON.stringify({ filesOutline: false }));
     (await fresh()).getState().toggle();
-    expect((await fresh()).getState().on).toBe(true);
-    expect(JSON.parse(localStorage.getItem("drover:settings")!)).toEqual({ filesOutline: false, filesWrap: true });
-    (await fresh()).getState().toggle();
     expect((await fresh()).getState().on).toBe(false);
+    expect(JSON.parse(localStorage.getItem("drover:settings")!)).toEqual({ filesOutline: false, filesWrap: false });
+    (await fresh()).getState().toggle();
+    expect((await fresh()).getState().on).toBe(true);
   });
 });
