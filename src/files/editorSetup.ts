@@ -17,6 +17,9 @@ import type { DiskVersion } from "./drafts";
 /** FileEditor fills this once the file's language has loaded. */
 export const languageSlot = new Compartment();
 
+/** FileEditor sets line wrapping here, from the Files wrap setting. */
+export const wrapSlot = new Compartment();
+
 /** Token colours come from the app's --hl-* variables, as the viewer's highlight.js classes do. */
 const appHighlight = HighlightStyle.define([
   { tag: [t.comment, t.docComment], color: "var(--hl-comment)", fontStyle: "italic" },
@@ -98,6 +101,7 @@ export function createEditorState(text: string): EditorState {
       text.includes("\r\n") ? [EditorState.lineSeparator.of("\r\n"), EditorState.transactionFilter.of(crlfOnly)] : [],
       history(),
       languageSlot.of([]),
+      wrapSlot.of([]),
       editorExtensions(),
     ],
   });

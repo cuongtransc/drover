@@ -49,4 +49,13 @@ describe("TextView", () => {
     rerender(<TextView {...props} find={{ query: "foo", index: 0, matchCase: false }} />);
     expect(status).toHaveBeenLastCalledWith({ count: 1, index: 0 });
   });
+
+  it("marks the view as wrapping only when wrap is on", () => {
+    const props = { text: "a\nb", path: "a.ts", initialScroll: 0, saveScroll: () => {}, find: null };
+    const { container, rerender } = render(<TextView {...props} />);
+    const text = () => container.querySelector(".files-text") as HTMLElement;
+    expect(text().classList.contains("wrap")).toBe(false);
+    rerender(<TextView {...props} wrap />);
+    expect(text().classList.contains("wrap")).toBe(true);
+  });
 });

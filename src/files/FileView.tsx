@@ -30,6 +30,7 @@ export function FileView({
   saveScroll,
   outline,
   onOutline,
+  wrap = false,
 }: {
   machineId: string;
   root: string;
@@ -49,6 +50,8 @@ export function FileView({
   outline?: boolean;
   /** Told whether the rendered markdown has an outline to show. */
   onOutline?(has: boolean): void;
+  /** Whether a text view wraps long lines. */
+  wrap?: boolean;
 }) {
   if (content.kind === "image") return <ImageView machineId={machineId} root={root} rel={rel} mtime={content.mtime} />;
   if (content.kind === "pdf") return <PdfView machineId={machineId} root={root} rel={rel} mtime={content.mtime} />;
@@ -90,6 +93,7 @@ export function FileView({
           saveScroll={saveScroll}
           find={find}
           onFindStatus={onFindStatus}
+          wrap={wrap}
         />
       )}
     </>

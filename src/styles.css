@@ -1924,6 +1924,10 @@ button.composer-model:disabled { cursor: default; }
 /* Drawn as generated content: WebKit still paints the selection over user-select:none text. */
 .files-gutter::before { content: attr(data-line); }
 .files-code { padding-right: 24px; }
+.files-text.wrap .files-text-body { min-width: 0; }
+.files-text.wrap .files-line { height: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.files-text.wrap .files-gutter { align-self: flex-start; height: var(--files-line-h); }
+.files-text.wrap .files-code { flex: 1; min-width: 0; }
 /* Find paints amber, not accent: an accent tint reads as the text selection. */
 .files-match { border-radius: 2px; background: color-mix(in srgb, var(--amber) 32%, transparent); color: inherit; }
 .files-match.current, .files-match.current * { background: var(--amber); color: #1a1206; }

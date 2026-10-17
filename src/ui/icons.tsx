@@ -107,6 +107,9 @@ export const EyeOffIcon = (p: SVGProps<SVGSVGElement>) => (
 export const OutlineIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}><path d="M4 6h16M8 12h12M12 18h8" /></Icon>
 );
+export const WrapIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}><path d="M3 6h18M3 12h15a3 3 0 0 1 0 6h-4M3 18h7M16 16l-2 2 2 2" /></Icon>
+);
 export const LockIcon = (p: SVGProps<SVGSVGElement>) => (
   <Icon {...p}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></Icon>
 );

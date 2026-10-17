@@ -5,7 +5,7 @@ import { filesRead, openLocalFile, revealLocalFile } from "../lib/ipc";
 import type { FileChange, FileContent } from "../lib/types";
 import { useApp } from "../store/app";
 import { itemKey, type OpenItem } from "../store/openItems";
-import { CopyIcon, FileCopyIcon, FolderOpenIcon, LaptopIcon, OutlineIcon } from "../ui/icons";
+import { CopyIcon, FileCopyIcon, FolderOpenIcon, LaptopIcon, OutlineIcon, WrapIcon } from "../ui/icons";
 import { showToast } from "../ui/Toast";
 import { useFilesBus } from "./bus";
 import { closeItemsGuarded, settleDrafts } from "./closeGuard";
@@ -21,6 +21,7 @@ import { latestOnly, STALE } from "./latest";
 import { HIGHLIGHT_LIMIT } from "./limits";
 import { lineOfHash } from "./links";
 import { useOutline } from "./outlineStore";
+import { useWrap } from "./wrapStore";
 import { absPath } from "./root";
 import { saveDraft } from "./save";
 import { filesKey, useFiles } from "./store";
@@ -54,6 +55,8 @@ export function FileViewer({ item, online }: Props) {
   const outline = useOutline((s) => s.shown);
   const toggleOutline = useOutline((s) => s.toggle);
   const [hasOutline, setHasOutline] = useState(false);
+  const wrap = useWrap((s) => s.on);
+  const toggleWrap = useWrap((s) => s.toggle);
   const [index, setIndex] = useState(0);
   const read = useMemo(() => latestOnly(filesRead), []);
   const reloads = useFilesBus((s) => s.reloads[key] ?? 0);
@@ -178,6 +181,8 @@ export function FileViewer({ item, online }: Props) {
       return d ? { dirty: d.dirty, saving: d.saving, conflict: d.conflict } : null;
     }),
   );
+  /** Lines can wrap in the editor and in a text view; rendered markdown wraps on its own. */
+  const wrappable = !!draft || (searchable && !(md && mode === "render"));
   // Parsing the text is costly, so it is done once per read, not per render.
   const { editable, mixedEnds } = useMemo(() => {
     if (!shown) return { editable: false, mixedEnds: false };
@@ -250,6 +255,14 @@ export function FileViewer({ item, online }: Props) {
       if (e.repeat || e.isComposing) return;
       // The editor's search panel takes the Esc that closes it (it prevents the default); one still open keeps it too.
       if (draft && !e.defaultPrevented && !document.querySelector(".files-editor .cm-search")) done();
+      return;
+    }
+    // ⌥Z, as in VS Code; by code, since ⌥ turns the key into Ω. A text field keeps it as typing.
+    if (e.code === "KeyZ" && e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+      const t = e.target;
+      if (!wrappable || t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      if (!e.repeat) toggleWrap();
       return;
     }
     if (!e.metaKey || e.altKey || e.ctrlKey) return;
@@ -350,6 +363,18 @@ export function FileViewer({ item, online }: Props) {
             <OutlineIcon />
           </button>
         )}
+        {wrappable && (
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Wrap lines"
+            title={`${wrap ? "Don't wrap lines" : "Wrap lines"} (⌥Z)`}
+            aria-pressed={wrap}
+            onClick={toggleWrap}
+          >
+            <WrapIcon />
+          </button>
+        )}
         {md && !draft && shown?.kind === "text" && (
           <div className="files-mode" role="group" aria-label="Markdown view">
             {(["render", "source"] as const).map((m) => (
@@ -420,7 +445,7 @@ export function FileViewer({ item, online }: Props) {
       )}
       <div className="files-view">
         {draft ? (
-          <FileEditor draftKey={draftId} />
+          <FileEditor draftKey={draftId} wrap={wrap} />
         ) : shown ? (
           <FileView
             machineId={machineId}
@@ -437,6 +462,7 @@ export function FileViewer({ item, online }: Props) {
             saveScroll={(r, top) => useFiles.getState().setScroll(key, r, top)}
             outline={outline}
             onOutline={setHasOutline}
+            wrap={wrap}
           />
         ) : folder === rel ? (
           <FolderView ws={ws} root={root} rel={rel} reload={folderReload} />
