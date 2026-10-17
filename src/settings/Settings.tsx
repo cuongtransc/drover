@@ -10,6 +10,7 @@ import { useNewTab } from "./newTab";
 import { AGENTS } from "../agents/openAgentTab";
 import { ACTIVE_MINUTES, idleLabel, useActiveWindow } from "../agents/paneFilter";
 import { useShowDefault } from "../sidebar/activeFilter";
+import { useReopenItems } from "./reopen";
 import { DEFAULT_QUICK_REPLIES, moveReply, moveReplyTo, QUICK_REPLIES_MAX, QUICK_REPLY_MAX_CHARS, slotAt, useQuickReplies } from "./quickReplies";
 import { CHAT_SIZE, DEFAULTS, TERM_SIZE, useSettings } from "./store";
 import { THEME_PREFS, useTheme } from "./theme";
@@ -51,6 +52,7 @@ function GeneralSettings() {
   const tabKey = useShortcutLabel("tabs.new");
   const active = useActiveWindow();
   const showDefault = useShowDefault();
+  const reopen = useReopenItems();
   return (
     <>
       <div className="setting-row">
@@ -92,6 +94,11 @@ function GeneralSettings() {
         <input type="checkbox" role="switch" checked={showDefault.show} onChange={(e) => showDefault.setShow(e.target.checked)} />
       </label>
       <p className="note">The session herdr starts when run without a name, on each machine. Off, Sessions lists it only while an agent runs in it.</p>
+      <label className="switch">
+        <span>Reopen open items on launch</span>
+        <input type="checkbox" role="switch" checked={reopen.on} onChange={(e) => reopen.setOn(e.target.checked)} />
+      </label>
+      <p className="note">Agents and files open when Drover quit open again; ones whose pane or workspace closed meanwhile are dropped.</p>
       <label className="switch">
         <span>Notifications</span>
         <input

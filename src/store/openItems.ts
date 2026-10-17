@@ -94,10 +94,15 @@ export function cycleItem(s: OpenItems, delta: 1 | -1): OpenItems {
   return { ...s, active: itemKey(s.items[next]) };
 }
 
-/** For machine `v`: drops agent items whose Pane is gone and file items whose Workspace is gone. Call only with a connected snapshot. */
+/**
+ * For machine `v`: drops agent items whose Pane is gone and file items whose Workspace is gone. Call only
+ * with a connected snapshot. A running Session whose view has not arrived, or failed, lists no Workspace
+ * yet says nothing about them, so its items stay (items reopened at launch meet that first).
+ */
 export function pruneItems(s: OpenItems, v: MachineView): OpenItems {
   const panes = new Set<string>();
   const workspaces = new Set<string>();
+  const unknown = new Set(v.sessions.filter((x) => x.running && (!x.loaded || x.error)).map((x) => x.name));
   for (const session of v.sessions)
     for (const w of session.workspaces) {
       workspaces.add([session.name, w.workspace_id].join("\0"));
@@ -105,8 +110,8 @@ export function pruneItems(s: OpenItems, v: MachineView): OpenItems {
     }
   return dropItems(s, (i) =>
     i.kind === "agent"
-      ? i.ref.machine_id === v.id && !panes.has(paneKey(i.ref))
-      : i.ws.machine_id === v.id && !workspaces.has([i.ws.session, i.ws.workspace_id].join("\0")),
+      ? i.ref.machine_id === v.id && !unknown.has(i.ref.session) && !panes.has(paneKey(i.ref))
+      : i.ws.machine_id === v.id && !unknown.has(i.ws.session) && !workspaces.has([i.ws.session, i.ws.workspace_id].join("\0")),
   );
 }
 
