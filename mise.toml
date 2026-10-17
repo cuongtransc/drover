@@ -56,7 +56,7 @@ run = "pnpm tauri build --bundles app"
 # newer than the bundle: vite rewrites dist/ on every run, which alone recompiles the drover
 # crate (~40 s). A build input outside `sources` goes unnoticed; `mise run -f` forces a build.
 [tasks."build:local"]
-description = "Build the bundle without LTO (Drover.app under target/local)"
+description = "Build the bundle without LTO, about 3x faster than build"
 sources = [
   "src/**/*", "index.html", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**/*",
   "tsconfig.json", "tsconfig.node.json", "vite.config.ts", "mise.toml",
@@ -74,7 +74,7 @@ run = "open $APP"
 # Replaces any previous copy so files removed from the bundle don't linger, then signs it with
 # the `sign:setup` identity so macOS keeps its permission grants across installs.
 [tasks."app:install"]
-description = "Build without LTO (profile.local) and install it into /Applications"
+description = "Build without LTO and install Drover.app into /Applications"
 depends = ["build:local"]
 run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $LOCAL_APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
@@ -83,15 +83,17 @@ description = "Build the release bundle, as shipped, and install it into /Applic
 depends = ["build"]
 run = ['[ -d "$HOME/Library/Application Support/dev.cuongtransc.drover" ] || scripts/migrate-id.sh', "rm -rf /Applications/Drover.app", "ditto $APP /Applications/Drover.app", "scripts/sign-app.sh /Applications/Drover.app"]
 
+# Copies the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders.
 # Ad-hoc signed builds get a new identity each time, so macOS asks again for every permission.
 # Before the first Drover install: Drover's identifier starts with empty folders. app:install
 # runs it while Drover has no state yet, so a reinstall never does.
 [tasks."app:migrate-id"]
-description = "One-time: copy the old Herdr state (dev.cuongnb.herdrapp) to Drover's folders"
+description = "One-time: copy the old Herdr state to Drover's folders"
 run = "scripts/migrate-id.sh"
 
+# The identity app:install signs Drover.app with.
 [tasks."sign:setup"]
-description = "One-time: create the local signing identity app:install signs Drover.app with"
+description = "One-time: create the local identity that signs Drover.app"
 run = "scripts/sign-setup.sh"
 
 # Call it `mise run fmt`: bare `mise fmt` is mise's own mise.toml formatter.
@@ -125,11 +127,12 @@ run = "pnpm test"
 
 # Real mouse and key events in the installed Chrome (headless); not part of `ci`.
 [tasks."test:browser"]
-description = "Frontend tests that need a real browser (*.browser.test.tsx)"
+description = "Frontend tests that need a real browser"
 run = "pnpm vitest run --config vitest.browser.config.ts"
 
+# Redraws docs/design/ui-map.html and the README screenshots from the real App.
 [tasks."docs:ui-map"]
-description = "Redraw docs/design/ui-map.html and the README screenshots from the real App (after a UI change)"
+description = "Redraw the UI map and README screenshots after a UI change"
 run = [
   "pnpm vitest run --config vitest.uimap.config.ts",
   "node scripts/ui-map.mjs",
@@ -170,8 +173,9 @@ depends = ["test:frontend", "test:backend", "test:sign", "test:migrate", "test:c
 
 # fmt, clippy and cargo test, only when src-tauri/ differs from origin/main (scripts/rust-changed.sh):
 # two PRs in three leave the backend alone, and a fresh worktree compiled it for 13 minutes each time.
+# CI_RUST=1 forces it.
 [tasks."ci:backend"]
-description = "The backend part of ci, skipped when src-tauri/ is unchanged (CI_RUST=1 forces it)"
+description = "Backend part of ci; skipped when src-tauri/ is unchanged"
 run = "if scripts/rust-changed.sh; then mise run fmt:check ::: lint ::: test:backend; fi"
 
 # Starts isolated `drover-test-*` sessions on the local herdr and always
@@ -184,8 +188,9 @@ run = "cargo test -- --ignored --test-threads=1"
 # Read-only, runs on pre-commit (.githooks/pre-commit).
 # Warns, never fails: words the glossaries list under _Avoid_ in living docs and UI strings
 # (specs/plans under docs/superpowers and the ADRs are history and left out).
+# Patterns are in the body below.
 [tasks."lint:terms"]
-description = "Warn where docs or UI strings use a word CONTEXT.md avoids (Agent Dashboard, Project row, session orchestrator, Herdr)"
+description = "Warn where docs or UI strings use a word CONTEXT.md avoids"
 run = """
 hits=$(git ls-files '*.md' '*.tsx' | grep -v -e '^docs/superpowers/' -e '^docs/adr/' -e '^CONTEXT.md$' | grep -v -F '.test.' \\
   | xargs grep -n -E 'Agent Dashboard|Project row|[Ss]ession orchestrator|"Directory"|/path/to/project|\\bHerdr\\b' | grep -v 'named Herdr' || true)
